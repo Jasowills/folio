@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630">
+  <rect width="1200" height="630" fill="#1A1A1A"/>
+  <text x="600" y="280" text-anchor="middle" font-family="Georgia, 'Playfair Display', serif" font-size="72" font-weight="700" fill="#F9F6F1">Folio <tspan fill="#5DCAA5">&amp;</tspan></text>
+  <text x="600" y="350" text-anchor="middle" font-family="Inter, system-ui, sans-serif" font-size="24" fill="#5DCAA5">your career, fully told.</text>
+  <text x="1150" y="580" text-anchor="end" font-family="Georgia, 'Playfair Display', serif" font-size="400" font-weight="700" fill="#1A1A1A" opacity="0.08">&amp;</text>
+</svg>
