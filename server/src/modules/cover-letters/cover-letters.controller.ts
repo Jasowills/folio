@@ -8,7 +8,9 @@ import {
   UseGuards,
   HttpCode,
   HttpStatus,
+  Res,
 } from '@nestjs/common';
+import type { Response } from 'express';
 import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
@@ -23,27 +25,43 @@ export class CoverLettersController {
   constructor(private coverLettersService: CoverLettersService) {}
 
   @Post('generate')
-  @HttpCode(HttpStatus.CREATED)
-  @ApiOperation({ summary: 'Generate a cover letter with AI' })
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Generate a cover letter with AI (SSE streaming)' })
   async generate(
     @Body()
     body: {
       resumeId: string;
       jobTitle: string;
-      companyName: string;
+      company: string;
       jobDescription?: string;
       tone?: string;
     },
     @CurrentUser() user: UserDocument,
+    @Res() res: Response,
   ) {
-    return this.coverLettersService.generate(
-      user._id.toString(),
-      body.resumeId,
-      body.jobTitle,
-      body.companyName,
-      body.jobDescription,
-      body.tone,
-    );
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Connection', 'keep-alive');
+    res.setHeader('X-Accel-Buffering', 'no');
+
+    try {
+      await this.coverLettersService.generateStream(
+        user._id.toString(),
+        body.resumeId,
+        body.jobTitle,
+        body.company,
+        body.jobDescription,
+        body.tone || 'professional',
+        (chunk: string, done: boolean) => {
+          res.write(`data: ${JSON.stringify({ text: chunk, done })}\n\n`);
+          if (done) res.end();
+        },
+      );
+    } catch (err) {
+      const message = (err as Error)?.message || 'Generation failed';
+      res.write(`data: ${JSON.stringify({ error: message })}\n\n`);
+      res.end();
+    }
   }
 
   @Get()

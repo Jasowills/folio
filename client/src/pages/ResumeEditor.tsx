@@ -1,13 +1,20 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
-import { useResume, useRewriteBullet } from '../lib/queries'
+import { useQueryClient } from '@tanstack/react-query'
+import { useResume, useRewriteBullet, useUpdateResume, useAnalyzeResume } from '../lib/queries'
 import { Button } from '../components/ui/button'
 import { cn } from '../lib/utils'
+import { MultiPagePreview } from '../components/editor/MultiPagePreview'
 import TemplatePicker from '../components/TemplatePicker'
 import ColorPicker from '../components/ColorPicker'
+import PdfViewer from '../components/PdfViewer'
 import { TEMPLATES } from '../templates'
 import type { ResumeTemplate } from '../templates/types'
+import { MinimalTemplate } from './editor/MinimalTemplate'
+import { ModernTemplate } from './editor/ModernTemplate'
+import { ExecutiveTemplate } from './editor/ExecutiveTemplate'
+import type { LocalData, ResumeShim } from './editor/types'
 import {
   Save,
   Wand2,
@@ -23,30 +30,27 @@ import {
   RefreshCw,
   Edit3,
   Loader2,
+  FileText,
+  Layout,
+  Sparkles,
 } from 'lucide-react'
 
-type Tab = 'Summary' | 'Experience' | 'Education' | 'Skills' | 'Certifications' | 'Languages'
+type Tab = 'Summary' | 'Experience' | 'Education' | 'Skills' | 'Certifications' | 'Languages' | 'Links'
 
-const TABS: Tab[] = ['Summary', 'Experience', 'Education', 'Skills', 'Certifications', 'Languages']
+const TABS: Tab[] = ['Summary', 'Experience', 'Education', 'Skills', 'Certifications', 'Languages', 'Links']
 
 function getSectionKey(tab: Tab): string {
-  return tab === 'Certifications' ? 'certifications' : tab === 'Languages' ? 'languages' : tab.toLowerCase()
+  return tab === 'Certifications' ? 'certifications' : tab === 'Languages' ? 'languages' : tab === 'Links' ? 'links' : tab.toLowerCase()
 }
 
-function hasRedFlagsForSection(redFlags: Resume['redFlags'], tab: Tab): boolean {
+function hasRedFlagsForSection(redFlags: ResumeShim['redFlags'], tab: Tab): boolean {
   const key = getSectionKey(tab)
   return (redFlags || []).some((rf) => rf.section?.toLowerCase() === key)
 }
 
-function getRedFlagsForSection(redFlags: Resume['redFlags'], tab: Tab) {
+function getRedFlagsForSection(redFlags: ResumeShim['redFlags'], tab: Tab) {
   const key = getSectionKey(tab)
   return (redFlags || []).filter((rf) => rf.section?.toLowerCase() === key)
-}
-
-function hasBulletFlag(redFlags: Resume['redFlags'], text: string): boolean {
-  return (redFlags || []).some(
-    (rf) => rf.section?.toLowerCase() === 'experience' && text.length > 0 && rf.message.toLowerCase().includes(text.toLowerCase().slice(0, 20)),
-  )
 }
 
 function ResumeSectionSkeleton() {
@@ -122,343 +126,15 @@ function LoadingState() {
   )
 }
 
-interface Resume {
-  _id: string
-  title: string
-  name?: string
-  summary?: string
-  contact?: { email?: string; phone?: string; location?: string }
-  experience?: Array<{
-    company: string
-    title: string
-    startDate?: string
-    endDate?: string
-    current?: boolean
-    bullets: string[]
-  }>
-  education?: Array<{
-    institution: string
-    degree: string
-    field?: string
-  }>
-  skills?: string[]
-  certifications?: Array<{ name: string; issuer?: string }>
-  languages?: string[]
-  redFlags?: Array<{ message: string; severity: 'low' | 'medium' | 'high'; section: string }>
-  quality?: { overallQuality: number; strengths: string[]; issues: string[]; suggestions: string[] }
-}
-
-function MinimalTemplate({ resume, localData, primaryColor }: { resume: Resume; localData: LocalData; redFlags: Resume['redFlags']; primaryColor?: string }) {
-  const hasIssue = (text?: string) => text && (resume.redFlags || []).some((rf) => rf.message.includes(text || ''))
-  return (
-    <div className="font-sans text-[11px] leading-relaxed text-ink">
-      <div className="text-center mb-6">
-        <h1 className="font-display text-[22px] font-bold text-ink mb-1">
-          {localData.name || resume.name || 'Your Name'}
-        </h1>
-        <p className="text-[10px] text-muted">
-          {localData.contact?.email || resume.contact?.email || ''}
-          {localData.contact?.phone || resume.contact?.phone ? ` | ${localData.contact?.phone || resume.contact?.phone || ''}` : ''}
-          {localData.contact?.location || resume.contact?.location ? ` | ${localData.contact?.location || resume.contact?.location || ''}` : ''}
-        </p>
-      </div>
-
-      {(localData.summary || resume.summary) && (
-        <div className={cn('mb-5', hasIssue('summary') && 'border-l-2 border-amber pl-3 bg-amber/5')}>
-          <h2 className="font-display text-[13px] font-semibold text-ink uppercase tracking-wider mb-1.5">Summary</h2>
-          <p className="text-[11px] text-muted leading-relaxed">{localData.summary || resume.summary}</p>
-        </div>
-      )}
-
-      {(localData.experience && localData.experience.length > 0 ? localData.experience : resume.experience || []).length > 0 && (
-        <div className="mb-5">
-          <h2 className="font-display text-[13px] font-semibold text-ink uppercase tracking-wider mb-2">Experience</h2>
-          <div className="space-y-3">
-            {((localData.experience && localData.experience.length > 0 ? localData.experience : resume.experience || [])).map((exp, i) => (
-              <div key={i} className={cn(exp.bullets?.some((b: string) => hasBulletFlag(resume.redFlags, b)) && 'border-l-2 border-amber pl-3 bg-amber/5')}>
-                <div className="flex items-start justify-between mb-0.5">
-                  <div>
-                    <p className="text-[12px] font-semibold text-ink">{exp.title}</p>
-                    <p className="text-[10px] text-muted">{exp.company}</p>
-                  </div>
-                  <p className="text-[9px] text-muted whitespace-nowrap ml-2">
-                    {exp.startDate || ''}{exp.startDate && exp.endDate ? ' — ' : ''}{exp.current ? 'Present' : exp.endDate || ''}
-                  </p>
-                </div>
-                {exp.bullets && exp.bullets.length > 0 && (
-                  <ul className="mt-1 space-y-0.5">
-                    {exp.bullets.filter((b: any) => typeof b === 'string').map((b: string, j: number) => (
-                      <li key={j} className="flex items-start gap-1.5 text-[11px] text-muted">
-                        <span className="text-muted mt-0.5">•</span>
-                        <span>{b}</span>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {(localData.education && localData.education.length > 0 ? localData.education : resume.education || []).length > 0 && (
-        <div className="mb-5">
-          <h2 className="font-display text-[13px] font-semibold text-ink uppercase tracking-wider mb-2">Education</h2>
-          <div className="space-y-2">
-            {((localData.education && localData.education.length > 0 ? localData.education : resume.education || [])).map((edu, i) => (
-              <div key={i}>
-                <p className="text-[12px] font-semibold text-ink">{edu.institution}</p>
-                <p className="text-[10px] text-muted">{edu.degree}{edu.field ? ` — ${edu.field}` : ''}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {(localData.skills && localData.skills.length > 0 ? localData.skills : resume.skills || []).length > 0 && (
-        <div className="mb-5">
-          <h2 className="font-display text-[13px] font-semibold text-ink uppercase tracking-wider mb-1.5">Skills</h2>
-          <div className="flex flex-wrap gap-1">
-            {(localData.skills && localData.skills.length > 0 ? localData.skills : resume.skills || []).filter(Boolean).map((s, i) => (
-              <span key={i} className="text-[10px] bg-paper px-2 py-0.5 rounded text-muted">{s}</span>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {(localData.certifications && localData.certifications.length > 0 ? localData.certifications : resume.certifications || []).length > 0 && (
-        <div className="mb-5">
-          <h2 className="font-display text-[13px] font-semibold text-ink uppercase tracking-wider mb-1.5">Certifications</h2>
-          <div className="space-y-1">
-            {((localData.certifications && localData.certifications.length > 0 ? localData.certifications : resume.certifications || [])).map((c, i) => (
-              <p key={i} className="text-[11px]">
-                <span className="font-medium text-ink">{c.name}</span>
-                {c.issuer ? <span className="text-muted"> — {c.issuer}</span> : null}
-              </p>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {(localData.languages && localData.languages.length > 0 ? localData.languages : resume.languages || []).length > 0 && (
-        <div>
-          <h2 className="font-display text-[13px] font-semibold text-ink uppercase tracking-wider mb-1.5">Languages</h2>
-          <div className="flex flex-wrap gap-1.5">
-            {(localData.languages && localData.languages.length > 0 ? localData.languages : resume.languages || []).filter(Boolean).map((l, i) => (
-              <span key={i} className="text-[11px] text-muted">{l}</span>
-            ))}
-          </div>
-        </div>
-      )}
-    </div>
-  )
-}
-
-function ModernTemplate({ resume, localData, primaryColor }: { resume: Resume; localData: LocalData; redFlags: Resume['redFlags']; primaryColor?: string }) {
-  return (
-    <div className="flex text-[11px] leading-relaxed h-full">
-      <div className="w-[90px] min-h-full p-4 shrink-0" style={{ backgroundColor: primaryColor || '#0F6E56' }}>
-        <div className="text-center mb-4">
-          <div className="w-12 h-12 rounded-full bg-white/20 mx-auto mb-2" />
-          <h1 className="font-display text-[14px] font-bold text-white leading-tight">
-            {localData.name || resume.name || 'Your Name'}
-          </h1>
-        </div>
-        <div className="space-y-3 text-white/80 text-[9px]">
-          {localData.contact?.email || resume.contact?.email ? (
-            <p className="break-words">{localData.contact?.email || resume.contact?.email}</p>
-          ) : null}
-          {localData.contact?.phone || resume.contact?.phone ? (
-            <p>{localData.contact?.phone || resume.contact?.phone}</p>
-          ) : null}
-          {localData.contact?.location || resume.contact?.location ? (
-            <p>{localData.contact?.location || resume.contact?.location}</p>
-          ) : null}
-        </div>
-        {(localData.skills && localData.skills.length > 0 ? localData.skills : resume.skills || []).length > 0 && (
-          <div className="mt-4">
-            <h2 className="text-[9px] font-semibold uppercase tracking-wider text-white/60 mb-1.5">Skills</h2>
-            <div className="flex flex-wrap gap-1">
-              {(localData.skills && localData.skills.length > 0 ? localData.skills : resume.skills || []).filter(Boolean).map((s, i) => (
-                <span key={i} className="text-[8px] bg-white/10 px-1.5 py-0.5 rounded text-white/80">{s}</span>
-              ))}
-            </div>
-          </div>
-        )}
-      </div>
-      <div className="flex-1 p-5 space-y-4">
-        {(localData.summary || resume.summary) && (
-          <div>
-            <h2 className="font-display text-[12px] font-semibold uppercase tracking-wider mb-1" style={{ color: primaryColor || '#0F6E56' }}>Summary</h2>
-            <p className="text-[10px] text-muted leading-relaxed">{localData.summary || resume.summary}</p>
-          </div>
-        )}
-        {(localData.experience && localData.experience.length > 0 ? localData.experience : resume.experience || []).length > 0 && (
-          <div>
-            <h2 className="font-display text-[12px] font-semibold uppercase tracking-wider mb-2" style={{ color: primaryColor || '#0F6E56' }}>Experience</h2>
-            {((localData.experience && localData.experience.length > 0 ? localData.experience : resume.experience || [])).map((exp, i) => (
-              <div key={i} className="mb-2.5">
-                <div className="flex items-start justify-between">
-                  <div>
-                    <p className="text-[11px] font-semibold text-ink">{exp.title}</p>
-                    <p className="text-[9px] text-muted">{exp.company}</p>
-                  </div>
-                  <p className="text-[8px] text-muted whitespace-nowrap">
-                    {exp.startDate || ''}{exp.startDate && exp.endDate ? ' — ' : ''}{exp.current ? 'Present' : exp.endDate || ''}
-                  </p>
-                </div>
-                {exp.bullets && exp.bullets.length > 0 && (
-                  <ul className="mt-1 space-y-0.5">
-                    {exp.bullets.filter((b: any) => typeof b === 'string').map((b: string, j: number) => (
-                      <li key={j} className="flex items-start gap-1 text-[9px] text-muted">
-                        <span className="mt-0.5">•</span>
-                        <span>{b}</span>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </div>
-            ))}
-          </div>
-        )}
-        {(localData.education && localData.education.length > 0 ? localData.education : resume.education || []).length > 0 && (
-          <div>
-            <h2 className="font-display text-[12px] font-semibold uppercase tracking-wider mb-1.5" style={{ color: primaryColor || '#0F6E56' }}>Education</h2>
-            {((localData.education && localData.education.length > 0 ? localData.education : resume.education || [])).map((edu, i) => (
-              <div key={i}>
-                <p className="text-[11px] font-semibold text-ink">{edu.institution}</p>
-                <p className="text-[9px] text-muted">{edu.degree}{edu.field ? ` — ${edu.field}` : ''}</p>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-    </div>
-  )
-}
-
-function ExecutiveTemplate({ resume, localData, primaryColor }: { resume: Resume; localData: LocalData; redFlags: Resume['redFlags']; primaryColor?: string }) {
-  return (
-    <div className="font-serif text-[11px] leading-relaxed">
-      <div className="bg-ink text-white text-center py-6 px-8 -mx-10 -mt-10 mb-6">
-        <h1 className="font-serif text-[24px] font-bold tracking-wide mb-1">
-          {localData.name || resume.name || 'Your Name'}
-        </h1>
-        <p className="text-[10px] text-white/70">
-          {localData.contact?.email || resume.contact?.email || ''}
-          {localData.contact?.phone || resume.contact?.phone ? ` | ${localData.contact?.phone || resume.contact?.phone || ''}` : ''}
-          {localData.contact?.location || resume.contact?.location ? ` | ${localData.contact?.location || resume.contact?.location || ''}` : ''}
-        </p>
-      </div>
-
-      {(localData.summary || resume.summary) && (
-        <div className="mb-5">
-          <h2 className="font-serif text-[14px] font-bold text-ink uppercase tracking-wider mb-1.5 border-b border-border pb-1">Summary</h2>
-          <p className="text-[11px] text-muted leading-relaxed mt-2">{localData.summary || resume.summary}</p>
-        </div>
-      )}
-
-      {(localData.experience && localData.experience.length > 0 ? localData.experience : resume.experience || []).length > 0 && (
-        <div className="mb-5">
-          <h2 className="font-serif text-[14px] font-bold text-ink uppercase tracking-wider mb-2 border-b border-border pb-1">Professional Experience</h2>
-          {((localData.experience && localData.experience.length > 0 ? localData.experience : resume.experience || [])).map((exp, i) => (
-            <div key={i} className="mt-3">
-              <div className="flex items-start justify-between">
-                <div>
-                  <p className="text-[12px] font-bold text-ink">{exp.title}</p>
-                  <p className="text-[10px] text-muted italic">{exp.company}</p>
-                </div>
-                <p className="text-[9px] text-muted whitespace-nowrap">
-                  {exp.startDate || ''}{exp.startDate && exp.endDate ? ' — ' : ''}{exp.current ? 'Present' : exp.endDate || ''}
-                </p>
-              </div>
-              {exp.bullets && exp.bullets.length > 0 && (
-                <ul className="mt-1.5 space-y-0.5">
-                  {exp.bullets.filter((b: any) => typeof b === 'string').map((b: string, j: number) => (
-                    <li key={j} className="flex items-start gap-1.5 text-[11px] text-muted">
-                      <span className="text-ink mt-0.5">—</span>
-                      <span>{b}</span>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </div>
-          ))}
-        </div>
-      )}
-
-      {(localData.education && localData.education.length > 0 ? localData.education : resume.education || []).length > 0 && (
-        <div className="mb-5">
-          <h2 className="font-serif text-[14px] font-bold text-ink uppercase tracking-wider mb-2 border-b border-border pb-1">Education</h2>
-          {((localData.education && localData.education.length > 0 ? localData.education : resume.education || [])).map((edu, i) => (
-            <div key={i} className="mt-2">
-              <p className="text-[12px] font-bold text-ink">{edu.institution}</p>
-              <p className="text-[10px] text-muted">{edu.degree}{edu.field ? ` — ${edu.field}` : ''}</p>
-            </div>
-          ))}
-        </div>
-      )}
-
-      <div className="grid grid-cols-2 gap-4 mt-4">
-        {(localData.skills && localData.skills.length > 0 ? localData.skills : resume.skills || []).length > 0 && (
-          <div>
-            <h2 className="font-serif text-[12px] font-bold text-ink uppercase tracking-wider mb-1.5">Skills</h2>
-            <div className="flex flex-wrap gap-1">
-              {(localData.skills && localData.skills.length > 0 ? localData.skills : resume.skills || []).filter(Boolean).map((s, i) => (
-                <span key={i} className="text-[10px] bg-paper px-1.5 py-0.5 rounded text-muted">{s}</span>
-              ))}
-            </div>
-          </div>
-        )}
-        {(localData.certifications && localData.certifications.length > 0 ? localData.certifications : resume.certifications || []).length > 0 && (
-          <div>
-            <h2 className="font-serif text-[12px] font-bold text-ink uppercase tracking-wider mb-1.5">Certifications</h2>
-            {((localData.certifications && localData.certifications.length > 0 ? localData.certifications : resume.certifications || [])).map((c, i) => (
-              <p key={i} className="text-[10px] text-muted">{c.name}{c.issuer ? ` — ${c.issuer}` : ''}</p>
-            ))}
-          </div>
-        )}
-      </div>
-
-      {(localData.languages && localData.languages.length > 0 ? localData.languages : resume.languages || []).length > 0 && (
-        <div className="mt-4">
-          <h2 className="font-serif text-[12px] font-bold text-ink uppercase tracking-wider mb-1.5">Languages</h2>
-          <p className="text-[11px] text-muted">
-            {(localData.languages && localData.languages.length > 0 ? localData.languages : resume.languages || []).filter(Boolean).join('  ·  ')}
-          </p>
-        </div>
-      )}
-    </div>
-  )
-}
-
-interface LocalData {
-  title: string
-  name: string
-  summary: string
-  contact: { email: string; phone: string; location: string }
-  experience: Array<{
-    company: string
-    title: string
-    startDate: string
-    endDate: string
-    current: boolean
-    bullets: string[]
-  }>
-  education: Array<{
-    institution: string
-    degree: string
-    field: string
-  }>
-  skills: string[]
-  certifications: Array<{ name: string; issuer: string }>
-  languages: string[]
-}
-
-function makeLocalData(resume?: Resume): LocalData {
+function makeLocalData(resume?: ResumeShim): LocalData {
+  let name = resume?.name || ''
+  if (!name && resume?.rawText) {
+    const firstLine = resume.rawText.split('\n').find(l => l.trim().length > 0)
+    if (firstLine) name = firstLine.trim().slice(0, 64)
+  }
   return {
     title: resume?.title || '',
-    name: resume?.name || '',
+    name,
     summary: resume?.summary || '',
     contact: {
       email: resume?.contact?.email || '',
@@ -484,12 +160,18 @@ function makeLocalData(resume?: Resume): LocalData {
       issuer: c.issuer || '',
     })),
     languages: resume?.languages || [],
+    links: (resume?.links || []).map((l) => ({
+      title: l.title || '',
+      url: l.url || '',
+    })),
   }
 }
 
 export default function ResumeEditor() {
   const { id } = useParams<{ id: string }>()
   const { data: resume, isLoading } = useResume(id!)
+  const queryClient = useQueryClient()
+  const analyzeResume = useAnalyzeResume()
   const [activeTab, setActiveTab] = useState<Tab>('Summary')
   const [saved, setSaved] = useState(true)
   const [template, setTemplate] = useState<ResumeTemplate>(TEMPLATES[0])
@@ -501,11 +183,19 @@ export default function ResumeEditor() {
   const [aiRewrites, setAiRewrites] = useState<string[]>([])
   const [aiRewritesLoading, setAiRewritesLoading] = useState(false)
   const rewriteBullet = useRewriteBullet()
+  const updateResume = useUpdateResume()
   const [mobilePanel, setMobilePanel] = useState<'edit' | 'preview'>('edit')
   const [localData, setLocalData] = useState<LocalData>(makeLocalData())
+  const saveAttemptRef = useRef(0)
+  const [previewMode, setPreviewMode] = useState<'template' | 'original'>('template')
+  const [analyzing, setAnalyzing] = useState(false)
+  const analysisTriggeredRef = useRef(false)
+  const autoSwitchedRef = useRef(false)
 
   const localRef = useRef(localData)
   localRef.current = localData
+
+  const hasStructuredData = !!(localData.summary || localData.experience?.some(e => e.company || e.title) || localData.education?.some(e => e.institution))
 
   useEffect(() => {
     if (resume) {
@@ -514,17 +204,74 @@ export default function ResumeEditor() {
     }
   }, [resume])
 
+  // Auto-default to original PDF view when resume has no structured data
+  useEffect(() => {
+    if (resume?.fileUrl && !hasStructuredData && !autoSwitchedRef.current) {
+      setPreviewMode('original')
+    }
+  }, [resume, hasStructuredData])
+
+  // Auto-analyze when resume has raw text but no structured data yet
+  useEffect(() => {
+    if (resume?.rawText && !hasStructuredData && !analysisTriggeredRef.current && !analyzing && id) {
+      analysisTriggeredRef.current = true
+      setAnalyzing(true)
+      analyzeResume.mutateAsync(id).then(() => {
+        queryClient.invalidateQueries({ queryKey: ['resume', id] })
+      }).catch(() => {}).finally(() => {
+        setAnalyzing(false)
+      })
+    }
+  }, [resume, hasStructuredData, id, analyzeResume, queryClient])
+
+  // Auto-switch to template preview when structured data arrives
+  useEffect(() => {
+    if (hasStructuredData && previewMode === 'original' && !autoSwitchedRef.current) {
+      autoSwitchedRef.current = true
+      setPreviewMode('template')
+    }
+  }, [hasStructuredData, previewMode])
+
   const redFlags: Array<{ message: string; severity: 'low' | 'medium' | 'high'; section?: string }> = resume?.redFlags || []
   const sectionRedFlags = getRedFlagsForSection(redFlags, activeTab)
 
   useEffect(() => {
-    if (!saved) {
-      const timer = setTimeout(() => {
-        setSaved(true)
+    if (!saved && id) {
+      const attempt = ++saveAttemptRef.current
+      const timer = setTimeout(async () => {
+        const data: Record<string, unknown> = {
+          title: localData.title,
+          name: localData.name,
+          summary: localData.summary,
+          contact: localData.contact,
+          experience: localData.experience,
+          education: localData.education,
+          skills: localData.skills,
+          certifications: localData.certifications,
+          languages: localData.languages,
+          links: localData.links,
+        }
+        try {
+          await updateResume.mutateAsync({ id, data })
+          if (saveAttemptRef.current === attempt) setSaved(true)
+        } catch {
+          if (saveAttemptRef.current === attempt) setSaved(false)
+        }
       }, 1500)
       return () => clearTimeout(timer)
     }
-  }, [localData, saved])
+  }, [localData, saved, id, updateResume])
+
+  useEffect(() => {
+    function handleBeforeUnload(e: BeforeUnloadEvent) {
+      if (!saved) {
+        e.preventDefault()
+        e.returnValue = ''
+      }
+    }
+    window.addEventListener('beforeunload', handleBeforeUnload)
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload)
+  }, [saved])
 
   function updateLocal<K extends keyof LocalData>(key: K, value: LocalData[K]) {
     setLocalData((prev) => ({ ...prev, [key]: value }))
@@ -639,6 +386,31 @@ export default function ResumeEditor() {
     setSaved(false)
   }
 
+  function addLink() {
+    setLocalData((prev) => ({
+      ...prev,
+      links: [...prev.links, { title: '', url: '' }],
+    }))
+    setSaved(false)
+  }
+
+  function updateLink(index: number, field: string, value: string) {
+    setLocalData((prev) => {
+      const links = [...prev.links]
+      links[index] = { ...links[index], [field]: value }
+      return { ...prev, links }
+    })
+    setSaved(false)
+  }
+
+  function removeLink(index: number) {
+    setLocalData((prev) => ({
+      ...prev,
+      links: prev.links.filter((_, i) => i !== index),
+    }))
+    setSaved(false)
+  }
+
   function removeLanguage(index: number) {
     setLocalData((prev) => ({
       ...prev,
@@ -694,58 +466,68 @@ export default function ResumeEditor() {
   }
 
   const previewData = localData
-
-  function renderPreview() {
-    const commonProps = { resume: resume || { _id: id || '', title: '' }, localData: previewData, redFlags, primaryColor: colorTheme }
-    switch (template.id) {
-      case 'executive':
-        return <ExecutiveTemplate {...commonProps} />
-      case 'modern':
-        return <ModernTemplate {...commonProps} />
-      default:
-        return <MinimalTemplate {...commonProps} />
-    }
-  }
+  const canShowOriginal = resume?.fileUrl || resume?.rawText
 
   if (isLoading) return <LoadingState />
 
   return (
     <div className="flex flex-col h-screen bg-paper">
-      <header className="h-14 bg-surface border-b border-border flex items-center justify-between px-6 shrink-0">
-        <div className="min-w-0">
-          <nav className="text-[11px] text-muted flex items-center gap-1.5">
-            <Link to="/resumes" className="hover:text-ink transition-colors">Resumes</Link>
-            <span className="text-muted-light">/</span>
-            <span className="text-ink truncate">{resume?.title || 'Untitled'}</span>
-          </nav>
-          <h1 className="font-display text-[16px] text-ink leading-tight mt-0.5 truncate">Resume Editor</h1>
-        </div>
-        <div className="flex items-center gap-2 shrink-0">
-          <div className="flex items-center gap-1.5 mr-2">
-            {saved ? (
-              <>
-                <CheckCircle className="h-3 w-3 text-success" />
-                <span className="text-[11px] text-success font-medium">Saved</span>
-              </>
-            ) : (
-              <>
-                <RefreshCw className="h-3 w-3 text-muted animate-spin" />
-                <span className="text-[11px] text-muted">Saving...</span>
-              </>
-            )}
+        <header className="h-14 bg-surface border-b border-border flex items-center justify-between px-3 sm:px-6 shrink-0">
+        <div className="flex items-center gap-3 min-w-0">
+          <Link
+            to="/resumes"
+            className="p-1.5 rounded-lg text-muted hover:text-ink hover:bg-paper-dark transition-colors shrink-0 cursor-pointer"
+            title="Back to resumes"
+          >
+            <ChevronLeft className="h-4 w-4" />
+          </Link>
+          <div className="min-w-0">
+            <nav className="text-[11px] text-muted flex items-center gap-1.5">
+              <Link to="/resumes" className="hover:text-ink transition-colors">Resumes</Link>
+              <span className="text-muted-light">/</span>
+              <span className="text-ink truncate">{resume?.title || 'Untitled'}</span>
+            </nav>
+            <h1 className="font-display text-[16px] text-ink leading-tight mt-0.5 truncate">Resume Editor</h1>
           </div>
-          <Link to={`/resume/${id}/review`}>
-            <Button variant="ghost" size="sm">Review</Button>
-          </Link>
-          <Link to="/ats">
-            <Button variant="ghost" size="sm">ATS Check</Button>
-          </Link>
-          <Link to={`/export/${id}`}>
-            <Button variant="primary" size="sm">
-              <Download className="h-3.5 w-3.5 mr-1" />
-              Export
-            </Button>
-          </Link>
+        </div>
+          <div className="flex items-center gap-2 shrink-0">
+            {analyzing && (
+              <div className="flex items-center gap-1.5 mr-2">
+                <Sparkles className="h-3 w-3 text-teal animate-pulse" />
+                <span className="text-[11px] text-teal font-medium hidden sm:inline">Analyzing...</span>
+              </div>
+            )}
+            <div className="flex items-center gap-1.5 mr-2">
+              {saved ? (
+                <>
+                  <CheckCircle className="h-3 w-3 text-success" />
+                  <span className="text-[11px] text-success font-medium hidden sm:inline">Saved</span>
+                </>
+              ) : (
+                <>
+                  <RefreshCw className="h-3 w-3 text-muted animate-spin" />
+                  <span className="text-[11px] text-muted hidden sm:inline">Saving...</span>
+                </>
+              )}
+            </div>
+            <Link to={`/resume/${id}/review`}>
+              <Button variant="ghost" size="sm">
+                <span className="hidden sm:inline">Review</span>
+                <span className="sm:hidden"><Eye className="h-4 w-4" /></span>
+              </Button>
+            </Link>
+            <Link to="/ats">
+              <Button variant="ghost" size="sm">
+                <span className="hidden sm:inline">ATS Check</span>
+                <span className="sm:hidden"><AlertTriangle className="h-4 w-4" /></span>
+              </Button>
+            </Link>
+            <Link to={`/export/${id}`}>
+              <Button variant="primary" size="sm">
+                <Download className="h-3.5 w-3.5 mr-1 sm:mr-1" />
+                <span className="hidden sm:inline">Export</span>
+              </Button>
+            </Link>
         </div>
       </header>
 
@@ -774,7 +556,7 @@ export default function ResumeEditor() {
 
       <div className="flex-1 flex overflow-hidden">
         <div className={cn(
-          'w-[380px] shrink-0 border-r border-border/50 flex flex-col bg-surface',
+          'w-full lg:w-[380px] shrink-0 border-r border-border/50 flex flex-col bg-surface min-w-0 overflow-hidden',
           mobilePanel === 'preview' && 'hidden lg:flex',
         )}>
           <div className="bg-paper border-b border-border px-4 py-3">
@@ -814,28 +596,28 @@ export default function ResumeEditor() {
 
           <div className="flex-1 overflow-y-auto">
             {activeTab === 'Summary' && (
-              <div className="p-5 space-y-4">
-                <div>
-                  <label className="label-uppercase text-muted block mb-1.5">Professional Summary</label>
+              <div className="flex flex-col h-full">
+                <div className="flex-[1_1_50%] min-h-0 p-5 flex flex-col">
+                  <label className="label-uppercase text-muted block mb-2 shrink-0">Professional Summary</label>
                   <textarea
-                    className="input-editorial resize-none min-h-[120px]"
+                    className="input-editorial resize-none flex-1 min-h-0"
                     placeholder="Write a brief summary of your professional background..."
                     value={localData.summary}
                     onChange={(e) => updateLocal('summary', e.target.value)}
                   />
                 </div>
-                <div>
-                  <label className="label-uppercase text-muted block mb-1.5">Name</label>
-                  <input
-                    className="input-editorial"
-                    placeholder="Your full name"
-                    value={localData.name}
-                    onChange={(e) => updateLocal('name', e.target.value)}
-                  />
-                </div>
-                <div className="grid grid-cols-3 gap-3">
+                <div className="flex-[1_1_50%] min-h-0 p-5 flex flex-col gap-4 overflow-y-auto">
                   <div>
-                    <label className="label-uppercase text-muted block mb-1">Email</label>
+                    <label className="label-uppercase text-muted block mb-1.5">Name</label>
+                    <input
+                      className="input-editorial"
+                      placeholder="Your full name"
+                      value={localData.name}
+                      onChange={(e) => updateLocal('name', e.target.value)}
+                    />
+                  </div>
+                  <div>
+                    <label className="label-uppercase text-muted block mb-1.5">Email</label>
                     <input
                       className="input-editorial"
                       type="email"
@@ -845,7 +627,7 @@ export default function ResumeEditor() {
                     />
                   </div>
                   <div>
-                    <label className="label-uppercase text-muted block mb-1">Phone</label>
+                    <label className="label-uppercase text-muted block mb-1.5">Phone</label>
                     <input
                       className="input-editorial"
                       type="tel"
@@ -855,7 +637,7 @@ export default function ResumeEditor() {
                     />
                   </div>
                   <div>
-                    <label className="label-uppercase text-muted block mb-1">Location</label>
+                    <label className="label-uppercase text-muted block mb-1.5">Location</label>
                     <input
                       className="input-editorial"
                       placeholder="City, State"
@@ -909,7 +691,7 @@ export default function ResumeEditor() {
                             className="overflow-hidden"
                           >
                             <div className="px-4 pb-4 space-y-3 border-t border-border pt-3">
-                              <div className="grid grid-cols-2 gap-3">
+                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                                 <div>
                                   <label className="label-uppercase text-muted block mb-1">Company</label>
                                   <input
@@ -1027,7 +809,7 @@ export default function ResumeEditor() {
                         onChange={(e) => updateEducation(i, 'institution', e.target.value)}
                       />
                     </div>
-                    <div className="grid grid-cols-2 gap-3">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                       <div>
                         <label className="label-uppercase text-muted block mb-1">Degree</label>
                         <input
@@ -1121,6 +903,49 @@ export default function ResumeEditor() {
               </div>
             )}
 
+            {activeTab === 'Links' && (
+              <div className="p-4 space-y-3">
+                {localData.links.map((link, i) => (
+                  <div key={i} className="rounded-lg border border-border bg-paper p-4 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <p className="text-xs font-medium text-muted">Link {i + 1}</p>
+                      <button
+                        onClick={() => removeLink(i)}
+                        className="p-1 text-muted hover:text-danger transition-colors cursor-pointer"
+                      >
+                        <X className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+                    <div>
+                      <label className="label-uppercase text-muted block mb-1">Title</label>
+                      <input
+                        className="w-full bg-transparent border-0 border-b border-border py-1.5 text-[14px] text-ink placeholder:text-muted/50 focus:outline-none focus:border-teal transition-colors"
+                        placeholder="e.g. Portfolio, GitHub, LinkedIn"
+                        value={link.title}
+                        onChange={(e) => updateLink(i, 'title', e.target.value)}
+                      />
+                    </div>
+                    <div>
+                      <label className="label-uppercase text-muted block mb-1">URL</label>
+                      <input
+                        className="w-full bg-transparent border-0 border-b border-border py-1.5 text-[14px] text-ink placeholder:text-muted/50 focus:outline-none focus:border-teal transition-colors"
+                        placeholder="https://"
+                        value={link.url}
+                        onChange={(e) => updateLink(i, 'url', e.target.value)}
+                      />
+                    </div>
+                  </div>
+                ))}
+                <button
+                  onClick={addLink}
+                  className="w-full py-2.5 border border-dashed border-border rounded-lg text-[12px] text-muted hover:text-teal hover:border-teal/40 transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
+                >
+                  <Plus className="h-3.5 w-3.5" />
+                  Add link
+                </button>
+              </div>
+            )}
+
             {activeTab === 'Languages' && (
               <div className="p-4 space-y-3">
                 {localData.languages.map((lang, i) => (
@@ -1152,11 +977,18 @@ export default function ResumeEditor() {
           </div>
 
           <div className="sticky bottom-0 bg-surface border-t border-border px-4 py-3 flex items-center gap-2">
-            <Button variant="ghost" size="sm" className="flex-1">
-              <Eye className="h-3.5 w-3.5 mr-1" />
-              AI Review
-            </Button>
-            <Button variant="primary" size="sm" className="flex-1">
+            <Link to={`/resume/${id}/review`} className="flex-1">
+              <Button variant="ghost" size="sm" className="w-full cursor-pointer">
+                <Eye className="h-3.5 w-3.5 mr-1" />
+                AI Review
+              </Button>
+            </Link>
+            <Button
+              variant="primary"
+              size="sm"
+              className="flex-1 cursor-pointer"
+              onClick={() => setAiDrawerOpen(true)}
+            >
               <Wand2 className="h-3.5 w-3.5 mr-1" />
               Rewrite all
             </Button>
@@ -1206,38 +1038,78 @@ export default function ResumeEditor() {
           'flex-1 flex flex-col min-w-0',
           mobilePanel === 'edit' && 'hidden lg:flex',
         )}>
-          <div className="bg-surface border-b border-border px-5 py-2.5 shrink-0 flex items-center justify-between gap-4">
-            <div className="flex items-center gap-3 min-w-0">
+          <div className="bg-surface border-b border-border px-3 sm:px-5 py-2.5 shrink-0 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="min-w-0 flex-1 flex flex-col gap-2">
               <TemplatePicker selected={template.id} onChange={setTemplate} />
-              <span className="h-4 w-px bg-border" />
-              <div className="flex items-center gap-2">
-                <p className="text-[11px] font-medium text-muted shrink-0">Color</p>
-                <ColorPicker selected={colorTheme} onChange={setColorTheme} />
+              <div className="flex items-center gap-0.5 bg-paper border border-border rounded-lg p-0.5 self-start">
+                <button
+                  onClick={() => setZoom((z) => Math.max(0.5, z - 0.1))}
+                  className="p-1 rounded text-muted hover:text-ink hover:bg-white transition-colors cursor-pointer"
+                >
+                  <ZoomOut className="h-3 w-3" />
+                </button>
+                <span className="text-[11px] text-muted w-7 text-center tabular-nums">{Math.round(zoom * 100)}%</span>
+                <button
+                  onClick={() => setZoom((z) => Math.min(2, z + 0.1))}
+                  className="p-1 rounded text-muted hover:text-ink hover:bg-white transition-colors cursor-pointer"
+                >
+                  <ZoomIn className="h-3 w-3" />
+                </button>
               </div>
             </div>
-            <div className="flex items-center gap-1 shrink-0">
-              <button
-                onClick={() => setZoom((z) => Math.max(0.5, z - 0.1))}
-                className="p-1.5 rounded text-muted hover:text-ink hover:bg-paper-dark transition-colors cursor-pointer"
-              >
-                <ZoomOut className="h-3.5 w-3.5" />
-              </button>
-              <span className="text-[11px] text-muted w-8 text-center tabular-nums">{Math.round(zoom * 100)}%</span>
-              <button
-                onClick={() => setZoom((z) => Math.min(2, z + 0.1))}
-                className="p-1.5 rounded text-muted hover:text-ink hover:bg-paper-dark transition-colors cursor-pointer"
-              >
-                <ZoomIn className="h-3.5 w-3.5" />
-              </button>
+            <div className="flex  px-8 flex-row items-center gap-4 shrink-0">
+              <ColorPicker selected={colorTheme} onChange={setColorTheme} />
+              <span className="h-5 w-px bg-border" />
+              <div className="flex items-center gap-0.5 bg-paper border border-border rounded-lg p-0.5">
+                <button
+                  onClick={() => setPreviewMode('template')}
+                  className={cn(
+                    'flex items-center gap-1 px-2 py-1 rounded text-[11px] font-medium transition-colors cursor-pointer whitespace-nowrap',
+                    previewMode === 'template' ? 'text-teal bg-white shadow-sm' : 'text-muted hover:text-ink',
+                  )}
+                >
+                  <Layout className="h-3.5 w-3.5" />
+                  <span>Template</span>
+                </button>
+                {canShowOriginal && (
+                  <button
+                    onClick={() => setPreviewMode('original')}
+                    className={cn(
+                      'flex items-center gap-1 px-2 py-1 rounded text-[11px] font-medium transition-colors cursor-pointer whitespace-nowrap',
+                      previewMode === 'original' ? 'text-teal bg-white shadow-sm' : 'text-muted hover:text-ink',
+                    )}
+                  >
+                    <FileText className="h-3.5 w-3.5" />
+                    <span>Original</span>
+                  </button>
+                )}
+              </div>
             </div>
           </div>
-          <div className="flex-1 bg-paper/50 overflow-y-auto flex justify-center p-8">
-            <div
-              className="w-[210mm] min-h-[297mm] bg-white shadow-lg rounded-sm p-10 transition-all duration-200"
-              style={{ transform: `scale(${zoom})`, transformOrigin: 'top center' }}
-            >
-              {renderPreview()}
-            </div>
+          <div className="flex-1 bg-paper/50 overflow-y-auto overflow-x-hidden flex justify-center p-2 sm:p-4 lg:p-8">
+            {previewMode === 'original' && resume?.fileUrl ? (
+              <div className="w-full max-w-[210mm]">
+                <PdfViewer fileUrl={resume.fileUrl} className="w-full" />
+              </div>
+            ) : previewMode === 'original' && resume?.rawText ? (
+              <div className="w-full max-w-[210mm] bg-white shadow-lg rounded-sm p-6 sm:p-8 lg:p-10">
+                <pre className="text-[11px] text-ink leading-relaxed whitespace-pre-wrap font-sans">{resume.rawText}</pre>
+              </div>
+            ) : (
+              <MultiPagePreview zoom={zoom} singlePage={template.id === 'modern'} contentKey={template.id + '-' + (resume?._id || '')}>
+                {({ showSections, pageIndex }) => {
+                  const commonProps = { resume: resume || { _id: id || '', title: '' }, localData: previewData, redFlags, primaryColor: colorTheme, showSections, pageIndex }
+                  switch (template.id) {
+                    case 'executive':
+                      return <ExecutiveTemplate {...commonProps} />
+                    case 'modern':
+                      return <ModernTemplate {...commonProps} />
+                    default:
+                      return <MinimalTemplate {...commonProps} />
+                  }
+                }}
+              </MultiPagePreview>
+            )}
           </div>
         </div>
       </div>

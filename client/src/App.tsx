@@ -1,5 +1,5 @@
-import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom'
-import { useEffect, useState, useRef, Component } from 'react'
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
+import { useEffect, Component } from 'react'
 import { useAuth } from './hooks/useAuth'
 import AppShell from './components/layout/AppShell'
 import Home from './pages/Home'
@@ -57,39 +57,6 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
   return <AppShell>{children}</AppShell>
 }
 
-function RouteTransition({ children }: { children: React.ReactNode }) {
-  const location = useLocation()
-  const [transitioning, setTransitioning] = useState(false)
-  const pathnameRef = useRef(location.pathname)
-
-  if (location.pathname !== pathnameRef.current && !transitioning) {
-    pathnameRef.current = location.pathname
-    setTransitioning(true)
-  }
-
-  useEffect(() => {
-    if (transitioning) {
-      const timer = setTimeout(() => setTransitioning(false), 400)
-      return () => clearTimeout(timer)
-    }
-  }, [transitioning])
-
-  if (transitioning) {
-    return (
-      <div className="fixed inset-0 z-50 flex items-center justify-center bg-paper">
-        <span
-          className="font-display text-teal text-4xl"
-          style={{ animation: 'blink 1.5s ease-in-out infinite' }}
-        >
-          &amp;
-        </span>
-      </div>
-    )
-  }
-
-  return <>{children}</>
-}
-
 function AppRoutes() {
   const { fetchUser } = useAuth()
 
@@ -99,25 +66,23 @@ function AppRoutes() {
 
   return (
     <ErrorBoundary>
-      <RouteTransition>
-        <Routes>
-          <Route path="/" element={<Home />} />
-          <Route path="/review/:token" element={<GuestReview />} />
-          <Route path="/login" element={<Login />} />
-          <Route path="/signup" element={<Signup />} />
-          <Route path="/auth/callback" element={<AuthCallback />} />
-          <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
-          <Route path="/resumes" element={<ProtectedRoute><ResumeBuilder /></ProtectedRoute>} />
-          <Route path="/resume/:id" element={<ProtectedRoute><ResumeEditor /></ProtectedRoute>} />
-          <Route path="/resume/:id/review" element={<ProtectedRoute><ResumeReview /></ProtectedRoute>} />
-          <Route path="/ats" element={<ProtectedRoute><AtsScorer /></ProtectedRoute>} />
-          <Route path="/cover-letters" element={<ProtectedRoute><CoverLetter /></ProtectedRoute>} />
-          <Route path="/cover-letter/new" element={<ProtectedRoute><CoverLetter /></ProtectedRoute>} />
-          <Route path="/portfolio" element={<ProtectedRoute><PortfolioAnalysis /></ProtectedRoute>} />
-          <Route path="/export/:resumeId" element={<ProtectedRoute><ExportResume /></ProtectedRoute>} />
-          <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
-      </RouteTransition>
+      <Routes>
+        <Route path="/" element={<Home />} />
+        <Route path="/review/:token" element={<GuestReview />} />
+        <Route path="/login" element={<Login />} />
+        <Route path="/signup" element={<Signup />} />
+        <Route path="/auth/callback" element={<AuthCallback />} />
+        <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+        <Route path="/resumes" element={<ProtectedRoute><ResumeBuilder /></ProtectedRoute>} />
+        <Route path="/resume/:id" element={<ProtectedRoute><ResumeEditor /></ProtectedRoute>} />
+        <Route path="/resume/:id/review" element={<ProtectedRoute><ResumeReview /></ProtectedRoute>} />
+        <Route path="/ats" element={<ProtectedRoute><AtsScorer /></ProtectedRoute>} />
+        <Route path="/cover-letters" element={<ProtectedRoute><CoverLetter /></ProtectedRoute>} />
+        <Route path="/cover-letter/new" element={<ProtectedRoute><CoverLetter /></ProtectedRoute>} />
+        <Route path="/portfolio" element={<ProtectedRoute><PortfolioAnalysis /></ProtectedRoute>} />
+        <Route path="/export/:resumeId" element={<ProtectedRoute><ExportResume /></ProtectedRoute>} />
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
     </ErrorBoundary>
   )
 }

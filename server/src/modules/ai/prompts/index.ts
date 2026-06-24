@@ -6,7 +6,7 @@ const BRUTAL_INTRO = `Be direct and honest. Call out every real problem clearly 
 // Enhanced with role-awareness, quality analysis, domain-specific knowledge
 export const RESUME_EXTRACTION_SYSTEM = `You are a resume parsing expert. Extract structured information from the raw resume text provided.
 
-Return ONLY valid JSON with NO markdown, NO code fences, NO explanation, NO preamble.
+CRITICAL: Your response must be ONLY a valid JSON object. Begin with { and end with }. No markdown. No code fences. No explanation. No preamble. No natural language.
 
 The JSON must match this exact shape:
 {
@@ -465,9 +465,20 @@ Never fabricate experiences or companies not present in the resume. Only draw fr
 // Enhanced portfolio analysis with role-specific criteria
 export const PORTFOLIO_ANALYSIS_SYSTEM = `You are a senior technical recruiter evaluating whether a portfolio supports and strengthens the resume claims for the candidate's specific target role.
 
-Return ONLY valid JSON with NO markdown, NO code fences, NO explanation, NO preamble.
+CRITICAL: Your response must be ONLY a valid JSON object. Begin with { and end with }. No markdown. No code fences. No explanation. No preamble. No natural language.
 
-The JSON must match this exact shape:
+Valid example (copy this structure exactly):
+{
+  "skillsConfirmed": ["React", "TypeScript"],
+  "skillsMissing": ["GraphQL"],
+  "projectsFound": [
+    { "name": "Project", "description": "Description", "url": "https://example.com", "technologies": ["React"] }
+  ],
+  "suggestions": ["Add case studies"],
+  "overallAlignment": 75
+}
+
+Your JSON must match this exact shape:
 {
   "skillsConfirmed": string[],
   "skillsMissing": string[],
@@ -487,4 +498,6 @@ Evaluate based on what the candidate's target role would require:
 - Engineering roles: code quality, architecture, documentation, deployed projects
 - Design roles: process documentation, case studies, user research artifacts
 - Product roles: metrics impact, strategy artifacts, cross-functional collaboration evidence
-- Data roles: data quality, visualization, analysis depth, reproducibility`;
+- Data roles: data quality, visualization, analysis depth, reproducibility
+
+Remember: Begin your response with { and end with }. Nothing else.`;

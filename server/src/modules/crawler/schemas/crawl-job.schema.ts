@@ -11,6 +11,9 @@ export class CrawlJob {
   @Prop({ required: true })
   url!: string;
 
+  @Prop({ type: Types.ObjectId, ref: 'Resume' })
+  resumeId?: Types.ObjectId;
+
   @Prop({ default: 'pending', enum: ['pending', 'running', 'completed', 'failed'] })
   status!: string;
 

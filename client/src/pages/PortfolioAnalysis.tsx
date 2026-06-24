@@ -1,8 +1,9 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useResumes, useAnalyzePortfolio, usePortfolioStatus, useStats } from '../lib/queries'
 import { ScoreRing } from '../components/ScoreRing'
 import { Button } from '../components/ui/button'
+import { Select } from '../components/ui/select'
 import { CheckCircle2, AlertTriangle, ExternalLink } from 'lucide-react'
 
 const statusLabels: Record<string, string> = {
@@ -45,9 +46,10 @@ export default function PortfolioAnalysis() {
   const [portfolioUrl, setPortfolioUrl] = useState('')
   const [analysisId, setAnalysisId] = useState<string | null>(null)
 
-  const { data: result } = usePortfolioStatus(analysisId)
+  const { data: result, error: statusError, isLoading: statusLoading } = usePortfolioStatus(analysisId)
 
   const [animatedScore, setAnimatedScore] = useState(0)
+  const animFrameRef = useRef<number>()
 
   const isComplete = result?.status === 'completed'
   const isFailed = result?.status === 'failed'
@@ -55,21 +57,50 @@ export default function PortfolioAnalysis() {
   const currentIdx = statusOrder.indexOf(status)
   const hasPastAnalyses = (stats?.portfolioAnalyses ?? 0) > 0
 
+  console.log('[Portfolio] Render state:', {
+    analysisId,
+    resultStatus: result?.status,
+    statusError: statusError ? ((statusError as any)?.message || String(statusError)) : null,
+    statusLoading,
+    isComplete,
+    isFailed,
+  })
+
   useEffect(() => {
     if (isComplete) {
-      const t = setTimeout(() => setAnimatedScore(result!.overallScore), 80)
-      return () => clearTimeout(t)
+      const target = result!.overallScore
+      const duration = 800
+      const start = performance.now()
+      function tick(now: number) {
+        const elapsed = now - start
+        const progress = Math.min(elapsed / duration, 1)
+        const eased = 1 - Math.pow(1 - progress, 3)
+        setAnimatedScore(Math.round(eased * target))
+        if (progress < 1) animFrameRef.current = requestAnimationFrame(tick)
+      }
+      animFrameRef.current = requestAnimationFrame(tick)
+      return () => { if (animFrameRef.current) cancelAnimationFrame(animFrameRef.current) }
     }
     setAnimatedScore(0)
   }, [isComplete, result?.overallScore])
 
   const handleAnalyze = async () => {
-    if (!resumeId || !portfolioUrl) return
-    const res = await analyze.mutateAsync({ resumeId, portfolioUrl })
-    setAnalysisId(res.analysisId)
+    if (!resumeId || !portfolioUrl) {
+      console.log('[Portfolio] handleAnalyze: missing resumeId or portfolioUrl', { resumeId, portfolioUrl })
+      return
+    }
+    console.log('[Portfolio] Starting analysis', { resumeId, portfolioUrl })
+    try {
+      const res = await analyze.mutateAsync({ resumeId, portfolioUrl })
+      console.log('[Portfolio] Analysis created', res)
+      setAnalysisId(res.analysisId)
+    } catch (err) {
+      console.error('[Portfolio] Analysis failed:', err)
+    }
   }
 
   const handleReset = () => {
+    console.log('[Portfolio] Resetting analysis')
     setAnalysisId(null)
     setPortfolioUrl('')
     setResumeId('')
@@ -107,18 +138,15 @@ export default function PortfolioAnalysis() {
                 <label className="label-uppercase text-muted block mb-1.5">
                   Select resume
                 </label>
-                <select
+                <Select
                   value={resumeId}
-                  onChange={(e) => setResumeId(e.target.value)}
-                  className="input-field"
-                >
-                  <option value="">Choose a resume...</option>
-                  {resumes?.map((r) => (
-                    <option key={r._id} value={r._id}>
-                      {r.title}
-                    </option>
-                  ))}
-                </select>
+                  onChange={setResumeId}
+                  options={[
+                    { value: '', label: 'Choose a resume...' },
+                    ...(resumes?.map((r) => ({ value: r._id, label: r.title })) || []),
+                  ]}
+                  placeholder="Choose a resume..."
+                />
               </div>
 
               <div>
@@ -145,7 +173,7 @@ export default function PortfolioAnalysis() {
               </div>
 
               <p className="text-xs text-muted text-center">
-                This takes about a minute. We'll notify you when it's done.
+                This takes about a minute. Stay on this page while we run the analysis.
               </p>
             </div>
           </motion.div>
@@ -367,7 +395,7 @@ export default function PortfolioAnalysis() {
               </div>
 
               <p className="text-sm text-white/40">
-                This takes 30–60 seconds. You can navigate away — we'll notify you when it's done.
+                This takes 30–60 seconds. Stay on this page while we run the analysis.
               </p>
             </div>
           </motion.div>

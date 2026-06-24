@@ -15,7 +15,7 @@ export class CoverLetter {
   jobTitle!: string;
 
   @Prop({ required: true })
-  companyName!: string;
+  company!: string;
 
   @Prop()
   jobDescription?: string;

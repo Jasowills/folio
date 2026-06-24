@@ -23,7 +23,9 @@ import type { UserDocument } from '../users/schemas/user.schema';
 @ApiTags('Auth')
 @Controller('auth')
 export class AuthController {
-  constructor(private authService: AuthService) {}
+  constructor(private authService: AuthService) {
+    (OAuth2Client as any).CLOCK_SKEW_SECS_ = 600;
+  }
 
   @ApiOperation({ summary: 'Get Google OAuth client ID' })
   @Get('google-client-id')
@@ -134,9 +136,14 @@ export class AuthController {
 
   private async verifyGoogleToken(credential: string) {
     try {
+      const clientId = process.env.GOOGLE_CLIENT_ID;
+      console.log('[auth] verifyGoogleToken', {
+        clientId,
+        credentialLength: credential?.length,
+      });
       const ticket = await this.googleClient.verifyIdToken({
         idToken: credential,
-        audience: process.env.GOOGLE_CLIENT_ID,
+        audience: clientId,
       });
       const payload = ticket.getPayload();
       if (!payload || !payload.email) {
@@ -148,7 +155,8 @@ export class AuthController {
         googleId: payload.sub,
         avatar: payload.picture || '',
       };
-    } catch (err) {
+    } catch (err: any) {
+      console.error('[auth] verifyGoogleToken error:', err.message, err.stack);
       throw new UnauthorizedException('Invalid Google credential');
     }
   }

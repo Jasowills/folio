@@ -80,7 +80,7 @@ export class AiService {
 
   private get maxTokens(): number {
     const val = Number(process.env.OPENROUTER_MAX_TOKENS);
-    return Number.isFinite(val) && val >= 0 ? val : 4096;
+    return Number.isFinite(val) && val >= 0 ? val : 1024;
   }
 
   private get apiKey(): string {
@@ -324,7 +324,9 @@ export class AiService {
       try {
         const parsed = JSON.parse(str);
         if (typeof parsed === 'object' && parsed !== null) return parsed;
-      } catch {}
+      } catch (e) {
+        this.logger.debug(`parseJson: JSON.parse failed — ${(e as Error).message.slice(0, 80)}`);
+      }
       return null;
     };
 

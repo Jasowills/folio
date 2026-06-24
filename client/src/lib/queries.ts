@@ -81,6 +81,7 @@ export interface Resume {
   skills?: string[]
   certifications?: ResumeCertification[]
   languages?: string[]
+  links?: Array<{ title: string; url: string }>
   score?: number
   updatedAt: string
   createdAt: string
@@ -121,7 +122,8 @@ export function useAnalyzeResume() {
       const { data } = await api.post(`/resumes/${id}/analyze`)
       return data.data || data
     },
-    onSuccess: () => {
+    onSettled: (_data, _err, id) => {
+      qc.invalidateQueries({ queryKey: ['resume', id] })
       qc.invalidateQueries({ queryKey: ['resumes'] })
       qc.invalidateQueries({ queryKey: ['stats'] })
     },
@@ -162,6 +164,20 @@ export function useResume(id: string) {
       return (data.data || data) as Resume
     },
     enabled: !!id,
+  })
+}
+
+export function useUpdateResume() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async ({ id, data }: { id: string; data: Record<string, unknown> }) => {
+      const res = await api.put(`/resumes/${id}`, data)
+      return (res.data.data || res.data) as Resume
+    },
+    onSuccess: (_, { id }) => {
+      qc.invalidateQueries({ queryKey: ['resume', id] })
+      qc.invalidateQueries({ queryKey: ['resumes'] })
+    },
   })
 }
 

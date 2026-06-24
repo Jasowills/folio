@@ -4,6 +4,7 @@ import { Resume, ResumeSchema } from './schemas/resume.schema';
 import { GuestResult, GuestResultSchema } from './schemas/guest-result.schema';
 import { ResumesController } from './resumes.controller';
 import { ResumesService } from './resumes.service';
+import { ResumeParserService } from './resume-parser.service';
 import { AiModule } from '../ai/ai.module';
 
 @Module({
@@ -15,7 +16,7 @@ import { AiModule } from '../ai/ai.module';
     AiModule,
   ],
   controllers: [ResumesController],
-  providers: [ResumesService],
+  providers: [ResumesService, ResumeParserService],
   exports: [ResumesService],
 })
 export class ResumesModule {}

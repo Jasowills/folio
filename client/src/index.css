@@ -265,17 +265,24 @@
     border-radius: var(--radius-md);
     background: var(--color-paper);
     border: 1px solid var(--color-border);
+    overflow-x: auto;
+    flex-wrap: nowrap;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+  .pill-group::-webkit-scrollbar {
+    display: none;
   }
 
   .pill {
-    flex: 1;
+    flex: 0 0 auto;
     padding: 0.375rem 0.75rem;
     border-radius: var(--radius-sm);
     font-size: var(--text-xs);
     font-weight: 500;
     transition: all 0.15s ease;
     cursor: pointer;
-    text-align: center;
+    white-space: nowrap;
   }
   .pill-active {
     background: var(--color-surface);

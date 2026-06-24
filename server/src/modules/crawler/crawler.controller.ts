@@ -31,13 +31,17 @@ export class CrawlerController {
   @ApiOperation({ summary: 'Start portfolio analysis' })
   async analyze(
     @Body('portfolioUrl') portfolioUrl: string,
+    @Body('resumeId') resumeId: string,
     @CurrentUser() user: UserDocument,
   ) {
+    console.log('[Crawler] analyze called', { userId: user._id.toString(), portfolioUrl, resumeId });
     if (!portfolioUrl) throw new BadRequestException('Portfolio URL is required');
     const analysisId = await this.crawlerService.startAnalysis(
       user._id.toString(),
       portfolioUrl,
+      resumeId,
     );
+    console.log('[Crawler] analysis created', { analysisId });
     return { analysisId, status: 'pending' };
   }
 

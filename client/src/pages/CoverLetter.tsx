@@ -1,18 +1,17 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useAuth } from '../hooks/useAuth'
-import { useResumes, useGenerateCoverLetter, useCoverLetters } from '../lib/queries'
+import { useResumes, useCoverLetters } from '../lib/queries'
 import { Button } from '../components/ui/button'
-import { Wand2, FileText, Copy, RefreshCw, FileDown, Save, ChevronRight, X } from 'lucide-react'
+import { Select } from '../components/ui/select'
+import { Wand2, FileText, Copy, RefreshCw, FileDown, ChevronRight, X } from 'lucide-react'
 
 const tones = ['Professional', 'Confident', 'Creative']
 
 export default function CoverLetter() {
   const { user } = useAuth()
   const { data: resumes } = useResumes()
-  const { data: coverLetters } = useCoverLetters()
-  const generateLetter = useGenerateCoverLetter()
-
+  const { data: coverLetters, isLoading: lettersLoading } = useCoverLetters()
   const [resumeId, setResumeId] = useState('')
   const [jobTitle, setJobTitle] = useState('')
   const [company, setCompany] = useState('')
@@ -25,46 +24,74 @@ export default function CoverLetter() {
   const [showLetters, setShowLetters] = useState(false)
 
   const editorRef = useRef<HTMLDivElement>(null)
-  const streamRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const abortRef = useRef<AbortController | null>(null)
 
   const handleGenerate = useCallback(async () => {
     if (!resumeId || !jobTitle || !company) return
     setGenerated(null)
     setDisplayedContent('')
-    setIsStreaming(false)
+    setIsStreaming(true)
+
+    abortRef.current?.abort()
+    abortRef.current = new AbortController()
+
     try {
-      const result = await generateLetter.mutateAsync({
-        resumeId,
-        jobTitle,
-        company,
-        jobDescription,
-        tone: tone.toLowerCase(),
+      const token = localStorage.getItem('accessToken')
+      const res = await fetch('/api/cover-letters/generate', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({
+          resumeId,
+          jobTitle,
+          company,
+          jobDescription: jobDescription || undefined,
+          tone: tone.toLowerCase(),
+        }),
+        signal: abortRef.current.signal,
       })
-      if (result?.content) {
-        setGenerated(result.content)
-        setIsStreaming(true)
-        let i = 0
-        const content = result.content
-        const streamChar = () => {
-          if (i < content.length) {
-            setDisplayedContent(content.slice(0, i + 1))
-            i++
-            streamRef.current = setTimeout(streamChar, 15 + Math.random() * 20)
-          } else {
-            setDisplayedContent(content)
-            setIsStreaming(false)
+
+      if (!res.ok || !res.body) throw new Error('Generation failed')
+
+      const reader = res.body.getReader()
+      const decoder = new TextDecoder()
+      let content = ''
+
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+        const chunk = decoder.decode(value, { stream: true })
+        const lines = chunk.split('\n').filter((l) => l.startsWith('data: '))
+        for (const line of lines) {
+          const json = line.slice(6).trim()
+          if (!json) continue
+          try {
+            const parsed = JSON.parse(json)
+            if (parsed.error) throw new Error(parsed.error)
+            if (parsed.text) {
+              content += parsed.text
+              setDisplayedContent(content)
+            }
+            if (parsed.done) {
+              setGenerated(content)
+              setDisplayedContent(content)
+              setIsStreaming(false)
+            }
+          } catch {
+            // skip
           }
         }
-        streamChar()
       }
     } catch {
       setIsStreaming(false)
     }
-  }, [resumeId, jobTitle, company, jobDescription, tone, generateLetter])
+  }, [resumeId, jobTitle, company, jobDescription, tone])
 
   useEffect(() => {
     return () => {
-      if (streamRef.current) clearTimeout(streamRef.current)
+      abortRef.current?.abort()
     }
   }, [])
 
@@ -118,18 +145,15 @@ export default function CoverLetter() {
                 <label className="label-uppercase text-muted block mb-1.5">
                   Select resume
                 </label>
-                <select
+                <Select
                   value={resumeId}
-                  onChange={(e) => setResumeId(e.target.value)}
-                  className="input-field"
-                >
-                  <option value="">Choose a resume...</option>
-                  {resumes?.map((r) => (
-                    <option key={r._id} value={r._id}>
-                      {r.title}
-                    </option>
-                  ))}
-                </select>
+                  onChange={setResumeId}
+                  options={[
+                    { value: '', label: 'Choose a resume...' },
+                    ...(resumes?.map((r) => ({ value: r._id, label: r.title })) || []),
+                  ]}
+                  placeholder="Choose a resume..."
+                />
               </div>
 
               <div>
@@ -189,10 +213,10 @@ export default function CoverLetter() {
                 variant="primary"
                 size="lg"
                 onClick={handleGenerate}
-                disabled={!resumeId || !jobTitle || !company || generateLetter.isPending}
+                disabled={!resumeId || !jobTitle || !company || isStreaming}
                 className="w-full"
               >
-                {generateLetter.isPending ? (
+                {isStreaming ? (
                   <span className="font-display text-lg animate-pulse">&amp;</span>
                 ) : (
                   <>
@@ -206,7 +230,7 @@ export default function CoverLetter() {
 
           {/* Right Panel — Document */}
           <div className="flex-1 flex flex-col min-h-0">
-            {!generated && !generateLetter.isPending && !isStreaming ? (
+            {!displayedContent && !isStreaming ? (
               <div className="flex-1 flex items-center justify-center">
                 <div className="text-center">
                   <FileText className="h-12 w-12 text-border mx-auto mb-4" />
@@ -216,13 +240,6 @@ export default function CoverLetter() {
                   <p className="text-xs text-muted mt-1">
                     Fill in the form and click generate.
                   </p>
-                </div>
-              </div>
-            ) : generateLetter.isPending && !isStreaming ? (
-              <div className="flex-1 flex items-center justify-center">
-                <div className="flex flex-col items-center gap-3">
-                  <span className="font-display text-teal text-3xl animate-pulse">&amp;</span>
-                  <p className="text-sm text-muted">Writing your cover letter...</p>
                 </div>
               </div>
             ) : (
@@ -277,18 +294,11 @@ export default function CoverLetter() {
                     Regenerate
                   </button>
                   <button
-                    onClick={() => {}}
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs text-muted hover:text-ink hover:bg-paper rounded-lg transition-colors"
+                    onClick={() => window.print()}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs text-muted hover:text-ink hover:bg-paper rounded-lg transition-colors cursor-pointer"
                   >
                     <FileDown className="h-3.5 w-3.5" />
                     Export PDF
-                  </button>
-                  <button
-                    onClick={() => {}}
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs text-muted hover:text-ink hover:bg-paper rounded-lg transition-colors"
-                  >
-                    <Save className="h-3.5 w-3.5" />
-                    Save to Drive
                   </button>
                 </div>
               </>
@@ -326,7 +336,11 @@ export default function CoverLetter() {
                 </button>
               </div>
               <div className="flex-1 overflow-y-auto p-5">
-                {!coverLetters || coverLetters.length === 0 ? (
+                {lettersLoading ? (
+                  <div className="flex items-center justify-center py-20">
+                    <span className="font-display text-teal text-2xl animate-pulse">&amp;</span>
+                  </div>
+                ) : !coverLetters || coverLetters.length === 0 ? (
                   <div className="flex flex-col items-center justify-center py-20 text-center">
                     <div className="empty-state-icon">&amp;</div>
                     <p className="text-sm text-muted">No cover letters yet.</p>

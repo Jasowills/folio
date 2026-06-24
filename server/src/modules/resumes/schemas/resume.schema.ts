@@ -97,6 +97,9 @@ export class Resume {
   @Prop({ type: [String] })
   languages?: string[];
 
+  @Prop({ type: [{ type: Object }] })
+  links?: Array<{ title: string; url: string }>;
+
   @Prop()
   fileUrl?: string;
 

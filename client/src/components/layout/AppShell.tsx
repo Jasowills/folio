@@ -16,6 +16,8 @@ import {
   CreditCard,
   HelpCircle,
   LogOut,
+  Menu,
+  X,
 } from 'lucide-react'
 import { useAuth } from '../../hooks/useAuth'
 import { useResumes } from '../../lib/queries'
@@ -45,6 +47,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   const navigate = useNavigate()
   const { data: resumes } = useResumes()
   const [menuOpen, setMenuOpen] = useState(false)
+  const [mobileNavOpen, setMobileNavOpen] = useState(false)
 
   if (loading) return null
 
@@ -63,22 +66,44 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   const resumeCount = resumes?.length ?? 0
 
   return (
-    <div className="flex min-h-screen bg-paper">
-      <aside className="w-[220px] min-w-[220px] bg-surface border-r border-border flex flex-col fixed top-0 left-0 bottom-0 z-10">
-        <div className="flex items-center gap-2.5 px-5 h-14 border-b border-border shrink-0">
-          <span className="font-display text-teal text-xl font-bold">&amp;</span>
-          <span className="font-display text-ink text-base font-bold tracking-tight">
-            Folio
-          </span>
+    <div className="flex min-h-screen bg-paper w-full overflow-x-hidden">
+      {/* Mobile menu overlay */}
+      {mobileNavOpen && (
+        <div
+          className="fixed inset-0 z-40 bg-black/30 lg:hidden"
+          onClick={() => setMobileNavOpen(false)}
+        />
+      )}
+
+      {/* Sidebar */}
+      <aside className={cn(
+        'w-[220px] min-w-[220px] bg-surface border-r border-border flex flex-col fixed top-0 left-0 bottom-0 z-50 transition-transform duration-200',
+        'lg:translate-x-0',
+        mobileNavOpen ? 'translate-x-0' : '-translate-x-full',
+      )}>
+        <div className="flex items-center justify-between gap-2.5 px-5 h-14 border-b border-border shrink-0">
+          <div className="flex items-center gap-2.5">
+            <span className="font-display text-teal text-xl font-bold">&amp;</span>
+            <span className="font-display text-ink text-base font-bold tracking-tight">
+              Folio
+            </span>
+          </div>
+          <button
+            onClick={() => setMobileNavOpen(false)}
+            className="lg:hidden p-1 text-muted hover:text-ink transition-colors cursor-pointer"
+          >
+            <X className="h-4 w-4" />
+          </button>
         </div>
 
         <nav className="flex-1 flex flex-col gap-0.5 px-3 py-3 overflow-y-auto">
-       
+
           {mainNavItems.map((item) => (
             <NavLink
               key={item.to}
               to={item.to}
               end={item.to === '/dashboard'}
+              onClick={() => setMobileNavOpen(false)}
               className={({ isActive }) =>
                 cn(
                   'flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-all duration-150 group relative',
@@ -90,9 +115,6 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
             >
               {({ isActive }) => (
                 <>
-                  {/* {isActive && (
-                    <span className="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-5 bg-teal rounded-full" />
-                  )} */}
                   <item.icon className={cn('h-4 w-4 shrink-0', isActive ? 'text-teal' : 'text-muted group-hover:text-ink transition-colors')} />
                   <span className="flex-1">{item.label}</span>
                   {item.badge && resumeCount > 0 && (
@@ -122,6 +144,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
             return (
               <NavLink
                 to={`/export/${exportId}`}
+                onClick={() => setMobileNavOpen(false)}
                 className={({ isActive }) =>
                   cn(
                     'flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-all duration-150 group relative',
@@ -237,7 +260,14 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
         </div>
       </aside>
 
-      <main className="flex-1 ml-[220px] flex flex-col min-h-screen relative z-[1]">
+      <main className="flex-1 lg:ml-[220px] flex flex-col min-h-screen min-w-0 max-w-full relative z-[1]">
+        {/* Mobile hamburger */}
+        <button
+          onClick={() => setMobileNavOpen(true)}
+          className="lg:hidden fixed top-3 left-3 z-30 p-2 rounded-lg bg-surface border border-border shadow-sm text-muted hover:text-ink transition-colors cursor-pointer"
+        >
+          <Menu className="h-5 w-5" />
+        </button>
         {children}
       </main>
     </div>

@@ -4,8 +4,8 @@ import { Model } from 'mongoose';
 import { Resume, ResumeDocument } from './schemas/resume.schema';
 import { GuestResult, GuestResultDocument } from './schemas/guest-result.schema';
 import { AiService } from '../ai/ai.service';
+import { ResumeParserService } from './resume-parser.service';
 import {
-  RESUME_EXTRACTION_SYSTEM,
   RED_FLAG_SYSTEM,
   ROLE_DETECTION_SYSTEM,
   RESUME_QUALITY_SYSTEM,
@@ -22,6 +22,7 @@ export class ResumesService {
     @InjectModel(Resume.name) private resumeModel: Model<ResumeDocument>,
     @InjectModel(GuestResult.name) private guestResultModel: Model<GuestResultDocument>,
     private aiService: AiService,
+    private resumeParser: ResumeParserService,
   ) {}
 
   async setGuestResult(token: string, data: Record<string, unknown>): Promise<void> {
@@ -76,12 +77,7 @@ export class ResumesService {
     fileUrl?: string,
     cloudinaryPublicId?: string,
   ): Promise<ResumeDocument> {
-    const existing = await this.resumeModel
-      .findOne({ userId })
-      .sort({ updatedAt: -1 })
-      .exec();
-
-    const resume = existing || (await this.create(userId));
+    const resume = await this.create(userId);
     resume.rawText = rawText;
     if (fileUrl) resume.fileUrl = fileUrl;
     if (cloudinaryPublicId) resume.cloudinaryPublicId = cloudinaryPublicId;
@@ -95,18 +91,26 @@ export class ResumesService {
   ): Promise<ResumeDocument> {
     const resume = await this.findById(id, userId);
     const rawText = resume.rawText || '';
-    const todayStr = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
-    const structured = await this.aiService.chat(
-      RESUME_EXTRACTION_SYSTEM,
-      `Today is ${todayStr}. Extract resume data from this text:\n\n${rawText.slice(0, 10000)}`,
-    );
 
-    resume.set(structured);
+    const parsed = this.resumeParser.parse(rawText);
+    this.logger.log(`analyzeResume: parsed name="${parsed.name}", exp=${parsed.experience.length}, edu=${parsed.education.length}, skills=${parsed.skills.length}`);
+
+    resume.set({
+      name: parsed.name,
+      contact: parsed.contact,
+      summary: parsed.summary,
+      experience: parsed.experience,
+      education: parsed.education,
+      skills: parsed.skills,
+      certifications: parsed.certifications,
+      languages: parsed.languages,
+      links: parsed.links,
+    });
     this.normalizeContactUrls(resume as any);
     await this.runAnalysis(resume, rawText);
     await this.saveVersion(resume);
 
-    return resume.save();
+    return this.resumeModel.findByIdAndUpdate(id, resume.toJSON(), { new: true }).exec() as unknown as Promise<ResumeDocument>;
   }
 
   async analyzeWithProgress(
@@ -119,20 +123,26 @@ export class ResumesService {
     if (!rawText) throw new BadRequestException('No extracted text to analyze');
 
     onProgress('extracting', 'Extracting resume data...');
-    const todayStr = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
-    const structured = await this.aiService.chat(
-      RESUME_EXTRACTION_SYSTEM,
-      `Today is ${todayStr}. Extract resume data from this text:\n\n${rawText.slice(0, 10000)}`,
-    );
+    const parsed = this.resumeParser.parse(rawText);
+    this.logger.log(`analyzeWithProgress: parsed name="${parsed.name}", exp=${parsed.experience.length}, edu=${parsed.education.length}, skills=${parsed.skills.length}`);
 
-    resume.set(structured);
-    this.normalizeContactUrls(resume as any);
+    resume.set({
+      name: parsed.name,
+      contact: parsed.contact,
+      summary: parsed.summary,
+      experience: parsed.experience,
+      education: parsed.education,
+      skills: parsed.skills,
+      certifications: parsed.certifications,
+      languages: parsed.languages,
+      links: parsed.links,
+    });
     onProgress('extracting_complete', 'Resume data extracted');
 
     await this.runAnalysis(resume, rawText, onProgress);
     await this.saveVersion(resume);
 
-    await resume.save();
+    await this.resumeModel.findByIdAndUpdate(id, resume.toJSON(), { new: true }).exec();
     return resume;
   }
 
@@ -143,43 +153,20 @@ export class ResumesService {
   ): Promise<Record<string, unknown>> {
     this.logger.log(`guestExtractFromText: rawText length = ${rawText.length}, first 200 chars: "${rawText.slice(0, 200).replace(/\n/g, '\\n')}"`);
 
-    const todayStr = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
-    const TODAY = `Today is ${todayStr}.`;
-    const structured = await this.aiService.chat(
-      RESUME_EXTRACTION_SYSTEM,
-      `${TODAY} Extract resume data from this text:\n\n${rawText.slice(0, 10000)}`,
-    ).catch(() => ({}));
-    this.logger.log(`guestExtractFromText: structured data keys = ${Object.keys(structured).join(', ')}`);
+    const parsed = this.resumeParser.parse(rawText);
+    this.logger.log(`guestExtractFromText: parsed name="${parsed.name}", exp=${parsed.experience.length}, edu=${parsed.education.length}, skills=${parsed.skills.length}`);
 
-    // Reject uploads that aren't actually resumes (receipts, articles, reports, random PDFs)
-    const s = structured as any;
-    if (s?.isResume === false) {
+    if (!parsed.isResume) {
       throw new BadRequestException('The uploaded file does not appear to be a resume. Please upload a resume, CV, or professional profile.');
     }
-    // Guard: even if AI says isResume=true, reject if no actual resume content was extracted
-    if (s?.isResume !== false) {
-      const hasResumeContent = (
-        (Array.isArray(s?.experience) && s.experience.length > 0) ||
-        (Array.isArray(s?.education) && s.education.length > 0) ||
-        (Array.isArray(s?.skills) && s.skills.length > 0) ||
-        (Array.isArray(s?.certifications) && s.certifications.length > 0) ||
-        (typeof s?.summary === 'string' && s.summary.length > 10)
-      );
-      if (!hasResumeContent) {
-        this.logger.log(`guestExtractFromText: AI said isResume=true but no resume content extracted — rejecting`);
-        throw new BadRequestException('The uploaded file does not appear to be a resume. Please upload a resume, CV, or professional profile.');
-      }
-    }
 
-    this.normalizeContactUrls(structured as any);
+    const todayStr = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+    const TODAY = `Today is ${todayStr}.`;
+    const structured = parsed as unknown as Record<string, unknown>;
 
-    // Log what contact info was extracted
-    const contact = (structured as any)?.contact || {};
-    this.logger.log(`guestExtractFromText: contact extracted — email=${!!contact.email}, phone=${!!contact.phone}, linkedin=${contact.linkedin || 'null'}, website=${contact.website || 'null'}, github=${contact.github || 'null'}`);
-    // Log whether raw text contains link labels
+    this.logger.log(`guestExtractFromText: contact extracted — email=${!!parsed.contact.email}, phone=${!!parsed.contact.phone}, linkedin=${parsed.contact.linkedin || 'null'}, website=${parsed.contact.website || 'null'}, github=${parsed.contact.github || 'null'}`);
     this.logger.log(`guestExtractFromText: raw text mentions — linkedin=${/\blinkedin\b/i.test(rawText)}, github=${/\bgithub\b/i.test(rawText)}, portfolio=${/\bportfolio\b/i.test(rawText)}`);
 
-    // Build a context note about link labels found in raw text but not extractable as URLs
     const linkNote = this.buildLinkContextNote(rawText);
 
     const stagger = (ms: number) => new Promise((r) => setTimeout(r, ms));

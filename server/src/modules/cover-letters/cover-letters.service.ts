@@ -34,13 +34,66 @@ export class CoverLettersService {
     userId: string,
     resumeId: string,
     jobTitle: string,
-    companyName: string,
+    company: string,
     jobDescription?: string,
     tone: string = 'professional',
   ): Promise<CoverLetterDocument> {
+    const { content } = await this.buildPromptAndStream(
+      userId, resumeId, jobTitle, company, jobDescription, tone,
+    );
+
+    const letter = await this.coverLetterModel.create({
+      userId,
+      resumeId,
+      jobTitle,
+      company,
+      jobDescription,
+      tone,
+      content,
+    });
+
+    return letter;
+  }
+
+  async generateStream(
+    userId: string,
+    resumeId: string,
+    jobTitle: string,
+    company: string,
+    jobDescription: string | undefined,
+    tone: string,
+    onChunk: (chunk: string, done: boolean) => void,
+  ): Promise<void> {
+    const { content } = await this.buildPromptAndStream(
+      userId, resumeId, jobTitle, company, jobDescription, tone,
+      (token) => onChunk(token, false),
+    );
+
+    await this.coverLetterModel.create({
+      userId,
+      resumeId,
+      jobTitle,
+      company,
+      jobDescription,
+      tone,
+      content,
+    });
+
+    onChunk(content, true);
+  }
+
+  private async buildPromptAndStream(
+    userId: string,
+    resumeId: string,
+    jobTitle: string,
+    company: string,
+    jobDescription?: string,
+    tone: string = 'professional',
+    onToken?: (token: string) => void,
+  ): Promise<{ content: string }> {
     const resume = await this.resumesService.findById(resumeId, userId);
 
-    const userPrompt = `Write a ${tone} cover letter for a ${jobTitle} role at ${companyName}.
+    const userPrompt = `Write a ${tone} cover letter for a ${jobTitle} role at ${company}.
 
 Resume:
 ${JSON.stringify(resume.toJSON())}
@@ -66,24 +119,18 @@ ${jobDescription ? `Job Description:\n${jobDescription}` : ''}`;
         if (json === '[DONE]') break;
         try {
           const parsed = JSON.parse(json);
-          content += parsed.choices?.[0]?.delta?.content || '';
+          const token = parsed.choices?.[0]?.delta?.content || '';
+          if (token) {
+            content += token;
+            onToken?.(token);
+          }
         } catch {
           // skip partial lines
         }
       }
     }
 
-    const letter = await this.coverLetterModel.create({
-      userId,
-      resumeId,
-      jobTitle,
-      companyName,
-      jobDescription,
-      tone,
-      content,
-    });
-
-    return letter;
+    return { content };
   }
 
   async delete(id: string, userId: string): Promise<void> {

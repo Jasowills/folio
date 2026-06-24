@@ -397,4 +397,9 @@ export const COLOR_THEMES: ResumeColorTheme[] = [
   { id: 'sky', name: 'Sky', primary: '#0284C7' },
   { id: 'purple', name: 'Purple', primary: '#7C3AED' },
   { id: 'graphite', name: 'Graphite', primary: '#334155' },
+  { id: 'wine', name: 'Wine', primary: '#831843' },
+  { id: 'forest', name: 'Forest', primary: '#166534' },
+  { id: 'coral', name: 'Coral', primary: '#BE123C' },
+  { id: 'violet', name: 'Violet', primary: '#6D28D9' },
+  { id: 'stone', name: 'Stone', primary: '#57534E' },
 ]
