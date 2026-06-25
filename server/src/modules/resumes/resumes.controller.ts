@@ -33,7 +33,6 @@ import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import type { UserDocument } from '../users/schemas/user.schema';
 import { ResumesService } from './resumes.service';
 import { StorageService } from '../storage/storage.service';
-import * as pdfjsLib from 'pdfjs-dist';
 import mammoth from 'mammoth';
 
 @ApiTags('Resumes')
@@ -307,6 +306,7 @@ export class ResumesController {
     try {
       if (file.mimetype === 'application/pdf') {
         this.logger.log(`extractText: parsing PDF (${file.size} bytes)`);
+        const pdfjsLib = await import('pdfjs-dist');
         const doc = await pdfjsLib.getDocument({ data: new Uint8Array(file.buffer) }).promise;
         let text = '';
         for (let i = 1; i <= doc.numPages; i++) {

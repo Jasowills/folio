@@ -1082,14 +1082,16 @@ function ResumeEditorInner() {
               <MultiPagePreview zoom={zoom} singlePage={template.id === 'modern'} contentKey={template.id + '-' + (resume?._id || '')}>
                 {({ showSections, pageIndex }) => {
                   const commonProps = { resume: resume || { _id: id || '', title: '' }, localData: previewData, redFlags, primaryColor: colorTheme, showSections, pageIndex }
-                  switch (template.id) {
-                    case 'executive':
-                      return <ExecutiveTemplate {...commonProps} />
-                    case 'modern':
-                      return <ModernTemplate {...commonProps} />
-                    default:
-                      return <MinimalTemplate {...commonProps} />
+                  console.log('[ResumeEditor] rendering template:', template.id, template.name, template.layout)
+                  const execNames = new Set(['executive', 'executive-brief', 'executive-sidebar', 'classic', 'formal', 'board', 'academic', 'federal', 'leadership'])
+                  const sidebarOrColNames = new Set(['modern', 'modern-clean', 'modern-sidebar', 'sidepanel', 'sidebar-right', 'profile', 'dashboard', 'left-brand', 'contact-left', 'skills-left', 'compact-sidebar', 'gradient-sidebar', 'dark-sidebar', 'minimal-sidebar', 'marginalia', 'remote', 'freelance', 'split', 'columns', 'creative', 'expertise', 'technical', 'metrics', 'consulting', 'saas', 'bilingual', 'portfolio', 'accent'])
+                  if (execNames.has(template.id)) {
+                    return <ExecutiveTemplate {...commonProps} />
                   }
+                  if (sidebarOrColNames.has(template.id) || template.layout === 'sidebar' || template.layout === 'two-column') {
+                    return <ModernTemplate {...commonProps} />
+                  }
+                  return <MinimalTemplate {...commonProps} />
                 }}
               </MultiPagePreview>
             )}
