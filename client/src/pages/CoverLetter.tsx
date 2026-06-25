@@ -133,9 +133,9 @@ export default function CoverLetter() {
           </Button>
         </div>
 
-        <div className="flex flex-1 gap-8 min-h-0">
+        <div className="flex flex-1 gap-8 min-h-0 flex-col lg:flex-row">
           {/* Left Panel — Form */}
-          <div className="w-[300px] shrink-0 space-y-5 overflow-y-auto">
+          <div className="w-full lg:w-[300px] shrink-0 space-y-5 overflow-y-auto">
             <p className="text-[13px] font-semibold text-ink">
               Generate a cover letter
             </p>
@@ -324,7 +324,7 @@ export default function CoverLetter() {
               animate={{ x: 0 }}
               exit={{ x: '100%' }}
               transition={{ type: 'spring', damping: 30, stiffness: 300 }}
-              className="fixed top-0 right-0 bottom-0 z-50 w-[400px] bg-surface shadow-2xl flex flex-col"
+              className="fixed top-0 right-0 bottom-0 z-50 w-[400px] max-w-full bg-surface shadow-2xl flex flex-col"
             >
               <div className="flex items-center justify-between p-5 border-b border-border shrink-0">
                 <h2 className="text-sm font-semibold text-ink">My letters</h2>

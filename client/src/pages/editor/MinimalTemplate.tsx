@@ -36,7 +36,13 @@ export function MinimalTemplate({ resume, localData, redFlags, primaryColor, sho
           {localData.contact?.email || resume.contact?.email || ''}
           {localData.contact?.phone || resume.contact?.phone ? ` | ${localData.contact?.phone || resume.contact?.phone || ''}` : ''}
           {localData.contact?.location || resume.contact?.location ? ` | ${localData.contact?.location || resume.contact?.location || ''}` : ''}
-          {links.map(l => l.url).filter(Boolean).join(' | ')}
+          {links.length > 0 && ' | '}
+          {links.map((link, i) => (
+            <span key={i}>
+              {i > 0 && ' | '}
+              <a href={link.url} target="_blank" rel="noopener noreferrer" style={{ color: accentColor }} className="underline decoration-from-font">{link.title || link.url}</a>
+            </span>
+          ))}
         </p>
       </div>
       )}
@@ -135,8 +141,8 @@ export function MinimalTemplate({ resume, localData, redFlags, primaryColor, sho
           <div className="space-y-1">
             {(localData.links && localData.links.length > 0 ? localData.links : resume.links || []).filter(l => l.title || l.url).map((link, i) => (
               <p key={i} className="text-[11px]">
-                <span className="text-ink">{link.title}</span>
-                {link.url ? <span className="text-muted"> — {link.url}</span> : null}
+                <a href={link.url} target="_blank" rel="noopener noreferrer" style={{ color: accentColor }} className="underline decoration-from-font">{link.title || link.url}</a>
+                {link.title && link.url ? <span className="text-muted"> — {link.url}</span> : null}
               </p>
             ))}
           </div>

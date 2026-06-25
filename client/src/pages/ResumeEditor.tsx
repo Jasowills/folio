@@ -1,8 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
-import { useQueryClient } from '@tanstack/react-query'
-import { useResume, useRewriteBullet, useUpdateResume, useAnalyzeResume } from '../lib/queries'
+import { useResume, useRewriteBullet, useUpdateResume } from '../lib/queries'
 import { Button } from '../components/ui/button'
 import { cn } from '../lib/utils'
 import { MultiPagePreview } from '../components/editor/MultiPagePreview'
@@ -32,7 +31,6 @@ import {
   Loader2,
   FileText,
   Layout,
-  Sparkles,
 } from 'lucide-react'
 
 type Tab = 'Summary' | 'Experience' | 'Education' | 'Skills' | 'Certifications' | 'Languages' | 'Links'
@@ -170,8 +168,7 @@ function makeLocalData(resume?: ResumeShim): LocalData {
 export default function ResumeEditor() {
   const { id } = useParams<{ id: string }>()
   const { data: resume, isLoading } = useResume(id!)
-  const queryClient = useQueryClient()
-  const analyzeResume = useAnalyzeResume()
+  const updateResume = useUpdateResume()
   const [activeTab, setActiveTab] = useState<Tab>('Summary')
   const [saved, setSaved] = useState(true)
   const [template, setTemplate] = useState<ResumeTemplate>(TEMPLATES[0])
@@ -183,13 +180,10 @@ export default function ResumeEditor() {
   const [aiRewrites, setAiRewrites] = useState<string[]>([])
   const [aiRewritesLoading, setAiRewritesLoading] = useState(false)
   const rewriteBullet = useRewriteBullet()
-  const updateResume = useUpdateResume()
   const [mobilePanel, setMobilePanel] = useState<'edit' | 'preview'>('edit')
   const [localData, setLocalData] = useState<LocalData>(makeLocalData())
   const saveAttemptRef = useRef(0)
   const [previewMode, setPreviewMode] = useState<'template' | 'original'>('template')
-  const [analyzing, setAnalyzing] = useState(false)
-  const analysisTriggeredRef = useRef(false)
   const autoSwitchedRef = useRef(false)
 
   const localRef = useRef(localData)
@@ -210,19 +204,6 @@ export default function ResumeEditor() {
       setPreviewMode('original')
     }
   }, [resume, hasStructuredData])
-
-  // Auto-analyze when resume has raw text but no structured data yet
-  useEffect(() => {
-    if (resume?.rawText && !hasStructuredData && !analysisTriggeredRef.current && !analyzing && id) {
-      analysisTriggeredRef.current = true
-      setAnalyzing(true)
-      analyzeResume.mutateAsync(id).then(() => {
-        queryClient.invalidateQueries({ queryKey: ['resume', id] })
-      }).catch(() => {}).finally(() => {
-        setAnalyzing(false)
-      })
-    }
-  }, [resume, hasStructuredData, id, analyzeResume, queryClient])
 
   // Auto-switch to template preview when structured data arrives
   useEffect(() => {
@@ -491,12 +472,6 @@ export default function ResumeEditor() {
           </div>
         </div>
           <div className="flex items-center gap-2 shrink-0">
-            {analyzing && (
-              <div className="flex items-center gap-1.5 mr-2">
-                <Sparkles className="h-3 w-3 text-teal animate-pulse" />
-                <span className="text-[11px] text-teal font-medium hidden sm:inline">Analyzing...</span>
-              </div>
-            )}
             <div className="flex items-center gap-1.5 mr-2">
               {saved ? (
                 <>
@@ -524,8 +499,8 @@ export default function ResumeEditor() {
             </Link>
             <Link to={`/export/${id}`}>
               <Button variant="primary" size="sm">
-                <Download className="h-3.5 w-3.5 mr-1 sm:mr-1" />
-                <span className="hidden sm:inline">Export</span>
+                <Download className="h-4 w-4 sm:h-3.5 sm:w-3.5" />
+                <span className="hidden sm:inline ml-1">Export</span>
               </Button>
             </Link>
         </div>
@@ -1038,51 +1013,54 @@ export default function ResumeEditor() {
           'flex-1 flex flex-col min-w-0',
           mobilePanel === 'edit' && 'hidden lg:flex',
         )}>
-          <div className="bg-surface border-b border-border px-3 sm:px-5 py-2.5 shrink-0 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-            <div className="min-w-0 flex-1 flex flex-col gap-2">
-              <TemplatePicker selected={template.id} onChange={setTemplate} />
-              <div className="flex items-center gap-0.5 bg-paper border border-border rounded-lg p-0.5 self-start">
-                <button
-                  onClick={() => setZoom((z) => Math.max(0.5, z - 0.1))}
-                  className="p-1 rounded text-muted hover:text-ink hover:bg-white transition-colors cursor-pointer"
-                >
-                  <ZoomOut className="h-3 w-3" />
-                </button>
-                <span className="text-[11px] text-muted w-7 text-center tabular-nums">{Math.round(zoom * 100)}%</span>
-                <button
-                  onClick={() => setZoom((z) => Math.min(2, z + 0.1))}
-                  className="p-1 rounded text-muted hover:text-ink hover:bg-white transition-colors cursor-pointer"
-                >
-                  <ZoomIn className="h-3 w-3" />
-                </button>
+          <div className="bg-surface border-b border-border px-3 sm:px-5 py-2.5 shrink-0">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              <div className="min-w-0 flex-1">
+                <TemplatePicker selected={template.id} onChange={setTemplate} />
               </div>
-            </div>
-            <div className="flex  px-8 flex-row items-center gap-4 shrink-0">
-              <ColorPicker selected={colorTheme} onChange={setColorTheme} />
-              <span className="h-5 w-px bg-border" />
-              <div className="flex items-center gap-0.5 bg-paper border border-border rounded-lg p-0.5">
-                <button
-                  onClick={() => setPreviewMode('template')}
-                  className={cn(
-                    'flex items-center gap-1 px-2 py-1 rounded text-[11px] font-medium transition-colors cursor-pointer whitespace-nowrap',
-                    previewMode === 'template' ? 'text-teal bg-white shadow-sm' : 'text-muted hover:text-ink',
-                  )}
-                >
-                  <Layout className="h-3.5 w-3.5" />
-                  <span>Template</span>
-                </button>
-                {canShowOriginal && (
+              <div className="flex items-center gap-2 sm:gap-3 shrink-0 flex-wrap">
+                <div className="flex items-center gap-0.5 bg-paper border border-border rounded-lg p-0.5">
                   <button
-                    onClick={() => setPreviewMode('original')}
+                    onClick={() => setZoom((z) => Math.max(0.5, z - 0.1))}
+                    className="p-1 rounded text-muted hover:text-ink hover:bg-white transition-colors cursor-pointer"
+                  >
+                    <ZoomOut className="h-3 w-3" />
+                  </button>
+                  <span className="text-[11px] text-muted w-7 text-center tabular-nums">{Math.round(zoom * 100)}%</span>
+                  <button
+                    onClick={() => setZoom((z) => Math.min(2, z + 0.1))}
+                    className="p-1 rounded text-muted hover:text-ink hover:bg-white transition-colors cursor-pointer"
+                  >
+                    <ZoomIn className="h-3 w-3" />
+                  </button>
+                </div>
+                <span className="h-5 w-px bg-border shrink-0 hidden sm:block" />
+                <ColorPicker selected={colorTheme} onChange={setColorTheme} />
+                <span className="h-5 w-px bg-border shrink-0" />
+                <div className="flex items-center gap-0.5 bg-paper border border-border rounded-lg p-0.5">
+                  <button
+                    onClick={() => setPreviewMode('template')}
                     className={cn(
                       'flex items-center gap-1 px-2 py-1 rounded text-[11px] font-medium transition-colors cursor-pointer whitespace-nowrap',
-                      previewMode === 'original' ? 'text-teal bg-white shadow-sm' : 'text-muted hover:text-ink',
+                      previewMode === 'template' ? 'text-teal bg-white shadow-sm' : 'text-muted hover:text-ink',
                     )}
                   >
-                    <FileText className="h-3.5 w-3.5" />
-                    <span>Original</span>
+                    <Layout className="h-3.5 w-3.5" />
+                    <span className="hidden sm:inline">Template</span>
                   </button>
-                )}
+                  {canShowOriginal && (
+                    <button
+                      onClick={() => setPreviewMode('original')}
+                      className={cn(
+                        'flex items-center gap-1 px-2 py-1 rounded text-[11px] font-medium transition-colors cursor-pointer whitespace-nowrap',
+                        previewMode === 'original' ? 'text-teal bg-white shadow-sm' : 'text-muted hover:text-ink',
+                      )}
+                    >
+                      <FileText className="h-3.5 w-3.5" />
+                      <span className="hidden sm:inline">Original</span>
+                    </button>
+                  )}
+                </div>
               </div>
             </div>
           </div>

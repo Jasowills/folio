@@ -83,10 +83,10 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       )}>
         <div className="flex items-center justify-between gap-2.5 px-5 h-14 border-b border-border shrink-0">
           <div className="flex items-center gap-2.5">
-            <span className="font-display text-teal text-xl font-bold">&amp;</span>
             <span className="font-display text-ink text-base font-bold tracking-tight">
               Folio
             </span>
+            <span className="font-display text-teal text-xl font-bold">&amp;</span>
           </div>
           <button
             onClick={() => setMobileNavOpen(false)}

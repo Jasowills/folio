@@ -82,6 +82,20 @@ export class ResumesService {
     if (fileUrl) resume.fileUrl = fileUrl;
     if (cloudinaryPublicId) resume.cloudinaryPublicId = cloudinaryPublicId;
 
+    const parsed = this.resumeParser.parse(rawText);
+    resume.set({
+      name: parsed.name,
+      contact: parsed.contact,
+      summary: parsed.summary,
+      experience: parsed.experience,
+      education: parsed.education,
+      skills: parsed.skills,
+      certifications: parsed.certifications,
+      languages: parsed.languages,
+      links: parsed.links,
+    });
+    this.normalizeContactUrls(resume as any);
+
     return resume.save();
   }
 

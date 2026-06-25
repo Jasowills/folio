@@ -27,7 +27,13 @@ export function ExecutiveTemplate({ resume, localData, primaryColor, showSection
           {localData.contact?.email || resume.contact?.email || ''}
           {localData.contact?.phone || resume.contact?.phone ? ` | ${localData.contact?.phone || resume.contact?.phone || ''}` : ''}
           {localData.contact?.location || resume.contact?.location ? ` | ${localData.contact?.location || resume.contact?.location || ''}` : ''}
-          {links.map(l => l.url).filter(Boolean).join(' | ')}
+          {links.length > 0 && ' | '}
+          {links.map((link, i) => (
+            <span key={i}>
+              {i > 0 && ' | '}
+              <a href={link.url} target="_blank" rel="noopener noreferrer" className="text-white underline decoration-from-font">{link.title || link.url}</a>
+            </span>
+          ))}
         </p>
       </div>
       )}
@@ -116,8 +122,8 @@ export function ExecutiveTemplate({ resume, localData, primaryColor, showSection
           <div className="space-y-1">
             {(localData.links && localData.links.length > 0 ? localData.links : resume.links || []).filter(l => l.title || l.url).map((link, i) => (
               <p key={i} className="text-[10px] text-muted">
-                <span className="text-ink font-medium">{link.title}</span>
-                {link.url ? <span className="text-muted"> — {link.url}</span> : null}
+                <a href={link.url} target="_blank" rel="noopener noreferrer" className="text-ink font-medium underline decoration-from-font">{link.title || link.url}</a>
+                {link.title && link.url ? <span className="text-muted"> — {link.url}</span> : null}
               </p>
             ))}
           </div>

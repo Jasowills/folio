@@ -51,8 +51,8 @@ export function ModernTemplate({ resume, localData, primaryColor, showSections, 
             <div className="space-y-1.5">
               {(localData.links && localData.links.length > 0 ? localData.links : resume.links || []).filter(l => l.title || l.url).map((link, i) => (
                 <p key={i} className="text-[8px] text-white/80 break-words">
-                  <span className="text-white/60">{link.title}</span>
-                  {link.url ? <span> — {link.url}</span> : null}
+                  <a href={link.url} target="_blank" rel="noopener noreferrer" className="text-white underline decoration-from-font">{link.title || link.url}</a>
+                  {link.title && link.url ? <span className="text-white/60"> — {link.url}</span> : null}
                 </p>
               ))}
             </div>

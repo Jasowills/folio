@@ -126,13 +126,13 @@ export default function ExportResume() {
         <div className="space-y-6">
           <div className="h-10 w-48 bg-border/60 rounded animate-pulse" />
           <div className="h-5 w-32 bg-border/40 rounded animate-pulse" />
-          <div className="grid grid-cols-3 gap-4">
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
             {[1, 2, 3].map((i) => (
               <div key={i} className="h-32 bg-border/30 rounded-lg animate-pulse" />
             ))}
           </div>
           <div className="h-5 w-32 bg-border/40 rounded animate-pulse mt-8" />
-          <div className="grid grid-cols-3 gap-4">
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
             {[1, 2, 3].map((i) => (
               <div key={i} className="h-56 bg-border/30 rounded-lg animate-pulse" />
             ))}
@@ -181,7 +181,7 @@ export default function ExportResume() {
 
         <div>
           <p className="text-[10px] font-semibold text-muted uppercase tracking-wider mb-3">Choose template</p>
-          <div className="grid grid-cols-3 gap-4">
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
             {TEMPLATES.map((tmpl) => {
               const isSelected = selectedTemplate === tmpl.value
               return (

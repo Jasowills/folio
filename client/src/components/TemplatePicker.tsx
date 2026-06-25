@@ -25,7 +25,7 @@ export default function TemplatePicker({ selected, onChange }: TemplatePickerPro
           <ChevronUp className="h-3 w-3" /> Show fewer
         </button>
       )}
-      <div className={`flex gap-2 flex-wrap ${expanded ? 'overflow-y-auto max-h-[50vh]' : ''}`}>
+      <div className={`${expanded ? 'grid grid-cols-[repeat(auto-fill,90px)] sm:grid-cols-[repeat(auto-fill,105px)] gap-2 overflow-y-auto max-h-[50vh]' : 'flex gap-2 flex-wrap'}`}>
         {visible.map((tpl) => {
           const isActive = selected === tpl.id
           const svg = TEMPLATE_PREVIEWS[tpl.id]

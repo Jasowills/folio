@@ -129,8 +129,8 @@ export default function GuestResult({
       {/* Header */}
       <header className="flex items-center justify-between px-8 py-3 bg-surface border-b border-border shrink-0 z-20">
         <div className="flex items-center gap-3">
-          <span className="font-display text-teal text-2xl font-bold">&amp;</span>
           <span className="font-display text-ink text-lg font-bold">Folio</span>
+          <span className="font-display text-teal text-2xl font-bold">&amp;</span>
           <span className="w-px h-5 bg-border mx-2" />
           <span className="text-sm font-medium text-ink truncate max-w-[240px]">{data.title}</span>
         </div>
@@ -152,9 +152,9 @@ export default function GuestResult({
       </header>
 
       {/* Two-column body */}
-      <div className="flex flex-1 overflow-hidden">
+      <div className="flex flex-1 overflow-hidden flex-col lg:flex-row">
         {/* Left: Rendered PDF + highlighted text */}
-        <div className="w-[45%] shrink-0 overflow-y-auto border-r border-border bg-white">
+        <div className="w-full lg:w-[45%] shrink-0 overflow-y-auto border-b lg:border-b-0 lg:border-r border-border bg-white">
           {data.cloudinaryPublicId && data.fileUrl ? (
             <PdfViewer fileUrl={data.fileUrl} className="p-4" />
           ) : data.resumeText ? (
@@ -368,7 +368,7 @@ export default function GuestResult({
             {data.quality && (
               <div className="card !shadow-sm">
                 <h3 className="font-body font-semibold text-xs text-ink mb-2.5 uppercase tracking-wider">Resume quality</h3>
-                <div className="grid grid-cols-4 gap-3 mb-2">
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-2">
                   {[
                     { label: 'Layout', value: data.quality.layoutScore },
                     { label: 'Links', value: data.quality.linksScore },

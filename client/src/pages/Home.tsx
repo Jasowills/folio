@@ -37,7 +37,7 @@ function HeroHeadline() {
   const parts = selected.stable.split('\n')
 
   return (
-    <h1 className="font-display text-display text-ink leading-[1.05] tracking-[-0.02em]">
+    <h1 className="font-display text-display text-ink leading-[1.05] tracking-[-0.02em] text-[clamp(2.5rem,8vw,88px)] sm:text-display">
       {parts.map((part, i) => (
         <span key={i}>
           {part}
@@ -238,10 +238,10 @@ export default function Home() {
           <header className="fixed top-0 left-0 right-0 z-20 bg-paper/90 backdrop-blur-sm border-b border-border">
             <div className="max-w-5xl mx-auto flex items-center justify-between px-8 h-14">
               <div className="flex items-center gap-2">
-                <span className="font-display text-teal text-2xl font-bold">&amp;</span>
                 <span className="font-display text-ink text-lg font-bold">Folio</span>
+                <span className="font-display text-teal text-2xl font-bold">&amp;</span>
               </div>
-              <div className="flex items-center gap-6">
+              <div className="flex items-center gap-3 sm:gap-6">
                 <Link to="/login" className="text-xs text-muted hover:text-ink transition-colors">Sign in</Link>
                 <Link to="/login">
                   <button className="text-xs font-medium text-white bg-teal px-4 py-2 rounded-md hover:bg-teal-dark transition-colors">
@@ -287,11 +287,11 @@ export default function Home() {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               transition={{ delay: 0.4, duration: 0.5 }}
-              className="flex items-center gap-6 mt-8"
+              className="flex flex-wrap items-center justify-center gap-x-6 gap-y-1 mt-8"
             >
               {['ATS Score', null, 'Bullet Rewriter', null, 'Cover Letter', null, 'Portfolio Check'].map((item, i) =>
                 item === null ? (
-                  <span key={`sep-${i}`} className="font-display text-border text-sm">&amp;</span>
+                  <span key={`sep-${i}`} className="font-display text-border text-sm hidden sm:inline">&amp;</span>
                 ) : (
                   <span key={item} className="label-uppercase text-muted-light text-[10px]">{item}</span>
                 )

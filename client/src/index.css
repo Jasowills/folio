@@ -151,25 +151,30 @@
 
 @layer components {
   .page-container {
-    width: 95rem;
+    width: 100%;
+    max-width: 95rem;
     margin-left: auto;
     margin-right: auto;
-    padding-left: 2rem;
-    padding-right: 3rem;
-    padding-top: 2.5rem;
-    padding-bottom: 2.5rem;
+    padding: 1.5rem 1rem;
+  }
+
+  @media (min-width: 640px) {
+    .page-container {
+      padding: 2.5rem 2rem;
+    }
   }
 
   .page-header {
     display: flex;
+    flex-wrap: wrap;
     align-items: flex-start;
     justify-content: space-between;
-    margin-bottom: 2rem;
+    margin-bottom: 1.5rem;
     gap: 1rem;
   }
 
   .page-title {
-    font-size: var(--text-h1);
+    font-size: clamp(1.5rem, 4vw, var(--text-h1));
     font-weight: 700;
     color: var(--color-ink);
     letter-spacing: -0.02em;

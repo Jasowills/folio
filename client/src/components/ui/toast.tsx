@@ -73,7 +73,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
             onOpenChange={(open) => { if (!open) removeToast(t.id) }}
             duration={t.duration ?? 5000}
             className={cn(
-              'fixed bottom-4 right-4 z-[999] w-[360px] rounded-lg border bg-white p-4 shadow-lg',
+              'fixed bottom-4 right-4 z-[999] w-[360px] max-w-[calc(100vw-2rem)] rounded-lg border bg-white p-4 shadow-lg',
               'radix-state-open:animate-slide-in-right',
               'radix-state-closed:animate-slide-out-right',
               'radix-swipe-end:animate-swipe-out',

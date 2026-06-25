@@ -145,7 +145,7 @@ export default function AtsScorer() {
           </div>
         )}
 
-        <div className="grid grid-cols-1 lg:grid-cols-[400px_1fr] gap-8 items-start">
+          <div className="grid grid-cols-1 lg:grid-cols-[minmax(300px,400px)_1fr] gap-8 items-start">
           <div className="space-y-4">
             <div className="card space-y-4">
               <h2 className="font-medium text-ink text-sm">

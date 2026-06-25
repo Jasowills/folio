@@ -8,12 +8,12 @@ interface ColorPickerProps {
 
 export default function ColorPicker({ selected, onChange }: ColorPickerProps) {
   return (
-    <div className="grid grid-cols-2 gap-1.5">
+    <div className="flex flex-wrap gap-1 max-w-[180px]">
       {COLOR_THEMES.map((theme) => (
         <button
           key={theme.id}
           onClick={() => onChange(theme.primary)}
-          className={`h-5 w-5 rounded-full border-2 transition-all hover:scale-110 ${
+          className={`h-4 w-4 rounded-full border-2 transition-all hover:scale-110 shrink-0 ${
             selected === theme.primary
               ? 'border-ink scale-110 shadow-sm'
               : 'border-transparent'
@@ -22,9 +22,9 @@ export default function ColorPicker({ selected, onChange }: ColorPickerProps) {
           title={theme.name}
         />
       ))}
-      <label className="relative cursor-pointer flex items-center justify-center">
+      <label className="relative cursor-pointer flex items-center justify-center shrink-0">
         <div
-          className="h-5 w-5 rounded-full border-2 border-dashed border-border hover:border-muted transition-colors flex items-center justify-center"
+          className="h-4 w-4 rounded-full border-2 border-dashed border-border hover:border-muted transition-colors flex items-center justify-center"
           title="Custom color"
         >
           <span className="text-[9px] text-muted leading-none">+</span>

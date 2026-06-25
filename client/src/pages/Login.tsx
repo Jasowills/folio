@@ -115,8 +115,8 @@ export default function Login() {
         </span>
 
         <div className="flex items-center gap-2 relative z-10">
-          <span className="font-display text-teal text-2xl font-bold">&amp;</span>
           <span className="font-display text-white text-lg font-bold">Folio</span>
+          <span className="font-display text-teal text-2xl font-bold">&amp;</span>
         </div>
 
         <div className="flex-1 flex flex-col justify-center max-w-md mx-auto relative z-10">
@@ -166,8 +166,8 @@ export default function Login() {
           className="w-full max-w-sm"
         >
           <div className="lg:hidden flex items-center gap-2 mb-8">
-            <span className="font-display text-teal text-2xl font-bold">&amp;</span>
             <span className="font-display text-ink text-lg font-bold">Folio</span>
+            <span className="font-display text-teal text-2xl font-bold">&amp;</span>
           </div>
 
           <h1 className="font-display text-h2 text-ink mb-1">
