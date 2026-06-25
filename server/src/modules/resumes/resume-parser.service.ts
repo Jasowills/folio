@@ -236,6 +236,9 @@ export class ResumeParserService {
 
         const threshold = header.length <= 5 ? 1 : header.length <= 8 ? 2 : 3;
         if (this.fuzzyMatchKeyword(clean, header, threshold)) return header;
+
+        if (clean.includes(' ' + header + ' ') || clean.startsWith(header + ' ') || clean.endsWith(' ' + header)) return header;
+        if (clean.includes(' ' + header + 's ') || clean.endsWith(' ' + header + 's')) return header;
       }
     }
 
@@ -303,11 +306,21 @@ export class ResumeParserService {
       /([A-Z][a-zA-Z]+(?:[\s,]+[A-Z][a-zA-Z'-]+)*)\s*,\s*([A-Z][a-zA-Z]+(?:\s[A-Z][a-zA-Z]+)*)\b/,
     ];
 
+    const locationBlocklist = new Set([
+      'rust', 'solana', 'solidity', 'node', 'react', 'angular', 'vue',
+      'python', 'java', 'ruby', 'go', 'c++', 'c#', 'typescript',
+      'javascript', 'html', 'css', 'sql', 'docker', 'kubernetes',
+      'aws', 'azure', 'gcp', 'linux', 'git', 'github',
+    ]);
+
     for (const line of lines.slice(0, 10)) {
       for (const pattern of patterns) {
         const m = line.match(pattern);
         if (m && !EMAIL_RE.test(line) && !PHONE_RE.test(line)) {
-          return m[0].trim();
+          const candidate = m[0].trim();
+          const firstWord = candidate.split(/[\s,]+/)[0].toLowerCase();
+          if (locationBlocklist.has(firstWord)) continue;
+          return candidate;
         }
       }
 
@@ -315,12 +328,18 @@ export class ResumeParserService {
       if (locationLabel) return locationLabel[2].trim();
 
       if (/^[A-Z][a-zA-Z]+(?:[\s,]+[A-Z][a-zA-Z]+)*,\s*[A-Z]{2}\b/.test(line)) {
+        const firstWord = line.split(/[\s,]+/)[0].toLowerCase();
+        if (locationBlocklist.has(firstWord)) continue;
         return line.trim();
       }
     }
 
     for (const line of lines.slice(0, 10)) {
-      if (/^[A-Z][a-zA-Z\s]+,\s*[A-Z]{2}\b/.test(line)) return line.trim();
+      if (/^[A-Z][a-zA-Z\s]+,\s*[A-Z]{2}\b/.test(line)) {
+        const firstWord = line.split(/[\s,]+/)[0].toLowerCase();
+        if (locationBlocklist.has(firstWord)) continue;
+        return line.trim();
+      }
     }
 
     return '';
@@ -352,7 +371,31 @@ export class ResumeParserService {
 
     if (lines.length === 0) return [];
 
-    return this.parseExperienceBlocks(lines);
+    const nonHeaderLines = lines.filter(l => {
+      if (EMAIL_RE.test(l) || PHONE_RE.test(l) || URL_RE.test(l)) return false;
+      if (l.length > 0 && l.length < 80 && /^[A-Z][a-zA-Z\s]{0,30}$/.test(l) && this.matchSectionHeader(l)) return false;
+      return true;
+    });
+
+    const experience = this.parseExperienceBlocks(nonHeaderLines.length >= 3 ? nonHeaderLines : lines);
+
+    const projHeaders = SECTION_HEADERS[6] as readonly string[];
+    let projLines: string[] = [];
+    for (const h of projHeaders) {
+      const found = sections.get(h);
+      if (found) { projLines = found; break; }
+    }
+
+    if (projLines.length > 0) {
+      const projects = this.parseExperienceBlocks(projLines);
+      for (const p of projects) {
+        if (p.title && !experience.some(e => e.title === p.title && e.company === p.company)) {
+          experience.push(p);
+        }
+      }
+    }
+
+    return experience;
   }
 
   private parseExperienceBlocks(lines: string[]): ParsedResume['experience'] {
@@ -393,11 +436,31 @@ export class ResumeParserService {
           if (bullet) current.bullets.push(bullet);
         } else if (line.length > 10 && !/^\d{4}\s/.test(line)) {
           current.bullets.push(line);
+        } else if (line.length > 3 && this.matchesTitleKeyword(line)) {
+          current.bullets.push(line);
         }
       }
     }
 
     if (current) blocks.push(current);
+
+    for (let i = 0; i < blocks.length; i++) {
+      const block = blocks[i];
+      const next = blocks[i + 1];
+      if (!block.company && next && next.bullets.length === 0) {
+        const hasTitleKw = this.matchesTitleKeyword(next.title);
+        const hasCompanyKw = next.company ? this.matchesTitleKeyword(next.company) : false;
+        if (!hasTitleKw || hasCompanyKw) {
+          block.company = next.title;
+          if (next.startDate) block.startDate = block.startDate || next.startDate;
+          if (next.endDate) block.endDate = block.endDate || next.endDate;
+          if (next.current) block.current = block.current || next.current;
+          blocks.splice(i + 1, 1);
+          i--;
+        }
+      }
+    }
+
     return blocks;
   }
 
@@ -442,6 +505,15 @@ export class ResumeParserService {
   }
 
   private splitTitleCompany(line: string): { title: string; company: string } {
+    const countTitleWords = (s: string): number => {
+      const lower = s.toLowerCase();
+      let count = 0;
+      for (const kw of TITLE_KEYWORDS) {
+        if (new RegExp(`\\b${kw.replace(/\./g, '\\.')}`, 'i').test(lower)) count++;
+      }
+      return count;
+    };
+
     const patterns = [
       { sep: /\s+•\s+/, before: true, after: true },
       { sep: /\s+\|\s+/, before: true, after: true },
@@ -449,6 +521,7 @@ export class ResumeParserService {
       { sep: /\s+@\s+/, before: true, after: true },
       { sep: /\s+[—–]\s+/, before: true, after: true },
       { sep: /\s+,\s+(?=inc|llc|ltd|corp|co|technologies|tech|solutions|group|associates|partners|consulting|services|systems|software|digital)/i, before: true, after: false },
+      { sep: /,\s+(?=[A-Z][a-zA-Z]*(?:\s+(?:inc|llc|ltd|corp|co|technologies|tech|solutions|group|associates|partners|consulting|services|systems|software|digital))?$)/, before: true, after: false },
     ];
 
     for (const { sep, before, after } of patterns) {
@@ -458,9 +531,14 @@ export class ResumeParserService {
         const first = datesRemoved[0].replace(/[,;]+$/, '').trim();
         const second = datesRemoved.slice(1).join(' ').replace(/[,;]+$/, '').trim();
         if (first && second) {
-          return before && after ? { title: first, company: second }
-            : before ? { title: first, company: second }
-            : { title: second, company: first };
+          const title = before ? first : second;
+          const company = before ? second : first;
+          const titleScore = countTitleWords(title);
+          const companyScore = countTitleWords(company);
+          if (companyScore > titleScore) {
+            return { title: company, company: title };
+          }
+          return { title, company };
         }
       }
     }
@@ -515,6 +593,7 @@ export class ResumeParserService {
   private extractDatesFromText(text: string): string[] {
     const monthNames = 'Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:tember)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?';
     const fullDate = new RegExp(`(${monthNames})\\s*[.\\s]*(\\d{4})`, 'gi');
+    const mmYyyy = /\b(0[1-9]|1[0-2])\/(\d{4})\b/g;
     const yearOnly = /\b(19|20)\d{2}\b/g;
 
     const result: string[] = [];
@@ -522,6 +601,15 @@ export class ResumeParserService {
     for (const m of fullMatches) {
       const month = m[1].charAt(0).toUpperCase() + m[1].slice(1).toLowerCase().replace(/\.$/, '');
       result.push(`${month} ${m[2]}`);
+    }
+
+    if (result.length === 0) {
+      const mmMatches = [...text.matchAll(mmYyyy)];
+      for (const m of mmMatches) {
+        const monthNames = ['', 'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+        const monthIdx = parseInt(m[1], 10);
+        result.push(`${monthNames[monthIdx] || m[1]} ${m[2]}`);
+      }
     }
 
     if (result.length === 0) {
@@ -601,12 +689,12 @@ export class ResumeParserService {
     const match = line.match(indicators);
     if (match) {
       const idx = match.index!;
-      const fullName = line.substring(0, idx + match[0].length + 20).replace(/[,;–—|].*$/, '').trim();
+      const fullName = line.substring(idx, idx + match[0].length + 30).replace(/[,;–—|].*$/, '').trim();
       const sentinel = line.indexOf(',', idx);
       if (sentinel > 0 && sentinel - idx < 30) {
-        return line.substring(0, sentinel).trim();
+        return line.substring(idx, sentinel).trim();
       }
-      return fullName || line.substring(0, idx + match[0].length).trim();
+      return fullName || line.substring(idx, idx + match[0].length).trim();
     }
 
     const commonPrefixes = ['university of', 'university at', 'state university of', 'institute of'];
@@ -678,17 +766,21 @@ export class ResumeParserService {
 
     if (lines.length === 0) return [];
 
-    const allText = lines.join(' ');
-    const separators = /[,•·|;/\n]+/;
+    const labelFilter = /^(languages|frontend|backend|blockchain|cloud|devops|databases|tools|practices|frameworks|libraries|platforms|technologies|stacks?|database|other):\s*/i;
+    const cleanedLines = lines.map(l => l.replace(labelFilter, '').trim()).filter(Boolean);
+
+    const allText = cleanedLines.join(', ');
+    const separators = /[,•·|;]+/;
     const skillList = allText
       .split(separators)
       .map(s => s.replace(/\(.*?\)/g, '').trim())
       .filter(s => s.length > 1 && s.length < 60)
-      .filter(s => !SECTION_HEADERS.flat().some(h => this.fuzzyMatch(s, h)));
+      .filter(s => !SECTION_HEADERS.flat().some(h => this.fuzzyMatch(s, h)))
+      .filter(s => !/^(languages|frontend|backend|blockchain|cloud|devops|databases|tools|practices|frameworks|libraries|platforms|technologies|stacks?|database|other)$/i.test(s));
 
     if (skillList.length >= 2) return [...new Set(skillList)];
 
-    const byLine = lines
+    const byLine = cleanedLines
       .map(l => l.replace(/^[-•*♦\d.)\s]+/, '').trim())
       .filter(l => l.length > 0 && l.length < 60);
 
@@ -725,6 +817,14 @@ export class ResumeParserService {
         }
       }
 
+      const knownIssuers = /\s+(Udemy|freeCodeCamp|Coursera|edX|LinkedIn Learning|Pluralsight|AWS|Microsoft|Google|IBM|Oracle|CompTIA|Cisco|(?:ISC)²|SANS|Offensive Security|Red Hat|Salesforce|HubSpot|Atlassian|Databricks|Snowflake|Airflow)\s*$/i;
+      const issuerMatch = text.match(knownIssuers);
+      if (issuerMatch) {
+        const name = text.substring(0, issuerMatch.index).trim();
+        const issuer = issuerMatch[1].trim();
+        if (name) return { name, issuer };
+      }
+
       return { name: text, issuer: '' };
     }).filter(c => c.name.length > 0);
   }
@@ -739,13 +839,17 @@ export class ResumeParserService {
 
     if (lines.length === 0) return [];
 
-    const allText = lines.join(', ');
+    const labelFilter = /^(frontend|backend|blockchain|cloud|devops|databases|tools|practices|languages|frameworks|libraries|platforms|technologies|stacks?|database):\s*/i;
+    const allText = lines
+      .map(l => l.replace(labelFilter, '').trim())
+      .join(', ');
     return allText
       .split(/[,•·|;/\n]+/)
-      .map(s => s.replace(/\(.*?\)/g, '').replace(/[-–].*$/, '').trim())
+      .map(s => s.replace(/\(.*?\)/g, '').replace(/[–—].*$/, '').trim())
       .filter(s => s.length > 1 && s.length < 40)
       .filter((s, i, arr) => arr.indexOf(s) === i)
-      .filter(s => !/^\d+(\.\d+)?$/.test(s));
+      .filter(s => !/^\d+(\.\d+)?$/.test(s))
+      .filter(s => !/^(frontend|backend|blockchain|cloud|devops|databases|tools|practices|languages|frameworks|libraries|platforms|technologies|stacks?|database)$/i.test(s));
   }
 
   private extractLinks(

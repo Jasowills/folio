@@ -33,7 +33,7 @@ import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import type { UserDocument } from '../users/schemas/user.schema';
 import { ResumesService } from './resumes.service';
 import { StorageService } from '../storage/storage.service';
-import { PDFParse } from 'pdf-parse';
+import * as pdfjsLib from 'pdfjs-dist';
 import mammoth from 'mammoth';
 
 @ApiTags('Resumes')
@@ -307,13 +307,16 @@ export class ResumesController {
     try {
       if (file.mimetype === 'application/pdf') {
         this.logger.log(`extractText: parsing PDF (${file.size} bytes)`);
-        const pdfDoc = new PDFParse({ data: file.buffer } as any);
-        await pdfDoc.load();
-        const textResult = await pdfDoc.getText() as any;
-        pdfDoc.destroy();
-        const text = textResult?.text ?? '';
+        const doc = await pdfjsLib.getDocument({ data: new Uint8Array(file.buffer) }).promise;
+        let text = '';
+        for (let i = 1; i <= doc.numPages; i++) {
+          const page = await doc.getPage(i);
+          const content = await page.getTextContent();
+          text += content.items.map((item: any) => item.str).join(' ') + '\n';
+        }
+        await doc.destroy();
         this.logger.log(`extractText: PDF parsing returned ${text.length} chars`);
-        return text;
+        return text.trim();
       }
       this.logger.log(`extractText: parsing DOCX (${file.size} bytes)`);
       const result = await mammoth.extractRawText({ buffer: file.buffer });

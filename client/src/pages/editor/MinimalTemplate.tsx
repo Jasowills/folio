@@ -36,7 +36,6 @@ export function MinimalTemplate({ resume, localData, redFlags, primaryColor, sho
           {localData.contact?.email || resume.contact?.email || ''}
           {localData.contact?.phone || resume.contact?.phone ? ` | ${localData.contact?.phone || resume.contact?.phone || ''}` : ''}
           {localData.contact?.location || resume.contact?.location ? ` | ${localData.contact?.location || resume.contact?.location || ''}` : ''}
-          {links.length > 0 && ' | '}
           {links.map((link, i) => (
             <span key={i}>
               {i > 0 && ' | '}

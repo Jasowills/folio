@@ -167,6 +167,11 @@ function makeLocalData(resume?: ResumeShim): LocalData {
 
 export default function ResumeEditor() {
   const { id } = useParams<{ id: string }>()
+  return <ResumeEditorInner key={id} />
+}
+
+function ResumeEditorInner() {
+  const { id } = useParams<{ id: string }>()
   const { data: resume, isLoading } = useResume(id!)
   const updateResume = useUpdateResume()
   const [activeTab, setActiveTab] = useState<Tab>('Summary')

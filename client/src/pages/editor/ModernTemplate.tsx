@@ -106,6 +106,24 @@ export function ModernTemplate({ resume, localData, primaryColor, showSections, 
             ))}
           </div>
         )}
+        {section('certifications') && (localData.certifications && localData.certifications.length > 0 ? localData.certifications : resume.certifications || []).length > 0 && (
+          <div data-section="certifications">
+            <h2 className="font-display text-[12px] font-semibold uppercase tracking-wider mb-1.5" style={{ color: primaryColor || '#0F6E56' }}>Certifications</h2>
+            <div className="space-y-0.5">
+              {((localData.certifications && localData.certifications.length > 0 ? localData.certifications : resume.certifications || [])).map((c, i) => (
+                <p key={i} className="text-[9px] text-muted">{c.name}{c.issuer ? ` — ${c.issuer}` : ''}</p>
+              ))}
+            </div>
+          </div>
+        )}
+        {section('languages') && (localData.languages && localData.languages.length > 0 ? localData.languages : resume.languages || []).length > 0 && (
+          <div data-section="languages">
+            <h2 className="font-display text-[12px] font-semibold uppercase tracking-wider mb-1.5" style={{ color: primaryColor || '#0F6E56' }}>Languages</h2>
+            <p className="text-[9px] text-muted">
+              {(localData.languages && localData.languages.length > 0 ? localData.languages : resume.languages || []).filter(Boolean).join('  ·  ')}
+            </p>
+          </div>
+        )}
       </div>
     </div>
   )
