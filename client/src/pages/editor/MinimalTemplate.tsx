@@ -102,7 +102,7 @@ export function MinimalTemplate({ resume, localData, redFlags, primaryColor, sho
       )}
 
       {section('skills', showSections) && (localData.skills && localData.skills.length > 0 ? localData.skills : resume.skills || []).length > 0 && (
-        <div data-section="skills" className="mb-5">
+        <div data-section="skills" className="mb-5 break-inside-avoid">
           <h2 className={hClass} style={hStyle}>Skills</h2>
           <div className="flex flex-wrap gap-1">
             {(localData.skills && localData.skills.length > 0 ? localData.skills : resume.skills || []).filter(Boolean).map((s, i) => (
@@ -113,7 +113,7 @@ export function MinimalTemplate({ resume, localData, redFlags, primaryColor, sho
       )}
 
       {section('certifications', showSections) && (localData.certifications && localData.certifications.length > 0 ? localData.certifications : resume.certifications || []).length > 0 && (
-        <div data-section="certifications" className="mb-5">
+        <div data-section="certifications" className="mb-5 break-inside-avoid">
           <h2 className={hClass} style={hStyle}>Certifications</h2>
           <div className="space-y-1">
             {((localData.certifications && localData.certifications.length > 0 ? localData.certifications : resume.certifications || [])).map((c, i) => (
