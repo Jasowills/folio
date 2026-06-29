@@ -127,7 +127,7 @@ export function MinimalTemplate({ resume, localData, redFlags, primaryColor, sho
       )}
 
       {section('languages', showSections) && (localData.languages && localData.languages.length > 0 ? localData.languages : resume.languages || []).length > 0 && (
-        <div data-section="languages" className="mb-5">
+        <div data-section="languages" className="mb-5 break-inside-avoid">
           <h2 className={hClass} style={hStyle}>Languages</h2>
           <div className="flex flex-wrap gap-1.5">
             {(localData.languages && localData.languages.length > 0 ? localData.languages : resume.languages || []).filter(Boolean).map((l, i) => (
@@ -138,7 +138,7 @@ export function MinimalTemplate({ resume, localData, redFlags, primaryColor, sho
       )}
 
       {section('links', showSections) && (localData.links && localData.links.length > 0 ? localData.links : resume.links || []).filter(l => l.title || l.url).length > 0 && (
-        <div data-section="links" className="mt-5">
+        <div data-section="links" className="mt-5 break-inside-avoid">
           <h2 className={hClass} style={hStyle}>Links</h2>
           <div className="space-y-1">
             {(localData.links && localData.links.length > 0 ? localData.links : resume.links || []).filter(l => l.title || l.url).map((link, i) => (

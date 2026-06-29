@@ -38,14 +38,14 @@ export function ExecutiveTemplate({ resume, localData, primaryColor, showSection
       )}
 
       {section('summary', showSections) && (localData.summary || resume.summary) && (
-        <div data-section="summary" className="mb-5">
+        <div data-section="summary" className="mb-5 break-inside-avoid">
           <h2 className="font-serif text-[14px] font-bold uppercase tracking-wider mb-1.5 border-b border-border pb-1" style={{ color: accentColor }}>Summary</h2>
           <p className="text-[11px] text-muted leading-relaxed mt-2">{localData.summary || resume.summary}</p>
         </div>
       )}
 
       {section('experience', showSections) && (localData.experience && localData.experience.length > 0 ? localData.experience : resume.experience || []).length > 0 && (
-        <div data-section="experience" className="mb-5">
+        <div data-section="experience" className="mb-5 break-inside-avoid">
           <h2 className="font-serif text-[14px] font-bold uppercase tracking-wider mb-2 border-b border-border pb-1" style={{ color: accentColor }}>Professional Experience</h2>
           {((localData.experience && localData.experience.length > 0 ? localData.experience : resume.experience || [])).map((exp, i) => (
             <div key={i} className="mt-3">
@@ -74,7 +74,7 @@ export function ExecutiveTemplate({ resume, localData, primaryColor, showSection
       )}
 
       {section('education', showSections) && (localData.education && localData.education.length > 0 ? localData.education : resume.education || []).length > 0 && (
-        <div data-section="education" className="mb-5">
+        <div data-section="education" className="mb-5 break-inside-avoid">
           <h2 className="font-serif text-[14px] font-bold uppercase tracking-wider mb-2 border-b border-border pb-1" style={{ color: accentColor }}>Education</h2>
           {((localData.education && localData.education.length > 0 ? localData.education : resume.education || [])).map((edu, i) => (
             <div key={i} className="mt-2">
@@ -87,7 +87,7 @@ export function ExecutiveTemplate({ resume, localData, primaryColor, showSection
 
       <div className="grid grid-cols-2 gap-4 mt-4">
         {section('skills', showSections) && (localData.skills && localData.skills.length > 0 ? localData.skills : resume.skills || []).length > 0 && (
-          <div data-section="skills">
+          <div data-section="skills" className="break-inside-avoid">
             <h2 className="font-serif text-[12px] font-bold uppercase tracking-wider mb-1.5" style={{ color: accentColor }}>Skills</h2>
             <div className="flex flex-wrap gap-1">
               {(localData.skills && localData.skills.length > 0 ? localData.skills : resume.skills || []).filter(Boolean).map((s, i) => (
@@ -97,7 +97,7 @@ export function ExecutiveTemplate({ resume, localData, primaryColor, showSection
           </div>
         )}
         {section('certifications', showSections) && (localData.certifications && localData.certifications.length > 0 ? localData.certifications : resume.certifications || []).length > 0 && (
-          <div data-section="certifications">
+          <div data-section="certifications" className="break-inside-avoid">
             <h2 className="font-serif text-[12px] font-bold uppercase tracking-wider mb-1.5" style={{ color: accentColor }}>Certifications</h2>
             {((localData.certifications && localData.certifications.length > 0 ? localData.certifications : resume.certifications || [])).map((c, i) => (
               <p key={i} className="text-[10px] text-muted">{c.name}{c.issuer ? ` — ${c.issuer}` : ''}</p>
