@@ -56,7 +56,7 @@ export function ModernTemplate({ resume, localData, primaryColor, showSections, 
         )}
 
         {section('links') && (localData.links && localData.links.length > 0 ? localData.links : resume.links || []).filter(l => l.title || l.url).length > 0 && (
-          <div data-section="links" className="mt-4">
+          <div data-section="links" className="mt-4 break-inside-avoid">
             <h2 className="text-[9px] font-semibold uppercase tracking-wider text-white/60 mb-1.5">Links</h2>
             <div className="space-y-1.5">
               {(localData.links && localData.links.length > 0 ? localData.links : resume.links || []).filter(l => l.title || l.url).map((link, i) => (
