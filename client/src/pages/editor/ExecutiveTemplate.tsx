@@ -107,7 +107,7 @@ export function ExecutiveTemplate({ resume, localData, primaryColor, showSection
       </div>
 
       {section('languages', showSections) && (localData.languages && localData.languages.length > 0 ? localData.languages : resume.languages || []).length > 0 && (
-        <div data-section="languages" className="mt-4">
+        <div data-section="languages" className="mt-4 break-inside-avoid">
           <h2 className="font-serif text-[12px] font-bold uppercase tracking-wider mb-1.5" style={{ color: accentColor }}>Languages</h2>
           <p className="text-[11px] text-muted">
             {(localData.languages && localData.languages.length > 0 ? localData.languages : resume.languages || []).filter(Boolean).join('  ·  ')}
@@ -116,7 +116,7 @@ export function ExecutiveTemplate({ resume, localData, primaryColor, showSection
       )}
 
       {section('links', showSections) && (localData.links && localData.links.length > 0 ? localData.links : resume.links || []).filter(l => l.title || l.url).length > 0 && (
-        <div data-section="links" className="mt-4">
+        <div data-section="links" className="mt-4 break-inside-avoid">
           <h2 className="font-serif text-[12px] font-bold uppercase tracking-wider mb-1.5" style={{ color: accentColor }}>Links</h2>
           <div className="space-y-1">
             {(localData.links && localData.links.length > 0 ? localData.links : resume.links || []).filter(l => l.title || l.url).map((link, i) => (
