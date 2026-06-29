@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { TEMPLATES, TEMPLATE_PREVIEWS } from '../templates'
 import type { ResumeTemplate } from '../templates/types'
 import { cn } from '../lib/utils'
-import { ChevronDown, ChevronUp } from 'lucide-react'
+import { IconChevronDown, IconChevronUp } from '@tabler/icons-react'
 
 interface TemplatePickerProps {
   selected: string
@@ -22,7 +22,7 @@ export default function TemplatePicker({ selected, onChange }: TemplatePickerPro
           onClick={() => setExpanded(false)}
           className="flex items-center gap-1 text-[11px] text-muted hover:text-teal transition-colors self-start cursor-pointer shrink-0"
         >
-          <ChevronUp className="h-3 w-3" /> Show fewer
+          <IconChevronUp className="h-3 w-3" /> Show fewer
         </button>
       )}
       <div className={`${expanded ? 'grid grid-cols-[repeat(auto-fill,90px)] sm:grid-cols-[repeat(auto-fill,105px)] gap-2 overflow-y-auto max-h-[50vh]' : 'flex gap-2 flex-wrap'}`}>
@@ -64,9 +64,9 @@ export default function TemplatePicker({ selected, onChange }: TemplatePickerPro
           className="flex items-center gap-1 text-[11px] text-muted hover:text-teal transition-colors self-start cursor-pointer"
         >
           {expanded ? (
-            <>Show fewer <ChevronUp className="h-3 w-3" /></>
+            <>Show fewer <IconChevronUp className="h-3 w-3" /></>
           ) : (
-            <>See more templates ({TEMPLATES.length - INITIAL_COUNT} more) <ChevronDown className="h-3 w-3" /></>
+            <>See more templates ({TEMPLATES.length - INITIAL_COUNT} more) <IconChevronDown className="h-3 w-3" /></>
           )}
         </button>
       )}

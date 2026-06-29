@@ -1,5 +1,5 @@
 import { useState, useCallback, type DragEvent, type ChangeEvent } from 'react'
-import { Loader2 } from 'lucide-react'
+import { IconLoader2 } from '@tabler/icons-react'
 import { cn } from '../lib/utils'
 
 interface UploadZoneProps {
@@ -45,7 +45,7 @@ export function UploadZone({ onFile, disabled, className }: UploadZoneProps) {
         'rounded-xl border-2 border-dashed border-teal/50 bg-teal-light/50 p-8 text-center',
         className,
       )}>
-        <Loader2 className="mx-auto mb-3 h-7 w-7 text-teal animate-spin" />
+        <IconLoader2 className="mx-auto mb-3 h-7 w-7 text-teal animate-spin" />
         <p className="font-body text-body-lg font-semibold text-ink">
           Uploading resume...
         </p>

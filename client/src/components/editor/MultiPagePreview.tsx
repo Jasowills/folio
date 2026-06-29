@@ -28,11 +28,23 @@ export function MultiPagePreview({ children, zoom, singlePage, contentKey }: Pro
 
     const pageHeight = pageEl.offsetHeight
     const padding = 80
-    const available = pageHeight - padding
 
-    const sectionEls = measure.querySelectorAll<HTMLElement>('[data-section]')
+    const allSectionEls = measure.querySelectorAll<HTMLElement>('[data-section]')
+    const mainSectionEls: HTMLElement[] = []
+    const sidebarSectionNames: SectionName[] = []
+
+    allSectionEls.forEach((el) => {
+      const name = el.getAttribute('data-section') as SectionName | null
+      if (!name) return
+      if (el.closest('[data-header]')) {
+        sidebarSectionNames.push(name)
+      } else {
+        mainSectionEls.push(el)
+      }
+    })
+
     const heights: { name: SectionName; height: number }[] = []
-    sectionEls.forEach((el) => {
+    mainSectionEls.forEach((el) => {
       const name = el.getAttribute('data-section') as SectionName | null
       if (name) {
         heights.push({ name, height: el.offsetHeight })
@@ -44,21 +56,43 @@ export function MultiPagePreview({ children, zoom, singlePage, contentKey }: Pro
       return
     }
 
-    const totalHeight = heights.reduce((sum, h) => sum + h.height, 0)
-    if (totalHeight <= available) {
+    // Check if total content (including header) fits on one page
+    const scrollHeight = pageEl.scrollHeight
+    if (scrollHeight <= pageHeight) {
       setPages([ALL_SECTIONS])
       return
     }
 
+    // Measure non-section overhead (header + top padding) before first section
+    const firstSection = mainSectionEls[0]
+    const pageRect = pageEl.getBoundingClientRect()
+    const firstSectionRect = firstSection.getBoundingClientRect()
+    const topOverhead = Math.max(0, firstSectionRect.top - pageRect.top)
+    const bottomPad = padding / 2
+
+    // Page 0 has reduced space due to header; subsequent pages have full space
+    const availablePage0 = Math.max(0, pageHeight - topOverhead - bottomPad)
+    const available = pageHeight - padding
+
     const distribution: SectionName[][] = [[]]
     let current = 0
     for (const { name, height } of heights) {
-      if (current + height > available && current > 0) {
+      const limit = distribution.length === 0 ? availablePage0 : available
+      if (current + height > limit && current > 0) {
         distribution.push([])
         current = 0
       }
       distribution[distribution.length - 1].push(name)
       current += height
+    }
+
+    // Ensure sidebar sections always appear on page 0 (the sidebar only renders there)
+    if (distribution.length > 0) {
+      for (const name of sidebarSectionNames) {
+        if (!distribution[0].includes(name)) {
+          distribution[0].push(name)
+        }
+      }
     }
 
     if (distribution[distribution.length - 1].length === 0) {

@@ -1,7 +1,7 @@
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
-import { useResume, useRewriteBullet, useUpdateResume } from '../lib/queries'
+import { useResume, useRewriteBullet, useUpdateResume, useAnalyzeResume } from '../lib/queries'
 import { Button } from '../components/ui/button'
 import { cn } from '../lib/utils'
 import { MultiPagePreview } from '../components/editor/MultiPagePreview'
@@ -12,26 +12,8 @@ import { TEMPLATES } from '../templates'
 import type { ResumeTemplate } from '../templates/types'
 import { MinimalTemplate } from './editor/MinimalTemplate'
 import { ModernTemplate } from './editor/ModernTemplate'
-import { ExecutiveTemplate } from './editor/ExecutiveTemplate'
 import type { LocalData, ResumeShim } from './editor/types'
-import {
-  Save,
-  Wand2,
-  ChevronLeft,
-  Download,
-  Plus,
-  X,
-  AlertTriangle,
-  Eye,
-  ZoomIn,
-  ZoomOut,
-  CheckCircle,
-  RefreshCw,
-  Edit3,
-  Loader2,
-  FileText,
-  Layout,
-} from 'lucide-react'
+import { IconWand, IconChevronLeft, IconDownload, IconPlus, IconX, IconAlertTriangle, IconEye, IconZoomIn, IconZoomOut, IconCircleCheck, IconRefresh, IconEdit, IconLoader2, IconFileText, IconLayout } from '@tabler/icons-react'
 
 type Tab = 'Summary' | 'Experience' | 'Education' | 'Skills' | 'Certifications' | 'Languages' | 'Links'
 
@@ -185,6 +167,7 @@ function ResumeEditorInner() {
   const [aiRewrites, setAiRewrites] = useState<string[]>([])
   const [aiRewritesLoading, setAiRewritesLoading] = useState(false)
   const rewriteBullet = useRewriteBullet()
+  const analyzeResume = useAnalyzeResume()
   const [mobilePanel, setMobilePanel] = useState<'edit' | 'preview'>('edit')
   const [localData, setLocalData] = useState<LocalData>(makeLocalData())
   const saveAttemptRef = useRef(0)
@@ -217,6 +200,15 @@ function ResumeEditorInner() {
       setPreviewMode('template')
     }
   }, [hasStructuredData, previewMode])
+
+  // Auto re-extract when resume has raw text but no structured data yet
+  const analysingRef = useRef(false)
+  useEffect(() => {
+    if (resume?.rawText && !hasStructuredData && !analysingRef.current && !isLoading) {
+      analysingRef.current = true
+      analyzeResume.mutate(resume._id!)
+    }
+  }, [resume?.rawText, hasStructuredData, isLoading, analyzeResume])
 
   const redFlags: Array<{ message: string; severity: 'low' | 'medium' | 'high'; section?: string }> = resume?.redFlags || []
   const sectionRedFlags = getRedFlagsForSection(redFlags, activeTab)
@@ -272,7 +264,7 @@ function ResumeEditorInner() {
     setSaved(false)
   }
 
-  function updateExperience(index: number, field: string, value: string) {
+  function updateExperience(index: number, field: string, value: string | boolean) {
     setLocalData((prev) => {
       const exp = [...prev.experience]
       exp[index] = { ...exp[index], [field]: value }
@@ -465,7 +457,7 @@ function ResumeEditorInner() {
             className="p-1.5 rounded-lg text-muted hover:text-ink hover:bg-paper-dark transition-colors shrink-0 cursor-pointer"
             title="Back to resumes"
           >
-            <ChevronLeft className="h-4 w-4" />
+            <IconChevronLeft className="h-4 w-4" />
           </Link>
           <div className="min-w-0">
             <nav className="text-[11px] text-muted flex items-center gap-1.5">
@@ -480,12 +472,12 @@ function ResumeEditorInner() {
             <div className="flex items-center gap-1.5 mr-2">
               {saved ? (
                 <>
-                  <CheckCircle className="h-3 w-3 text-success" />
+                  <IconCircleCheck className="h-3 w-3 text-success" />
                   <span className="text-[11px] text-success font-medium hidden sm:inline">Saved</span>
                 </>
               ) : (
                 <>
-                  <RefreshCw className="h-3 w-3 text-muted animate-spin" />
+                  <IconRefresh className="h-3 w-3 text-muted animate-spin" />
                   <span className="text-[11px] text-muted hidden sm:inline">Saving...</span>
                 </>
               )}
@@ -493,18 +485,18 @@ function ResumeEditorInner() {
             <Link to={`/resume/${id}/review`}>
               <Button variant="ghost" size="sm">
                 <span className="hidden sm:inline">Review</span>
-                <span className="sm:hidden"><Eye className="h-4 w-4" /></span>
+                <span className="sm:hidden"><IconEye className="h-4 w-4" /></span>
               </Button>
             </Link>
             <Link to="/ats">
               <Button variant="ghost" size="sm">
                 <span className="hidden sm:inline">ATS Check</span>
-                <span className="sm:hidden"><AlertTriangle className="h-4 w-4" /></span>
+                <span className="sm:hidden"><IconAlertTriangle className="h-4 w-4" /></span>
               </Button>
             </Link>
             <Link to={`/export/${id}`}>
               <Button variant="primary" size="sm">
-                <Download className="h-4 w-4 sm:h-3.5 sm:w-3.5" />
+                <IconDownload className="h-4 w-4 sm:h-3.5 sm:w-3.5" />
                 <span className="hidden sm:inline ml-1">Export</span>
               </Button>
             </Link>
@@ -519,7 +511,7 @@ function ResumeEditorInner() {
             mobilePanel === 'edit' ? 'border-teal text-teal' : 'border-transparent text-muted',
           )}
         >
-          <Edit3 className="h-3.5 w-3.5 inline mr-1.5" />
+          <IconEdit className="h-3.5 w-3.5 inline mr-1.5" />
           Edit
         </button>
         <button
@@ -529,7 +521,7 @@ function ResumeEditorInner() {
             mobilePanel === 'preview' ? 'border-teal text-teal' : 'border-transparent text-muted',
           )}
         >
-          <Eye className="h-3.5 w-3.5 inline mr-1.5" />
+          <IconEye className="h-3.5 w-3.5 inline mr-1.5" />
           Preview
         </button>
       </div>
@@ -564,7 +556,7 @@ function ResumeEditorInner() {
 
           {sectionRedFlags.length > 0 && (
             <div className="mx-4 mt-3 flex items-center gap-2 px-3 py-2 rounded-lg bg-amber/5 border border-amber/20 text-[11px] text-ink">
-              <AlertTriangle className="h-3.5 w-3.5 text-amber shrink-0" />
+              <IconAlertTriangle className="h-3.5 w-3.5 text-amber shrink-0" />
               <span>
                 {sectionRedFlags.length} red flag{sectionRedFlags.length > 1 ? 's' : ''} in this section —
               </span>
@@ -658,7 +650,7 @@ function ResumeEditorInner() {
                           animate={{ rotate: isOpen ? 180 : 0 }}
                           transition={{ duration: 0.2 }}
                         >
-                          <ChevronLeft className="h-3.5 w-3.5 text-muted shrink-0" />
+                          <IconChevronLeft className="h-3.5 w-3.5 text-muted shrink-0" />
                         </motion.div>
                       </button>
                       <AnimatePresence>
@@ -745,7 +737,7 @@ function ResumeEditorInner() {
                                           onClick={() => openAiDrawer(i, j)}
                                           className="opacity-0 group-hover:opacity-100 p-1 text-muted hover:text-teal transition-all shrink-0 cursor-pointer"
                                         >
-                                          <Wand2 className="h-3.5 w-3.5" />
+                                          <IconWand className="h-3.5 w-3.5" />
                                         </button>
                                       </div>
                                     )
@@ -755,7 +747,7 @@ function ResumeEditorInner() {
                                   onClick={() => addBullet(i)}
                                   className="mt-2 text-[11px] text-muted hover:text-ink transition-colors flex items-center gap-1 cursor-pointer"
                                 >
-                                  <Plus className="h-3 w-3" />
+                                  <IconPlus className="h-3 w-3" />
                                   Add bullet
                                 </button>
                               </div>
@@ -770,7 +762,7 @@ function ResumeEditorInner() {
                   onClick={addExperience}
                   className="w-full py-2.5 border border-dashed border-border rounded-lg text-[12px] text-muted hover:text-teal hover:border-teal/40 transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
                 >
-                  <Plus className="h-3.5 w-3.5" />
+                  <IconPlus className="h-3.5 w-3.5" />
                   Add experience
                 </button>
               </div>
@@ -815,7 +807,7 @@ function ResumeEditorInner() {
                   onClick={addEducation}
                   className="w-full py-2.5 border border-dashed border-border rounded-lg text-[12px] text-muted hover:text-teal hover:border-teal/40 transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
                 >
-                  <Plus className="h-3.5 w-3.5" />
+                  <IconPlus className="h-3.5 w-3.5" />
                   Add education
                 </button>
               </div>
@@ -850,7 +842,7 @@ function ResumeEditorInner() {
                         onClick={() => removeCertification(i)}
                         className="p-1 text-muted hover:text-danger transition-colors cursor-pointer"
                       >
-                        <X className="h-3.5 w-3.5" />
+                        <IconX className="h-3.5 w-3.5" />
                       </button>
                     </div>
                     <div>
@@ -877,7 +869,7 @@ function ResumeEditorInner() {
                   onClick={addCertification}
                   className="w-full py-2.5 border border-dashed border-border rounded-lg text-[12px] text-muted hover:text-teal hover:border-teal/40 transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
                 >
-                  <Plus className="h-3.5 w-3.5" />
+                  <IconPlus className="h-3.5 w-3.5" />
                   Add certification
                 </button>
               </div>
@@ -893,7 +885,7 @@ function ResumeEditorInner() {
                         onClick={() => removeLink(i)}
                         className="p-1 text-muted hover:text-danger transition-colors cursor-pointer"
                       >
-                        <X className="h-3.5 w-3.5" />
+                        <IconX className="h-3.5 w-3.5" />
                       </button>
                     </div>
                     <div>
@@ -920,7 +912,7 @@ function ResumeEditorInner() {
                   onClick={addLink}
                   className="w-full py-2.5 border border-dashed border-border rounded-lg text-[12px] text-muted hover:text-teal hover:border-teal/40 transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
                 >
-                  <Plus className="h-3.5 w-3.5" />
+                  <IconPlus className="h-3.5 w-3.5" />
                   Add link
                 </button>
               </div>
@@ -941,7 +933,7 @@ function ResumeEditorInner() {
                       onClick={() => removeLanguage(i)}
                       className="opacity-0 group-hover:opacity-100 p-1 text-muted hover:text-danger transition-all cursor-pointer"
                     >
-                      <X className="h-3.5 w-3.5" />
+                      <IconX className="h-3.5 w-3.5" />
                     </button>
                   </div>
                 ))}
@@ -949,7 +941,7 @@ function ResumeEditorInner() {
                   onClick={addLanguage}
                   className="w-full py-2.5 border border-dashed border-border rounded-lg text-[12px] text-muted hover:text-teal hover:border-teal/40 transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
                 >
-                  <Plus className="h-3.5 w-3.5" />
+                  <IconPlus className="h-3.5 w-3.5" />
                   Add language
                 </button>
               </div>
@@ -959,7 +951,7 @@ function ResumeEditorInner() {
           <div className="sticky bottom-0 bg-surface border-t border-border px-4 py-3 flex items-center gap-2">
             <Link to={`/resume/${id}/review`} className="flex-1">
               <Button variant="ghost" size="sm" className="w-full cursor-pointer">
-                <Eye className="h-3.5 w-3.5 mr-1" />
+                <IconEye className="h-3.5 w-3.5 mr-1" />
                 AI Review
               </Button>
             </Link>
@@ -969,7 +961,7 @@ function ResumeEditorInner() {
               className="flex-1 cursor-pointer"
               onClick={() => setAiDrawerOpen(true)}
             >
-              <Wand2 className="h-3.5 w-3.5 mr-1" />
+              <IconWand className="h-3.5 w-3.5 mr-1" />
               Rewrite all
             </Button>
           </div>
@@ -989,13 +981,13 @@ function ResumeEditorInner() {
                     onClick={() => { setAiDrawerOpen(false); setAiDrawerBullet(null) }}
                     className="p-1.5 rounded-lg text-muted hover:text-ink hover:bg-paper-dark transition-colors cursor-pointer"
                   >
-                    <X className="h-3.5 w-3.5" />
+                    <IconX className="h-3.5 w-3.5" />
                   </button>
                 </div>
                 <div className="p-3 space-y-2">
                   {aiRewritesLoading ? (
                     <div className="flex items-center justify-center py-6">
-                      <Loader2 className="h-5 w-5 text-muted animate-spin" />
+                      <IconLoader2 className="h-5 w-5 text-muted animate-spin" />
                     </div>
                   ) : (
                     aiRewrites.map((text, i) => (
@@ -1029,14 +1021,14 @@ function ResumeEditorInner() {
                     onClick={() => setZoom((z) => Math.max(0.5, z - 0.1))}
                     className="p-1 rounded text-muted hover:text-ink hover:bg-white transition-colors cursor-pointer"
                   >
-                    <ZoomOut className="h-3 w-3" />
+                    <IconZoomOut className="h-3 w-3" />
                   </button>
                   <span className="text-[11px] text-muted w-7 text-center tabular-nums">{Math.round(zoom * 100)}%</span>
                   <button
                     onClick={() => setZoom((z) => Math.min(2, z + 0.1))}
                     className="p-1 rounded text-muted hover:text-ink hover:bg-white transition-colors cursor-pointer"
                   >
-                    <ZoomIn className="h-3 w-3" />
+                    <IconZoomIn className="h-3 w-3" />
                   </button>
                 </div>
                 <span className="h-5 w-px bg-border shrink-0 hidden sm:block" />
@@ -1050,7 +1042,7 @@ function ResumeEditorInner() {
                       previewMode === 'template' ? 'text-teal bg-white shadow-sm' : 'text-muted hover:text-ink',
                     )}
                   >
-                    <Layout className="h-3.5 w-3.5" />
+                    <IconLayout className="h-3.5 w-3.5" />
                     <span className="hidden sm:inline">Template</span>
                   </button>
                   {canShowOriginal && (
@@ -1061,7 +1053,7 @@ function ResumeEditorInner() {
                         previewMode === 'original' ? 'text-teal bg-white shadow-sm' : 'text-muted hover:text-ink',
                       )}
                     >
-                      <FileText className="h-3.5 w-3.5" />
+                      <IconFileText className="h-3.5 w-3.5" />
                       <span className="hidden sm:inline">Original</span>
                     </button>
                   )}
@@ -1081,14 +1073,9 @@ function ResumeEditorInner() {
             ) : (
               <MultiPagePreview zoom={zoom} singlePage={template.id === 'modern'} contentKey={template.id + '-' + (resume?._id || '')}>
                 {({ showSections, pageIndex }) => {
-                  const commonProps = { resume: resume || { _id: id || '', title: '' }, localData: previewData, redFlags, primaryColor: colorTheme, showSections, pageIndex }
-                  console.log('[ResumeEditor] rendering template:', template.id, template.name, template.layout)
-                  const execNames = new Set(['executive', 'executive-brief', 'executive-sidebar', 'classic', 'formal', 'board', 'academic', 'federal', 'leadership'])
-                  const sidebarOrColNames = new Set(['modern', 'modern-clean', 'modern-sidebar', 'sidepanel', 'sidebar-right', 'profile', 'dashboard', 'left-brand', 'contact-left', 'skills-left', 'compact-sidebar', 'gradient-sidebar', 'dark-sidebar', 'minimal-sidebar', 'marginalia', 'remote', 'freelance', 'split', 'columns', 'creative', 'expertise', 'technical', 'metrics', 'consulting', 'saas', 'bilingual', 'portfolio', 'accent'])
-                  if (execNames.has(template.id)) {
-                    return <ExecutiveTemplate {...commonProps} />
-                  }
-                  if (sidebarOrColNames.has(template.id) || template.layout === 'sidebar' || template.layout === 'two-column') {
+                  const commonProps = { resume: resume || { _id: id || '', title: '' }, localData: previewData, redFlags, primaryColor: colorTheme, showSections, pageIndex, templateStyle: template.style }
+                  console.log('[ResumeEditor] rendering template:', template.id, template.name, template.layout, template.style)
+                  if (template.layout === 'sidebar' || template.layout === 'two-column') {
                     return <ModernTemplate {...commonProps} />
                   }
                   return <MinimalTemplate {...commonProps} />

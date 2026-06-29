@@ -6,12 +6,7 @@ import { ScoreRing } from '../components/ScoreRing'
 import PdfViewer from '../components/PdfViewer'
 import { Button } from '../components/ui/button'
 import { cn } from '../lib/utils'
-import {
-  CheckCircle2, AlertTriangle, ChevronDown, ChevronRight,
-  Sparkles, FileText, XCircle, RefreshCw,
-  Award, BookOpen, Code, Globe, Languages,
-  Lightbulb, BarChart3, Eye, ListChecks, TrendingUp, Clock
-} from 'lucide-react'
+import { IconCircleCheck, IconAlertTriangle, IconChevronDown, IconChevronRight, IconSparkles, IconFileText, IconCircleX, IconRefresh, IconAward, IconBook, IconCode, IconGlobe, IconLanguage, IconBulb, IconChartBar, IconEye, IconListCheck, IconTrendingUp, IconClock } from '@tabler/icons-react'
 
 type StreamingState = 'idle' | 'connecting' | 'streaming' | 'complete' | 'error'
 
@@ -61,7 +56,7 @@ function StrengthsBlock({ strengths }: { strengths: string[] }) {
   return (
     <div className="card h-full">
       <div className="section-title mb-4">
-        <Award className="h-4 w-4 text-success" />
+        <IconAward className="h-4 w-4 text-success" />
         Strengths
       </div>
       <ul className="space-y-2.5">
@@ -73,7 +68,7 @@ function StrengthsBlock({ strengths }: { strengths: string[] }) {
             transition={{ delay: i * 0.08 + 0.2, duration: 0.3 }}
             className="flex items-start gap-2.5 text-sm text-ink leading-relaxed"
           >
-            <CheckCircle2 className="h-4 w-4 text-success shrink-0 mt-0.5" />
+            <IconCircleCheck className="h-4 w-4 text-success shrink-0 mt-0.5" />
             {s}
           </motion.li>
         ))}
@@ -96,7 +91,7 @@ function RedFlagsBlock({ redFlags }: { redFlags: Array<{ message: string; reason
   return (
     <div className="card h-full">
       <div className="section-title mb-4">
-        <AlertTriangle className="h-4 w-4 text-danger" />
+        <IconAlertTriangle className="h-4 w-4 text-danger" />
         Red Flags
       </div>
       <ul className="space-y-2.5">
@@ -110,7 +105,7 @@ function RedFlagsBlock({ redFlags }: { redFlags: Array<{ message: string; reason
               transition={{ delay: i * 0.08 + 0.3, duration: 0.3 }}
               className={`flex items-start gap-2.5 text-sm text-ink leading-relaxed p-2.5 rounded-lg ${colors.bg} border ${colors.border}`}
             >
-              <AlertTriangle className={`h-4 w-4 ${colors.icon} shrink-0 mt-0.5`} />
+              <IconAlertTriangle className={`h-4 w-4 ${colors.icon} shrink-0 mt-0.5`} />
               <div>
                 <span className="font-medium">{f.message}</span>
                 {f.reason && (
@@ -135,7 +130,7 @@ function SectionBreakdownBlock({ sectionScores }: { sectionScores: Record<string
   return (
     <div>
       <div className="section-title mb-4">
-        <BarChart3 className="h-4 w-4 text-muted" />
+        <IconChartBar className="h-4 w-4 text-muted" />
         Section Breakdown
       </div>
       <div className="space-y-2">
@@ -158,7 +153,7 @@ function SectionBreakdownBlock({ sectionScores }: { sectionScores: Record<string
                     <span className="text-sm font-semibold text-ink">{section}</span>
                     <div className="flex items-center gap-2">
                       <span className="text-xs text-muted">{sectionScore}%</span>
-                      {isExpanded ? <ChevronDown className="h-3.5 w-3.5 text-muted" /> : <ChevronRight className="h-3.5 w-3.5 text-muted" />}
+                      {isExpanded ? <IconChevronDown className="h-3.5 w-3.5 text-muted" /> : <IconChevronRight className="h-3.5 w-3.5 text-muted" />}
                     </div>
                   </div>
                   <div className="progress-bar-track">
@@ -197,12 +192,12 @@ function SectionBreakdownBlock({ sectionScores }: { sectionScores: Record<string
 
 function MissingElementsBlock({ resume }: { resume: { skills?: string[]; certifications?: Array<{ name: string }>; languages?: string[]; contact?: { linkedin?: string | null; github?: string | null; website?: string | null } } }) {
   const gaps: Array<{ icon: React.ReactNode; label: string; present: boolean }> = [
-    { icon: <Code className="h-3.5 w-3.5" />, label: 'Skills', present: !!resume.skills?.length },
-    { icon: <Award className="h-3.5 w-3.5" />, label: 'Certifications', present: !!resume.certifications?.length },
-    { icon: <Languages className="h-3.5 w-3.5" />, label: 'Languages', present: !!resume.languages?.length },
-    { icon: <Globe className="h-3.5 w-3.5" />, label: 'LinkedIn', present: !!resume.contact?.linkedin },
-    { icon: <Globe className="h-3.5 w-3.5" />, label: 'GitHub', present: !!resume.contact?.github },
-    { icon: <Globe className="h-3.5 w-3.5" />, label: 'Portfolio', present: !!resume.contact?.website },
+    { icon: <IconCode className="h-3.5 w-3.5" />, label: 'Skills', present: !!resume.skills?.length },
+    { icon: <IconAward className="h-3.5 w-3.5" />, label: 'Certifications', present: !!resume.certifications?.length },
+    { icon: <IconLanguage className="h-3.5 w-3.5" />, label: 'Languages', present: !!resume.languages?.length },
+    { icon: <IconGlobe className="h-3.5 w-3.5" />, label: 'LinkedIn', present: !!resume.contact?.linkedin },
+    { icon: <IconGlobe className="h-3.5 w-3.5" />, label: 'GitHub', present: !!resume.contact?.github },
+    { icon: <IconGlobe className="h-3.5 w-3.5" />, label: 'Portfolio', present: !!resume.contact?.website },
   ]
 
   const missing = gaps.filter(g => !g.present)
@@ -210,12 +205,12 @@ function MissingElementsBlock({ resume }: { resume: { skills?: string[]; certifi
   return (
     <div>
       <div className="section-title mb-4">
-        <ListChecks className="h-4 w-4 text-muted" />
+        <IconListCheck className="h-4 w-4 text-muted" />
         Missing Elements
       </div>
       {missing.length === 0 ? (
         <div className="card text-center py-6">
-          <CheckCircle2 className="h-8 w-8 text-success mx-auto mb-2" />
+          <IconCircleCheck className="h-8 w-8 text-success mx-auto mb-2" />
           <p className="text-sm text-ink font-medium">All key sections present</p>
           <p className="text-xs text-muted mt-0.5">Your resume covers all the essential elements.</p>
         </div>
@@ -242,7 +237,7 @@ function MissingElementsBlock({ resume }: { resume: { skills?: string[]; certifi
   )
 }
 
-function ResumePreviewBlock({ fileUrl, rawText, resumeName }: { fileUrl?: string | null; rawText?: string | null; resumeName?: string }) {
+function ResumePreviewBlock({ fileUrl, rawText }: { fileUrl?: string | null; rawText?: string | null }) {
   const [view, setView] = useState<'pdf' | 'text'>('pdf')
 
   if (!fileUrl && !rawText) return null
@@ -251,7 +246,7 @@ function ResumePreviewBlock({ fileUrl, rawText, resumeName }: { fileUrl?: string
     <div>
       <div className="flex items-center justify-between mb-4">
         <div className="section-title">
-          <Eye className="h-4 w-4 text-muted" />
+          <IconEye className="h-4 w-4 text-muted" />
           Resume Preview
         </div>
         <div className="flex items-center gap-1.5 bg-paper rounded-lg border border-border p-0.5">
@@ -298,7 +293,7 @@ function NextActionsBlock({ suggestions }: { suggestions: string[] }) {
   return (
     <div>
       <div className="section-title mb-4">
-        <Lightbulb className="h-4 w-4 text-amber" />
+        <IconBulb className="h-4 w-4 text-amber" />
         Next Actions
       </div>
       <div className="card">
@@ -327,11 +322,11 @@ function ReviewHistoryBlock() {
   return (
     <div>
       <div className="section-title mb-4">
-        <TrendingUp className="h-4 w-4 text-muted" />
+        <IconTrendingUp className="h-4 w-4 text-muted" />
         Review History
       </div>
       <div className="card text-center py-6">
-        <Clock className="h-8 w-8 text-muted-light mx-auto mb-2" />
+        <IconClock className="h-8 w-8 text-muted-light mx-auto mb-2" />
         <p className="text-sm text-muted">No previous reviews</p>
         <p className="text-xs text-muted-light mt-0.5">Future analyses will appear here.</p>
       </div>
@@ -368,7 +363,7 @@ function EmptyState({ id, onAnalyze, analyzing }: { id: string; onAnalyze: () =>
         </Link>
       </div>
       <div className="flex flex-col items-center justify-center py-20 max-w-md mx-auto text-center">
-        <FileText className="h-12 w-12 text-muted-light mb-4" />
+        <IconFileText className="h-12 w-12 text-muted-light mb-4" />
         <h2 className="font-display text-h3 text-ink mb-2">Not yet analysed</h2>
         <p className="text-sm text-muted mb-8 leading-relaxed">
           Run an analysis to get a detailed breakdown of your resume&apos;s strengths, red flags, and actionable improvements.
@@ -376,12 +371,12 @@ function EmptyState({ id, onAnalyze, analyzing }: { id: string; onAnalyze: () =>
         <Button variant="primary" size="lg" onClick={onAnalyze} disabled={analyzing}>
           {analyzing ? (
             <span className="flex items-center gap-2">
-              <RefreshCw className="h-4 w-4 animate-spin" />
+              <IconRefresh className="h-4 w-4 animate-spin" />
               Analysing...
             </span>
           ) : (
             <span className="flex items-center gap-2">
-              <Sparkles className="h-4 w-4" />
+              <IconSparkles className="h-4 w-4" />
               Analyse Resume
             </span>
           )}
@@ -400,13 +395,13 @@ function ErrorState({ id, message, onRetry }: { id: string; message?: string; on
         </Link>
       </div>
       <div className="flex flex-col items-center justify-center py-20 max-w-md mx-auto text-center">
-        <XCircle className="h-12 w-12 text-danger mb-4" />
+        <IconCircleX className="h-12 w-12 text-danger mb-4" />
         <h2 className="font-display text-h3 text-ink mb-2">Could not complete analysis</h2>
         <p className="text-sm text-muted mb-8 leading-relaxed">
           {message || 'The AI was temporarily unavailable. Try again in a moment.'}
         </p>
         <Button variant="primary" size="lg" onClick={onRetry}>
-          <RefreshCw className="h-4 w-4 mr-1.5" />
+          <IconRefresh className="h-4 w-4 mr-1.5" />
           Try Again
         </Button>
       </div>
@@ -417,7 +412,7 @@ function ErrorState({ id, message, onRetry }: { id: string; message?: string; on
 function StreamingStatusBar({ label }: { label: string }) {
   return (
     <div className="flex items-center gap-3 px-4 py-2.5 bg-teal/5 border border-teal/20 rounded-lg mb-8">
-      <RefreshCw className="h-4 w-4 text-teal animate-spin shrink-0" />
+      <IconRefresh className="h-4 w-4 text-teal animate-spin shrink-0" />
       <div className="flex-1 min-w-0">
         <div className="flex items-center justify-between gap-2 mb-1">
           <span className="text-sm font-medium text-teal truncate">{label}</span>
@@ -441,7 +436,7 @@ const containerVariants = {
 
 const itemVariants = {
   hidden: { opacity: 0, y: 12 },
-  visible: { opacity: 1, y: 0, transition: { duration: 0.35, ease: 'easeOut' } },
+  visible: { opacity: 1, y: 0, transition: { duration: 0.35, ease: 'easeOut' as const } },
 }
 
 export default function ResumeReview() {
@@ -536,7 +531,7 @@ export default function ResumeReview() {
     return (
       <div className="page-container">
         <div className="flex flex-col items-center justify-center py-20">
-          <FileText className="h-12 w-12 text-muted-light mb-4" />
+          <IconFileText className="h-12 w-12 text-muted-light mb-4" />
           <h2 className="font-display text-h3 text-ink mb-2">Resume not found</h2>
           <Link to="/dashboard">
             <Button variant="primary" className="mt-4">Back to Dashboard</Button>
@@ -630,7 +625,7 @@ export default function ResumeReview() {
           {/* 5. Resume Preview */}
           {showPreview && (
             <motion.div variants={itemVariants}>
-              <ResumePreviewBlock fileUrl={resume.fileUrl} rawText={resume.rawText} resumeName={resume.name} />
+              <ResumePreviewBlock fileUrl={resume.fileUrl} rawText={resume.rawText} />
             </motion.div>
           )}
 
@@ -650,12 +645,12 @@ export default function ResumeReview() {
           <motion.div variants={itemVariants} className="flex items-center justify-center gap-4 pt-2 pb-6">
             <Link to={`/resume/${id}`}>
               <Button variant="ghost">
-                <BookOpen className="h-4 w-4 mr-1.5" />
+                <IconBook className="h-4 w-4 mr-1.5" />
                 Edit Resume
               </Button>
             </Link>
             <Button variant="primary" onClick={startStream}>
-              <RefreshCw className="h-4 w-4 mr-1.5" />
+              <IconRefresh className="h-4 w-4 mr-1.5" />
               Re-analyse
             </Button>
           </motion.div>

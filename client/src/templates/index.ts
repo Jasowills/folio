@@ -1,4 +1,4 @@
-import type { ResumeTemplate, ResumeColorTheme } from './types'
+import type { ResumeTemplate, ResumeColorTheme, TemplateStyle } from './types'
 
 // ---- SVG preview generators ----
 
@@ -8,14 +8,6 @@ function rect(x: number, y: number, w: number, h: number, fill: string, r = 0): 
 
 function line(x1: number, y1: number, x2: number, y2: number, stroke: string, w = 0.5): string {
   return `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${stroke}" stroke-width="${w}"/>`
-}
-
-function dot(cx: number, cy: number, r: number, fill: string): string {
-  return `<circle cx="${cx}" cy="${cy}" r="${r}" fill="${fill}"/>`
-}
-
-function text(x: number, y: number, content: string, size: number, color: string, bold = false): string {
-  return `<text x="${x}" y="${y}" font-size="${size}" fill="${color}" font-family="sans-serif" font-weight="${bold ? 'bold' : 'normal'}">${content}</text>`
 }
 
 function contentLines(x: number, y: number, count: number, w: number, h: number, gap: number, color: string): string {
@@ -40,7 +32,6 @@ function singleColPreview(i: number): string {
   const dark = '#1A1A2E'
   const light = '#E0DDD7'
   const muted = '#8E8E9A'
-  const bg = '#FFFFFF'
 
   const styles = [
     // 0: clean minimal
@@ -317,61 +308,78 @@ function pickPreview(layout: 'single-column' | 'two-column' | 'sidebar', idx: nu
   return singleColPreview(idx)
 }
 
+// ---- Style Presets ----
+
+const STYLE_PRESETS: Record<string, TemplateStyle> = {
+  clean:     { header: 'center',       heading: 'underline',  bullet: 'dot',   font: 'sans',    spacing: 'normal' },
+  modern:    { header: 'thin-line',    heading: 'uppercase',  bullet: 'dash',  font: 'sans',    spacing: 'normal' },
+  executive: { header: 'dark-block',   heading: 'underline',  bullet: 'dash',  font: 'serif',   spacing: 'normal' },
+  compact:   { header: 'left-accent',  heading: 'uppercase',  bullet: 'dot',   font: 'sans',    spacing: 'compact' },
+  elegant:   { header: 'centered-line',heading: 'small-caps', bullet: 'dash',  font: 'serif',   spacing: 'airy' },
+  editorial: { header: 'left-accent',  heading: 'left-bar',   bullet: 'arrow', font: 'display', spacing: 'normal' },
+  bold:      { header: 'top-stripe',   heading: 'badge',      bullet: 'check', font: 'sans',    spacing: 'compact' },
+  classic:   { header: 'center',       heading: 'small-caps', bullet: 'dot',   font: 'serif',   spacing: 'airy' },
+  sharp:     { header: 'thin-line',    heading: 'underline',  bullet: 'dash',  font: 'sans',    spacing: 'compact' },
+  journal:   { header: 'paper',        heading: 'dot-accent', bullet: 'hyphen',font: 'serif',   spacing: 'normal' },
+  minimal:   { header: 'minimal',      heading: 'uppercase',  bullet: 'dot',   font: 'sans',    spacing: 'airy' },
+  accent:    { header: 'top-stripe',   heading: 'underline',  bullet: 'dot',   font: 'display', spacing: 'normal' },
+}
+
 // ---- Templates ----
 
-const TEMPLATE_DEFS: Array<Omit<ResumeTemplate, 'preview'> & { _idx: number }> = [
-  { id: 'minimal', name: 'Minimal', description: 'Clean single column. Best for ATS parsing and traditional roles.', layout: 'single-column', _idx: 0 },
-  { id: 'modern', name: 'Modern', description: 'Two-column with teal sidebar. Great for tech and creative roles.', layout: 'two-column', _idx: 0 },
-  { id: 'executive', name: 'Executive', description: 'Bold name block with serif headings. For senior roles.', layout: 'single-column', _idx: 1 },
-  { id: 'compact', name: 'Compact', description: 'Dense single-column. Fits more content per page.', layout: 'single-column', _idx: 5 },
-  { id: 'sidepanel', name: 'Side Panel', description: 'Left sidebar with contact and skills. Clean main area.', layout: 'sidebar', _idx: 0 },
-  { id: 'split', name: 'Split', description: 'Even two-column split. Balanced visual presentation.', layout: 'two-column', _idx: 1 },
-  { id: 'accent', name: 'Accent', description: 'Bold color accents on headers. Modern and eye-catching.', layout: 'single-column', _idx: 6 },
-  { id: 'timeline', name: 'Timeline', description: 'Experience shown as a visual timeline.', layout: 'single-column', _idx: 8 },
-  { id: 'minimalist', name: 'Minimalist', description: 'Extra whitespace. Elegant layout for design roles.', layout: 'single-column', _idx: 4 },
-  { id: 'classic', name: 'Classic', description: 'Traditional resume format. Universally accepted.', layout: 'single-column', _idx: 9 },
-  { id: 'clean', name: 'Clean', description: 'Serif body text with generous spacing for readability.', layout: 'single-column', _idx: 7 },
-  { id: 'sharp', name: 'Sharp', description: 'Bold black headers with thin separator rules.', layout: 'single-column', _idx: 2 },
-  { id: 'airy', name: 'Airy', description: 'Maximum whitespace and minimal visual rules.', layout: 'single-column', _idx: 4 },
-  { id: 'formal', name: 'Formal', description: 'Traditional serif layout for conservative industries.', layout: 'single-column', _idx: 3 },
-  { id: 'modern-clean', name: 'Modern Clean', description: 'Sans-serif with clean layout lines.', layout: 'single-column', _idx: 0 },
-  { id: 'slate', name: 'Slate', description: 'Dark header block for bold first impression.', layout: 'single-column', _idx: 2 },
-  { id: 'editorial', name: 'Editorial', description: 'Magazine-inspired layout for creative fields.', layout: 'single-column', _idx: 1 },
-  { id: 'mono', name: 'Mono', description: 'Monospace font throughout for engineering roles.', layout: 'single-column', _idx: 7 },
-  { id: 'columns', name: 'Columns', description: 'Equal two-column with thin divider line.', layout: 'two-column', _idx: 1 },
-  { id: 'sidebar-right', name: 'Sidebar Right', description: 'Right sidebar variant for contact and skills.', layout: 'two-column', _idx: 3 },
-  { id: 'profile', name: 'Profile', description: 'Photo-friendly sidebar for consulting roles.', layout: 'sidebar', _idx: 1 },
-  { id: 'metrics', name: 'Metrics', description: 'Data-focused layout with KPI highlight sections.', layout: 'two-column', _idx: 5 },
-  { id: 'technical', name: 'Technical', description: 'Code-friendly monospace sidebar for engineers.', layout: 'two-column', _idx: 4 },
-  { id: 'creative', name: 'Creative', description: 'Asymmetric colorful layout for design roles.', layout: 'two-column', _idx: 2 },
-  { id: 'dashboard', name: 'Dashboard', description: 'Left sidebar with colored icon indicators.', layout: 'sidebar', _idx: 4 },
-  { id: 'expertise', name: 'Expertise', description: 'Skills-focused two-column for specialists.', layout: 'two-column', _idx: 0 },
-  { id: 'left-brand', name: 'Left Brand', description: 'Branded left panel with accent color header.', layout: 'sidebar', _idx: 2 },
-  { id: 'contact-left', name: 'Contact Left', description: 'Contact information prominent in sidebar.', layout: 'sidebar', _idx: 0 },
-  { id: 'skills-left', name: 'Skills Left', description: 'Skills-focused sidebar for technical roles.', layout: 'sidebar', _idx: 1 },
-  { id: 'compact-sidebar', name: 'Compact Sidebar', description: 'Dense sidebar layout for one-page resumes.', layout: 'sidebar', _idx: 3 },
-  { id: 'modern-sidebar', name: 'Modern Sidebar', description: 'Modern sidebar with icon-friendly layout.', layout: 'sidebar', _idx: 4 },
-  { id: 'executive-sidebar', name: 'Executive Sidebar', description: 'Executive sidebar with distinguished header.', layout: 'sidebar', _idx: 2 },
-  { id: 'ats-optimized', name: 'ATS Optimized', description: 'No columns. Maximum ATS parsing compatibility.', layout: 'single-column', _idx: 5 },
-  { id: 'career-change', name: 'Career Change', description: 'Functional skills-focused layout for pivots.', layout: 'single-column', _idx: 8 },
-  { id: 'entry-level', name: 'Entry Level', description: 'Education-first layout for new graduates.', layout: 'single-column', _idx: 3 },
-  { id: 'academic', name: 'Academic', description: 'Research and publications emphasis layout.', layout: 'single-column', _idx: 9 },
-  { id: 'federal', name: 'Federal', description: 'Government resume format with required sections.', layout: 'single-column', _idx: 2 },
-  { id: 'consulting', name: 'Consulting', description: 'Metrics-driven with project impact highlights.', layout: 'two-column', _idx: 5 },
-  { id: 'executive-brief', name: 'Executive Brief', description: 'One-page executive summary format.', layout: 'single-column', _idx: 1 },
-  { id: 'board', name: 'Board', description: 'Board of directors and advisory roles format.', layout: 'single-column', _idx: 6 },
-  { id: 'intern', name: 'Intern', description: 'Internship-focused with education emphasis.', layout: 'single-column', _idx: 7 },
-  { id: 'saas', name: 'SaaS', description: 'SaaS role focused with product metrics.', layout: 'two-column', _idx: 4 },
-  { id: 'remote', name: 'Remote', description: 'Remote work focused with distributed skills.', layout: 'sidebar', _idx: 1 },
-  { id: 'startup', name: 'Startup', description: 'Startup culture focused, concise and bold.', layout: 'single-column', _idx: 0 },
-  { id: 'freelance', name: 'Freelance', description: 'Freelancer portfolio style with project list.', layout: 'sidebar', _idx: 3 },
-  { id: 'bilingual', name: 'Bilingual', description: 'Side-by-side language layout for dual roles.', layout: 'two-column', _idx: 1 },
-  { id: 'gradient-sidebar', name: 'Gradient Sidebar', description: 'Gradient sidebar background for modern look.', layout: 'sidebar', _idx: 4 },
-  { id: 'dark-sidebar', name: 'Dark Sidebar', description: 'Dark sidebar with light text for contrast.', layout: 'sidebar', _idx: 2 },
-  { id: 'minimal-sidebar', name: 'Minimal Sidebar', description: 'Clean sidebar layout with thin divider.', layout: 'sidebar', _idx: 1 },
-  { id: 'marginalia', name: 'Marginalia', description: 'Notes in the margin style for creative roles.', layout: 'sidebar', _idx: 3 },
-  { id: 'portfolio', name: 'Portfolio', description: 'Visual portfolio layout with project grid.', layout: 'two-column', _idx: 2 },
-  { id: 'leadership', name: 'Leadership', description: 'Leadership-focused with team impact metrics.', layout: 'single-column', _idx: 6 },
+const TEMPLATE_DEFS: Array<Omit<ResumeTemplate, 'preview' | 'style'> & { _idx: number; _preset: string }> = [
+  { id: 'minimal', name: 'Minimal', description: 'Clean single column. Best for ATS parsing and traditional roles.', layout: 'single-column', _idx: 0, _preset: 'clean' },
+  { id: 'modern', name: 'Modern', description: 'Two-column with teal sidebar. Great for tech and creative roles.', layout: 'two-column', _idx: 0, _preset: 'modern' },
+  { id: 'executive', name: 'Executive', description: 'Bold name block with serif headings. For senior roles.', layout: 'single-column', _idx: 1, _preset: 'executive' },
+  { id: 'compact', name: 'Compact', description: 'Dense single-column. Fits more content per page.', layout: 'single-column', _idx: 5, _preset: 'compact' },
+  { id: 'sidepanel', name: 'Side Panel', description: 'Left sidebar with contact and skills. Clean main area.', layout: 'sidebar', _idx: 0, _preset: 'editorial' },
+  { id: 'split', name: 'Split', description: 'Even two-column split. Balanced visual presentation.', layout: 'two-column', _idx: 1, _preset: 'modern' },
+  { id: 'accent', name: 'Accent', description: 'Bold color accents on headers. Modern and eye-catching.', layout: 'single-column', _idx: 6, _preset: 'accent' },
+  { id: 'timeline', name: 'Timeline', description: 'Experience shown as a visual timeline.', layout: 'single-column', _idx: 8, _preset: 'journal' },
+  { id: 'minimalist', name: 'Minimalist', description: 'Extra whitespace. Elegant layout for design roles.', layout: 'single-column', _idx: 4, _preset: 'minimal' },
+  { id: 'classic', name: 'Classic', description: 'Traditional resume format. Universally accepted.', layout: 'single-column', _idx: 9, _preset: 'classic' },
+  { id: 'clean', name: 'Clean', description: 'Serif body text with generous spacing for readability.', layout: 'single-column', _idx: 7, _preset: 'elegant' },
+  { id: 'sharp', name: 'Sharp', description: 'Bold black headers with thin separator rules.', layout: 'single-column', _idx: 2, _preset: 'sharp' },
+  { id: 'airy', name: 'Airy', description: 'Maximum whitespace and minimal visual rules.', layout: 'single-column', _idx: 4, _preset: 'minimal' },
+  { id: 'formal', name: 'Formal', description: 'Traditional serif layout for conservative industries.', layout: 'single-column', _idx: 3, _preset: 'executive' },
+  { id: 'modern-clean', name: 'Modern Clean', description: 'Sans-serif with clean layout lines.', layout: 'single-column', _idx: 0, _preset: 'clean' },
+  { id: 'slate', name: 'Slate', description: 'Dark header block for bold first impression.', layout: 'single-column', _idx: 2, _preset: 'bold' },
+  { id: 'editorial', name: 'Editorial', description: 'Magazine-inspired layout for creative fields.', layout: 'single-column', _idx: 1, _preset: 'editorial' },
+  { id: 'mono', name: 'Mono', description: 'Monospace font throughout for engineering roles.', layout: 'single-column', _idx: 7, _preset: 'sharp' },
+  { id: 'columns', name: 'Columns', description: 'Equal two-column with thin divider line.', layout: 'two-column', _idx: 1, _preset: 'modern' },
+  { id: 'sidebar-right', name: 'Sidebar Right', description: 'Right sidebar variant for contact and skills.', layout: 'two-column', _idx: 3, _preset: 'sharp' },
+  { id: 'profile', name: 'Profile', description: 'Photo-friendly sidebar for consulting roles.', layout: 'sidebar', _idx: 1, _preset: 'editorial' },
+  { id: 'metrics', name: 'Metrics', description: 'Data-focused layout with KPI highlight sections.', layout: 'two-column', _idx: 5, _preset: 'bold' },
+  { id: 'technical', name: 'Technical', description: 'Code-friendly monospace sidebar for engineers.', layout: 'two-column', _idx: 4, _preset: 'sharp' },
+  { id: 'creative', name: 'Creative', description: 'Asymmetric colorful layout for design roles.', layout: 'two-column', _idx: 2, _preset: 'accent' },
+  { id: 'dashboard', name: 'Dashboard', description: 'Left sidebar with colored icon indicators.', layout: 'sidebar', _idx: 4, _preset: 'bold' },
+  { id: 'expertise', name: 'Expertise', description: 'Skills-focused two-column for specialists.', layout: 'two-column', _idx: 0, _preset: 'modern' },
+  { id: 'left-brand', name: 'Left Brand', description: 'Branded left panel with accent color header.', layout: 'sidebar', _idx: 2, _preset: 'accent' },
+  { id: 'contact-left', name: 'Contact Left', description: 'Contact information prominent in sidebar.', layout: 'sidebar', _idx: 0, _preset: 'clean' },
+  { id: 'skills-left', name: 'Skills Left', description: 'Skills-focused sidebar for technical roles.', layout: 'sidebar', _idx: 1, _preset: 'editorial' },
+  { id: 'compact-sidebar', name: 'Compact Sidebar', description: 'Dense sidebar layout for one-page resumes.', layout: 'sidebar', _idx: 3, _preset: 'compact' },
+  { id: 'modern-sidebar', name: 'Modern Sidebar', description: 'Modern sidebar with icon-friendly layout.', layout: 'sidebar', _idx: 4, _preset: 'modern' },
+  { id: 'executive-sidebar', name: 'Executive Sidebar', description: 'Executive sidebar with distinguished header.', layout: 'sidebar', _idx: 2, _preset: 'executive' },
+  { id: 'ats-optimized', name: 'ATS Optimized', description: 'No columns. Maximum ATS parsing compatibility.', layout: 'single-column', _idx: 5, _preset: 'minimal' },
+  { id: 'career-change', name: 'Career Change', description: 'Functional skills-focused layout for pivots.', layout: 'single-column', _idx: 8, _preset: 'journal' },
+  { id: 'entry-level', name: 'Entry Level', description: 'Education-first layout for new graduates.', layout: 'single-column', _idx: 3, _preset: 'classic' },
+  { id: 'academic', name: 'Academic', description: 'Research and publications emphasis layout.', layout: 'single-column', _idx: 9, _preset: 'classic' },
+  { id: 'federal', name: 'Federal', description: 'Government resume format with required sections.', layout: 'single-column', _idx: 2, _preset: 'sharp' },
+  { id: 'consulting', name: 'Consulting', description: 'Metrics-driven with project impact highlights.', layout: 'two-column', _idx: 5, _preset: 'bold' },
+  { id: 'executive-brief', name: 'Executive Brief', description: 'One-page executive summary format.', layout: 'single-column', _idx: 1, _preset: 'executive' },
+  { id: 'board', name: 'Board', description: 'Board of directors and advisory roles format.', layout: 'single-column', _idx: 6, _preset: 'executive' },
+  { id: 'intern', name: 'Intern', description: 'Internship-focused with education emphasis.', layout: 'single-column', _idx: 7, _preset: 'clean' },
+  { id: 'saas', name: 'SaaS', description: 'SaaS role focused with product metrics.', layout: 'two-column', _idx: 4, _preset: 'sharp' },
+  { id: 'remote', name: 'Remote', description: 'Remote work focused with distributed skills.', layout: 'sidebar', _idx: 1, _preset: 'minimal' },
+  { id: 'startup', name: 'Startup', description: 'Startup culture focused, concise and bold.', layout: 'single-column', _idx: 0, _preset: 'accent' },
+  { id: 'freelance', name: 'Freelance', description: 'Freelancer portfolio style with project list.', layout: 'sidebar', _idx: 3, _preset: 'editorial' },
+  { id: 'bilingual', name: 'Bilingual', description: 'Side-by-side language layout for dual roles.', layout: 'two-column', _idx: 1, _preset: 'modern' },
+  { id: 'gradient-sidebar', name: 'Gradient Sidebar', description: 'Gradient sidebar background for modern look.', layout: 'sidebar', _idx: 4, _preset: 'accent' },
+  { id: 'dark-sidebar', name: 'Dark Sidebar', description: 'Dark sidebar with light text for contrast.', layout: 'sidebar', _idx: 2, _preset: 'bold' },
+  { id: 'minimal-sidebar', name: 'Minimal Sidebar', description: 'Clean sidebar layout with thin divider.', layout: 'sidebar', _idx: 1, _preset: 'minimal' },
+  { id: 'marginalia', name: 'Marginalia', description: 'Notes in the margin style for creative roles.', layout: 'sidebar', _idx: 3, _preset: 'journal' },
+  { id: 'portfolio', name: 'Portfolio', description: 'Visual portfolio layout with project grid.', layout: 'two-column', _idx: 2, _preset: 'accent' },
+  { id: 'leadership', name: 'Leadership', description: 'Leadership-focused with team impact metrics.', layout: 'single-column', _idx: 6, _preset: 'executive' },
 ]
 
 export const TEMPLATES: ResumeTemplate[] = TEMPLATE_DEFS.map((def) => ({
@@ -380,7 +388,12 @@ export const TEMPLATES: ResumeTemplate[] = TEMPLATE_DEFS.map((def) => ({
   description: def.description,
   layout: def.layout,
   preview: pickPreview(def.layout, def._idx),
+  style: STYLE_PRESETS[def._preset] || STYLE_PRESETS.clean,
 }))
+
+export const TEMPLATE_STYLES: Record<string, TemplateStyle> = Object.fromEntries(
+  TEMPLATES.map((t) => [t.id, t.style]),
+)
 
 export const TEMPLATE_PREVIEWS: Record<string, string> = Object.fromEntries(
   TEMPLATES.map((t) => [t.id, t.preview]),

@@ -5,12 +5,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import { useResumes, useUploadResume, useDeleteResume, useAnalyzeResume, useCreateResume } from '../lib/queries'
 import api from '../lib/api'
 import type { Resume } from '../lib/queries'
-import {
-  FileText, Trash2, Download, Search, Upload,
-  Plus, X, FilePlus, MoreHorizontal,
-  AlertTriangle, CheckCircle, Eye, BarChart3,
-  FileEdit, Copy, RotateCcw,
-} from 'lucide-react'
+import { IconFileText, IconTrash, IconDownload, IconSearch, IconUpload, IconPlus, IconX, IconFilePlus, IconDots, IconAlertTriangle, IconCircleCheck, IconEye, IconChartBar, IconFilePencil, IconCopy, IconRefresh } from '@tabler/icons-react'
 
 const MAX_FILE_SIZE = 15 * 1024 * 1024
 
@@ -50,12 +45,6 @@ function getStatus(r: Resume): { label: string; dot: string; bg: string; text: s
   if (r.redFlags && r.redFlags.length > 0) return { label: 'Needs attention', dot: 'bg-danger', bg: 'bg-danger-light', text: 'text-danger', key: 'attention' }
   if (isAnalysed) return { label: 'Analysed', dot: 'bg-teal', bg: 'bg-teal-light', text: 'text-teal', key: 'analysed' }
   return { label: 'Draft', dot: 'bg-muted-light', bg: 'bg-paper', text: 'text-muted', key: 'draft' }
-}
-
-function getScoreColor(score: number): string {
-  if (score >= 75) return 'text-score-high'
-  if (score >= 50) return 'text-score-mid'
-  return 'text-score-low'
 }
 
 function getScoreRingColor(score: number): string {
@@ -152,14 +141,14 @@ function ContextMenu({ x, y, resume, onClose, onNavigate, onDelete, onAnalyze, o
   const menuX = Math.min(x, window.innerWidth - 220)
   const menuY = Math.min(y, window.innerHeight - 360)
 
-  const items: { icon: typeof FileText; label: string; action: () => void; disabled?: boolean }[] = [
-    { icon: FileEdit, label: 'Edit', action: () => onNavigate(`/resume/${resume._id}`) },
-    ...(isAnalysed ? [{ icon: Eye as typeof FileText, label: 'View review', action: () => onNavigate(`/resume/${resume._id}/review`) }] : []),
-    { icon: BarChart3, label: 'Run ATS check', action: () => onNavigate(`/ats?resume=${resume._id}`) },
-    { icon: FileText, label: 'Generate cover letter', action: () => onNavigate(`/cover-letter/new?resume=${resume._id}`) },
-    { icon: Download, label: 'Export PDF', action: () => onNavigate(`/export/${resume._id}`) },
-    { icon: Copy, label: 'Duplicate', action: () => onDuplicate(resume._id) },
-    ...(isAnalysed ? [{ icon: RotateCcw as typeof FileText, label: 'Re-analyse', action: () => onAnalyze(resume._id) }] : []),
+  const items: { icon: typeof IconFileText; label: string; action: () => void; disabled?: boolean }[] = [
+    { icon: IconFilePencil, label: 'Edit', action: () => onNavigate(`/resume/${resume._id}`) },
+    ...(isAnalysed ? [{ icon: IconEye as typeof IconFileText, label: 'View review', action: () => onNavigate(`/resume/${resume._id}/review`) }] : []),
+    { icon: IconChartBar, label: 'Run ATS check', action: () => onNavigate(`/ats?resume=${resume._id}`) },
+    { icon: IconFileText, label: 'Generate cover letter', action: () => onNavigate(`/cover-letter/new?resume=${resume._id}`) },
+    { icon: IconDownload, label: 'Export PDF', action: () => onNavigate(`/export/${resume._id}`) },
+    { icon: IconCopy, label: 'Duplicate', action: () => onDuplicate(resume._id) },
+    ...(isAnalysed ? [{ icon: IconRefresh as typeof IconFileText, label: 'Re-analyse', action: () => onAnalyze(resume._id) }] : []),
   ]
 
   return (
@@ -168,7 +157,7 @@ function ContextMenu({ x, y, resume, onClose, onNavigate, onDelete, onAnalyze, o
       className="fixed z-50 bg-white border border-border rounded-lg shadow-modal py-1 min-w-[200px]"
       style={{ left: menuX, top: menuY }}
     >
-      {items.map((item, i) => (
+      {items.map((item) => (
         <button
           key={item.label}
           onClick={() => { item.action(); onClose() }}
@@ -202,7 +191,7 @@ function ContextMenu({ x, y, resume, onClose, onNavigate, onDelete, onAnalyze, o
           onClick={() => setDeleting(true)}
           className="w-full flex items-center gap-2.5 px-3 py-2 text-xs text-danger hover:bg-danger-light transition-colors cursor-pointer"
         >
-          <Trash2 className="h-3.5 w-3.5 shrink-0" />
+          <IconTrash className="h-3.5 w-3.5 shrink-0" />
           Delete
         </button>
       )}
@@ -231,14 +220,14 @@ function MobileContextSheet({ resume, onClose, onNavigate, onDelete, onAnalyze, 
     return () => document.removeEventListener('keydown', handleKey)
   }, [onClose])
 
-  const items: { icon: typeof FileText; label: string; action: () => void }[] = [
-    { icon: FileEdit, label: 'Edit', action: () => onNavigate(`/resume/${resume._id}`) },
-    ...(isAnalysed ? [{ icon: Eye as typeof FileText, label: 'View review', action: () => onNavigate(`/resume/${resume._id}/review`) }] : []),
-    { icon: BarChart3, label: 'Run ATS check', action: () => onNavigate(`/ats?resume=${resume._id}`) },
-    { icon: FileText, label: 'Generate cover letter', action: () => onNavigate(`/cover-letter/new?resume=${resume._id}`) },
-    { icon: Download, label: 'Export PDF', action: () => onNavigate(`/export/${resume._id}`) },
-    { icon: Copy, label: 'Duplicate', action: () => onDuplicate(resume._id) },
-    ...(isAnalysed ? [{ icon: RotateCcw as typeof FileText, label: 'Re-analyse', action: () => onAnalyze(resume._id) }] : []),
+  const items: { icon: typeof IconFileText; label: string; action: () => void }[] = [
+    { icon: IconFilePencil, label: 'Edit', action: () => onNavigate(`/resume/${resume._id}`) },
+    ...(isAnalysed ? [{ icon: IconEye as typeof IconFileText, label: 'View review', action: () => onNavigate(`/resume/${resume._id}/review`) }] : []),
+    { icon: IconChartBar, label: 'Run ATS check', action: () => onNavigate(`/ats?resume=${resume._id}`) },
+    { icon: IconFileText, label: 'Generate cover letter', action: () => onNavigate(`/cover-letter/new?resume=${resume._id}`) },
+    { icon: IconDownload, label: 'Export PDF', action: () => onNavigate(`/export/${resume._id}`) },
+    { icon: IconCopy, label: 'Duplicate', action: () => onDuplicate(resume._id) },
+    ...(isAnalysed ? [{ icon: IconRefresh as typeof IconFileText, label: 'Re-analyse', action: () => onAnalyze(resume._id) }] : []),
   ]
 
   return (
@@ -297,7 +286,7 @@ function MobileContextSheet({ resume, onClose, onNavigate, onDelete, onAnalyze, 
               onClick={() => setDeleting(true)}
               className="w-full flex items-center gap-3 py-3 text-sm text-danger hover:bg-danger-light transition-colors cursor-pointer"
             >
-              <Trash2 className="h-4 w-4 shrink-0" />
+              <IconTrash className="h-4 w-4 shrink-0" />
               Delete
             </button>
           )}
@@ -393,9 +382,9 @@ function ResumeCard({
         {/* Three-dot menu button */}
         <button
           onClick={(e) => { e.stopPropagation(); onContextMenu(e, resume) }}
-          className="absolute bottom-2 right-2.5 h-7 w-7 rounded-full bg-white border border-border flex items-center justify-center opacity-0 group-hover:opacity-100 hover:opacity-100 transition-opacity duration-150 hover:border-teal cursor-pointer"
+          className="absolute bottom-2 right-2.5 h-7 w-7 rounded-full bg-white border border-border flex items-center justify-center opacity-100 transition-opacity duration-150 hover:border-teal cursor-pointer"
         >
-          <MoreHorizontal className="h-3.5 w-3.5 text-muted" />
+          <IconDots className="h-3.5 w-3.5 text-muted" />
         </button>
       </div>
 
@@ -411,13 +400,13 @@ function ResumeCard({
           <div className="flex items-center gap-1.5 flex-wrap">
             {redFlagCount > 0 && (
               <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-danger-light text-danger text-[10px] font-medium leading-none">
-                <AlertTriangle className="h-2.5 w-2.5" />
+                <IconAlertTriangle className="h-2.5 w-2.5" />
                 {redFlagCount} {redFlagCount === 1 ? 'red flag' : 'red flags'}
               </span>
             )}
             {weakBullets > 0 && (
               <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-amber-light text-amber text-[10px] font-medium leading-none">
-                <AlertTriangle className="h-2.5 w-2.5" />
+                <IconAlertTriangle className="h-2.5 w-2.5" />
                 {weakBullets} weak {weakBullets === 1 ? 'bullet' : 'bullets'}
               </span>
             )}
@@ -427,7 +416,7 @@ function ResumeCard({
         {!hasFlags && isAnalysed && (
           <div className="flex items-center gap-1">
             <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-success-light text-success text-[10px] font-medium leading-none">
-              <CheckCircle className="h-2.5 w-2.5" />
+              <IconCircleCheck className="h-2.5 w-2.5" />
               Strong
             </span>
           </div>
@@ -552,12 +541,12 @@ function CollapsibleUpload({ onFile, onClose }: { onFile: (file: File) => void; 
           onClick={(e) => { e.stopPropagation(); onClose() }}
           className="absolute top-3 right-3 h-6 w-6 rounded-full bg-paper flex items-center justify-center text-muted hover:text-ink hover:bg-border transition-colors cursor-pointer"
         >
-          <X className="h-3.5 w-3.5" />
+          <IconX className="h-3.5 w-3.5" />
         </button>
 
         <div className="flex flex-col items-center gap-3">
           <div className="h-10 w-10 rounded-full bg-teal-light flex items-center justify-center">
-            <Upload className="h-5 w-5 text-teal" />
+            <IconUpload className="h-5 w-5 text-teal" />
           </div>
           <div className="text-center">
             <p className="text-[15px] font-semibold text-ink">Drop your PDF or DOCX here</p>
@@ -616,7 +605,7 @@ export default function ResumeBuilder() {
   const [sortBy, setSortBy] = useState<SortKey>('updatedAt')
   const [contextMenu, setContextMenu] = useState<{ resume: Resume; x: number; y: number } | null>(null)
   const [mobileSheet, setMobileSheet] = useState<Resume | null>(null)
-  const [deletingIds, setDeletingIds] = useState<Set<string>>(new Set())
+  const [, setDeletingIds] = useState<Set<string>>(new Set())
   const [analysingIds, setAnalysingIds] = useState<Set<string>>(new Set())
   const [newResumeId, setNewResumeId] = useState<string | null>(null)
 
@@ -766,14 +755,14 @@ export default function ResumeBuilder() {
             onClick={() => setUploadOpen((v) => !v)}
             className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-muted bg-transparent border border-border rounded-md hover:border-teal hover:text-teal transition-colors cursor-pointer"
           >
-            <Upload className="h-3.5 w-3.5" />
+            <IconUpload className="h-3.5 w-3.5" />
             <span className="hidden sm:inline">Upload</span>
           </button>
           <button
             onClick={() => createResume.mutateAsync().then((r) => navigate(`/resume/${r._id}`))}
             className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-teal rounded-md hover:bg-teal-dark transition-colors cursor-pointer"
           >
-            <Plus className="h-3.5 w-3.5" />
+            <IconPlus className="h-3.5 w-3.5" />
             <span className="hidden sm:inline">New</span>
           </button>
         </div>
@@ -807,7 +796,7 @@ export default function ResumeBuilder() {
         <div className="flex items-center gap-4 mb-5 flex-wrap">
           {/* Search */}
           <div className="relative flex-1 min-w-[160px] max-w-[240px]">
-            <Search className="absolute left-0 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-light pointer-events-none" />
+            <IconSearch className="absolute left-0 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-light pointer-events-none" />
             <input
               type="text"
               placeholder="Search resumes..."
@@ -820,7 +809,7 @@ export default function ResumeBuilder() {
                 onClick={() => setSearchQuery('')}
                 className="absolute right-0 top-1/2 -translate-y-1/2 text-muted hover:text-ink cursor-pointer"
               >
-                <X className="h-3 w-3" />
+                <IconX className="h-3 w-3" />
               </button>
             )}
           </div>
@@ -885,7 +874,7 @@ export default function ResumeBuilder() {
             onClick={() => createResume.mutateAsync().then((r) => navigate(`/resume/${r._id}`))}
             className="flex items-center gap-2 px-4 py-2 text-xs font-medium text-muted bg-transparent border border-border rounded-md hover:border-teal hover:text-teal transition-colors cursor-pointer"
           >
-            <FilePlus className="h-3.5 w-3.5" />
+            <IconFilePlus className="h-3.5 w-3.5" />
             Build from scratch
           </button>
         </div>
@@ -894,7 +883,7 @@ export default function ResumeBuilder() {
       {/* ---- Filtered Empty State ---- */}
       {showFilteredEmpty && !showNoResumesEmpty && (
         <div className="flex flex-col items-center justify-center py-20 text-center">
-          <Search className="h-8 w-8 text-border mb-3" />
+          <IconSearch className="h-8 w-8 text-border mb-3" />
           {searchQuery ? (
             <>
               <p className="text-sm text-muted">No resumes matching <span className="text-ink font-medium">"{searchQuery}"</span></p>

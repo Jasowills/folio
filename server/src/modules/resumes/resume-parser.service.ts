@@ -1,160 +1,319 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { SKILL_DICTIONARY, LANGUAGE_DICTIONARY, PROFICIENCY_MAP, SECTION_PATTERNS, ALL_SECTION_HEADERS } from './resume-parser.constants';
+import { parseDateRange, normalizeToISO } from './resume-parser.dates';
 
-interface ParsedResume {
-  isResume: boolean;
+interface ParsedContact {
+  email: string | null;
+  phone: string | null;
+  location: string | null;
+  linkedin: string | null;
+  website: string | null;
+  github: string | null;
+}
+
+interface ParsedExperience {
+  company: string;
+  title: string;
+  startDate: string | null;
+  endDate: string | null;
+  current: boolean;
+  bullets: string[];
+}
+
+interface ParsedEducation {
+  institution: string;
+  degree: string;
+  field: string | null;
+  startDate?: string | null;
+  endDate?: string | null;
+  gpa?: string | null;
+}
+
+interface ParsedCertification {
   name: string;
-  contact: {
-    email: string;
-    phone: string;
-    location: string;
-    linkedin: string;
-    website: string;
-    github: string;
-  };
-  summary: string;
-  experience: Array<{
-    company: string;
-    title: string;
-    startDate: string;
-    endDate: string;
-    current: boolean;
-    bullets: string[];
-  }>;
-  education: Array<{
-    institution: string;
-    degree: string;
-    field: string;
-    startDate?: string;
-    endDate?: string;
-    gpa?: string;
-  }>;
-  skills: string[];
-  certifications: Array<{ name: string; issuer: string }>;
-  languages: string[];
-  links: Array<{ title: string; url: string }>;
+  issuer: string | null;
+  date?: string | null;
+}
+
+interface ParsedLanguage {
+  language: string;
+  proficiency: string | null;
+}
+
+interface ParsedLinks {
+  title: string;
+  url: string;
+}
+
+interface SectionMap {
+  sections: Map<string, string>;
+  detectedOrder: string[];
+  unrecognized: string[];
   confidence: number;
 }
 
-const SECTION_HEADERS = [
-  ['professional experience', 'experience', 'work experience', 'employment',
-   'work history', 'professional background', 'relevant experience',
-   'professional employment', 'career history', 'work', 'employment history',
-   'professional experience', 'job experience', 'related experience'],
-  ['education', 'academic background', 'academic history', 'academic training',
-   'educational background', 'education and training', 'studies'],
-  ['skills', 'technical skills', 'core competencies', 'key skills',
-   'skills & abilities', 'skills and abilities', 'competencies',
-   'technical proficiencies', 'areas of expertise', 'expertise',
-   'professional skills', 'technical expertise', 'skill set', 'specialties',
-   'qualifications', 'core qualifications'],
-  ['certifications', 'certificates', 'professional certifications',
-   'certifications and licenses', 'licenses', 'licenses and certifications',
-   'professional development', 'training and certifications'],
-  ['languages', 'language proficiency', 'language skills', 'linguistic skills'],
-  ['professional summary', 'summary', 'profile', 'objective',
-   'career objective', 'about me', 'personal summary', 'professional profile',
-   'qualifications summary', 'summary of qualifications', 'career summary',
-   'personal statement', 'professional background'],
-  ['projects', 'personal projects', 'professional projects', 'key projects',
-   'project experience', 'technical projects'],
-  ['publications', 'research', 'research experience'],
-  ['awards', 'honors', 'awards and honors', 'honours', 'achievements'],
-  ['volunteer', 'volunteer experience', 'volunteer work', 'community service',
-   'volunteering'],
-  ['links', 'social', 'social links', 'online presence', 'contact links',
-   'profiles'],
-  ['references', 'additional information', 'other', 'activities',
-   'leadership', 'leadership experience', 'professional affiliations',
-   'affiliations', 'memberships'],
-] as const;
+interface QualityAssessment {
+  score: number;
+  issues: string[];
+  requiresFallback: boolean;
+  isLikelyScanned: boolean;
+}
 
-const EMAIL_RE = /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/;
+export interface ParsedResume {
+  isResume: boolean;
+  name: string | null;
+  contact: ParsedContact;
+  summary: string | null;
+  experience: ParsedExperience[];
+  education: ParsedEducation[];
+  skills: string[];
+  certifications: ParsedCertification[];
+  languages: ParsedLanguage[];
+  links: ParsedLinks[];
+  confidence: number;
+  warnings: string[];
+}
+
+const EMAIL_RE = /[\w.+-]+@[\w-]+\.[a-z]{2,}/gi;
 const PHONE_RE = /(?:\+?\d{1,3}[-.\s]?)?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}/;
-const URL_RE = /(https?:\/\/[^\s"]+)/gi;
-const LINKEDIN_RE = /linkedin\.com\/(?:in|company)\/[a-zA-Z0-9_-]+/i;
+const URL_RE = /(https?:\/\/[^\s"<>]+)/gi;
+const LINKEDIN_RE = /linkedin\.com\/(?:in|pub|company)\/[a-zA-Z0-9_-]+/i;
 const GITHUB_RE = /github\.com\/[a-zA-Z0-9_-]+/i;
-
-const DEGREE_KEYWORDS = [
-  'bachelor', 'master', 'phd', 'doctorate', 'associate', 'mba',
-  'b\.s\.', 'b\.a\.', 'm\.s\.', 'm\.a\.', 'ph\.d\.',
-  'b\.eng', 'm\.eng', 'bsc', 'msc', 'ba', 'ma', 'bs', 'ms', 'phd',
-  'b\.tech', 'm\.tech', 'b\.com', 'm\.com', 'b\.ba', 'm\.ba',
-  'bachelor of', 'master of', 'doctor of philosophy',
-  'high school', 'diploma', 'certificate',
-  'bachelors', 'masters', 'bachelor\'s', 'master\'s',
-  'doctor', 'doctoral',
-];
+const BARE_DOMAIN_RE = /(?:^|\s)([a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\.(?:vercel\.app|netlify\.app|github\.io|pages\.dev|herokuapp\.com|onrender\.com|fly\.dev|replit\.app|glitch\.me|railway\.app|cyclic\.app|koyeb\.app|uwu\.ai|render\.com|adaptable\.app|wordpress\.com|blogspot\.com|wixsite\.com|squarespace\.com|web\.app))\b/gi;
+const BARE_GITHUB_RE = /(?:^|\s)(github\.com\/[a-zA-Z0-9_-]+)(?:\s|$)/gi;
 
 const TITLE_KEYWORDS = [
-  'manager', 'engineer', 'developer', 'designer', 'analyst',
-  'consultant', 'director', 'coordinator', 'specialist',
-  'associate', 'intern', 'lead', 'head', 'chief', 'officer',
-  'assistant', 'representative', 'technician', 'architect',
-  'administrator', 'supervisor', 'president', 'vice president',
-  'principal', 'senior', 'junior', 'freelance', 'contractor',
-  'partner', 'owner', 'founder', 'co-founder', 'ceo', 'cto', 'cfo',
-  'vp', 'svp', 'evp', 'director of', 'manager of',
-  'software engineer', 'software developer', 'data scientist',
-  'product manager', 'project manager', 'program manager',
-  'scrum master', 'business analyst', 'quality assurance',
-  'devops', 'sysadmin', 'administrator',
-  'researcher', 'scientist', 'professor', 'teacher', 'instructor',
-  'nurse', 'doctor', 'physician', 'surgeon', 'attorney', 'lawyer',
-  'accountant', 'auditor', 'financial analyst', 'underwriter',
-  'broker', 'agent', 'representative',
+  'engineer', 'manager', 'designer', 'director', 'lead', 'senior',
+  'junior', 'head', 'vp', 'vice president', 'analyst', 'developer',
+  'consultant', 'specialist', 'coordinator', 'executive', 'officer',
+  'associate', 'architect', 'principal', 'product', 'software',
+  'data', 'ux', 'ui', 'marketing', 'sales', 'operations', 'finance',
+  'legal', 'hr', 'research', 'intern', 'founder', 'co-founder',
+  'owner', 'partner', 'freelance', 'contractor', 'ceo', 'cto', 'cfo',
+  'scrum master', 'devops', 'sre', 'solutions', 'technical',
+  'full stack', 'fullstack', 'frontend', 'front-end', 'backend',
+  'back-end', 'qa', 'quality assurance', 'sysadmin', 'administrator',
+  'scientist', 'professor', 'lecturer', 'instructor', 'teacher',
+  'nurse', 'doctor', 'physician', 'attorney', 'lawyer', 'accountant',
+  'auditor', 'broker', 'agent',
 ];
+
+const COMPANY_SUFFIXES = [
+  'ltd', 'limited', 'llc', 'inc', 'plc', 'gmbh', 'ag', 'corp',
+  'corporation', 'group', 'technologies', 'tech', 'solutions',
+  'services', 'consulting', 'digital', 'labs', 'studio', 'agency',
+  'partners', 'ventures', 'capital', 'health', 'media', 'systems',
+  'software', 'industries', 'global', 'international', 'holdings',
+  'network', 'associates', 'enterprises', 'llp', 'pvt',
+];
+
+const LOCATION_BLOCKLIST = new Set([
+  'rust', 'solana', 'solidity', 'node', 'react', 'angular', 'vue',
+  'python', 'java', 'ruby', 'go', 'c++', 'c#', 'typescript',
+  'javascript', 'html', 'css', 'sql', 'docker', 'kubernetes',
+  'aws', 'azure', 'gcp', 'linux', 'git',
+]);
+
+const KNOWN_COMPOUND_WORDS = new Set([
+  'javascript', 'typescript', 'webgl', 'webrtc', 'webassembly',
+  'websocket', 'webpack', 'graphql', 'devops', 'devsecops',
+  'github', 'gitlab', 'gitbook', 'gitops', 'macos', 'ios',
+  'openapi', 'openid', 'openssl', 'opencv', 'postgresql', 'mysql',
+  'mongodb', 'sqlite', 'cloudfront', 'cloudwatch', 'cloudformation',
+  'cloudflare', 'codepipeline', 'codebuild', 'codecommit',
+  'nextjs', 'nestjs', 'fastapi', 'springboot',
+]);
 
 @Injectable()
 export class ResumeParserService {
   private readonly logger = new Logger(ResumeParserService.name);
 
-  parse(rawText: string): ParsedResume {
-    const lines = rawText.split('\n').map(l => l.trim());
-    const nonEmpty = lines.filter(l => l.length > 0);
+  assessQuality(text: string, pageCount: number): QualityAssessment {
+    let score = 1.0;
+    const issues: string[] = [];
 
-    const sections = this.extractSections(nonEmpty);
-    const headerLines = this.getHeaderLines(sections);
-    const headerText = headerLines.join(' ');
-    const allHeaderText = nonEmpty.slice(0, Math.min(25, nonEmpty.length)).join(' ');
+    const charsPerPage = text.length / Math.max(pageCount, 1);
+    if (charsPerPage < 150) {
+      score -= 0.4;
+      issues.push('low-text-density');
+    } else if (charsPerPage < 300) {
+      score -= 0.1;
+      issues.push('below-average-text-density');
+    }
 
-    const name = this.extractName(headerLines, nonEmpty);
-    const contact = this.extractContact(nonEmpty);
-    const summary = this.extractSectionText(sections, ['professional summary', 'summary', 'profile', 'objective', 'about me', 'personal summary', 'qualifications summary', 'summary of qualifications', 'career summary', 'personal statement', 'professional profile']);
-    const experience = this.extractExperience(sections, nonEmpty);
-    const education = this.extractEducation(sections);
-    const skills = this.extractSkills(sections);
-    const certifications = this.extractCertifications(sections);
-    const languages = this.extractLanguages(sections);
-    const links = this.extractLinks(contact, nonEmpty, sections);
+    const nonAsciiCount = (text.match(/[^\x00-\x7F]/g) || []).length;
+    const nonAsciiPct = nonAsciiCount / Math.max(text.length, 1);
+    if (nonAsciiPct > 0.08) {
+      score -= 0.3;
+      issues.push('high-non-ascii');
+    } else if (nonAsciiPct > 0.03) {
+      score -= 0.1;
+      issues.push('moderate-non-ascii');
+    }
 
-    const hasResumeContent = !!(name || contact.email || contact.phone ||
-      experience.length > 0 || education.length > 0 ||
-      skills.length > 0 || summary.length > 10);
+    const repeatRuns = text.match(/(.)\1{6,}/g);
+    if (repeatRuns && repeatRuns.length > 3) {
+      score -= 0.2;
+      issues.push('repetition-artifacts');
+    }
 
-    const hasDates = /\b(19|20)\d{2}\b/.test(rawText);
-    const hasJobIndicators = TITLE_KEYWORDS.some(k => new RegExp(`\\b${k.replace(/\./g, '\\.')}`, 'i').test(rawText));
-    const hasSectionLabels = SECTION_HEADERS.flat().some(h => {
-      const regex = new RegExp(`(?:^|\\n)\\s*${this.escapeRegex(h)}\\s*[:\\n]`, 'im');
-      return regex.test(rawText);
-    });
+    const hasEmail = EMAIL_RE.test(text);
+    const hasDate = /\b(19|20)\d{2}\b/.test(text);
+    const newlinesPer100 = (text.match(/\n/g) || []).length / Math.max(text.length / 100, 1);
+    const hasStructure = newlinesPer100 >= 2;
 
-    const signals = [hasResumeContent, hasDates, hasJobIndicators, hasSectionLabels];
-    const strongSignals = signals.filter(Boolean).length;
-    const confidence = Math.round((strongSignals / signals.length) * 100);
+    if (!hasEmail) { score -= 0.1; issues.push('missing-email'); }
+    if (!hasDate) { score -= 0.1; issues.push('missing-date'); }
+    if (!hasStructure) { score -= 0.1; issues.push('no-line-structure'); }
 
-    return {
-      isResume: strongSignals >= 1,
-      name,
-      contact,
-      summary,
-      experience,
-      education,
-      skills,
-      certifications,
-      languages,
-      links,
-      confidence,
+    const alphaNumRatio = (text.match(/[a-zA-Z0-9]/g) || []).length / Math.max(text.length, 1);
+
+    const result = {
+      score: Math.max(0, score),
+      issues,
+      requiresFallback: score < 0.6,
+      isLikelyScanned: score < 0.4 && alphaNumRatio < 0.3,
     };
+    this.logger.log(`assessQuality: score=${result.score}, issues=[${issues.join(', ')}], requiresFallback=${result.requiresFallback}, isLikelyScanned=${result.isLikelyScanned}, charsPerPage=${charsPerPage.toFixed(1)}, nonAsciiPct=${(nonAsciiPct * 100).toFixed(1)}%`);
+    return result;
+  }
+
+  detectSections(text: string): SectionMap {
+    const rawLines = text.split('\n');
+    const mergedLines = this.mergeWrappedLines(rawLines);
+    const lines = mergedLines.map(l => l.trim());
+
+    const headings: Array<{ index: number; line: string; section: string | null }> = [];
+
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+      const trimmed = line.trim();
+      if (!trimmed) continue;
+
+      const prevLine = i > 0 ? lines[i - 1] : '';
+      const prevIsBlank = !prevLine || prevLine.trim().length === 0;
+
+      const matched = this.matchSectionHeader(trimmed);
+      const matchedExact = this.matchSectionHeader(trimmed, true);
+
+      if (!this.isHeadingCandidate(trimmed, i === 0, prevIsBlank) && !matchedExact) continue;
+
+      const isAllUpper = trimmed.length > 4 && trimmed === trimmed.toUpperCase() && /[A-Z]{3,}/.test(trimmed);
+      const nextLine = i < lines.length - 1 ? lines[i + 1] : '';
+      const nextIsBlank = !nextLine || nextLine.trim().length === 0;
+
+      if (matched || isAllUpper || (nextIsBlank && trimmed.length < 35)) {
+        headings.push({ index: i, line: trimmed, section: matched });
+      }
+    }
+
+    const sections = new Map<string, string>();
+    const detectedOrder: string[] = [];
+    const unrecognized: string[] = [];
+
+    let currentSection = 'header';
+    let currentContent: string[] = [];
+
+    for (let i = 0; i < lines.length; i++) {
+      const heading = headings.find(h => h.index === i);
+
+      if (heading) {
+        if (currentContent.length > 0) {
+          const existing = sections.get(currentSection) || '';
+          sections.set(currentSection, existing + currentContent.join('\n'));
+        }
+
+        currentSection = heading.section || `unrecognized_${heading.line.toLowerCase().replace(/[^a-z0-9]/g, '_')}`;
+
+        if (!detectedOrder.includes(currentSection)) {
+          detectedOrder.push(currentSection);
+        }
+
+        if (!heading.section) {
+          unrecognized.push(heading.line);
+        }
+
+        currentContent = [];
+      } else {
+        currentContent.push(lines[i]);
+      }
+    }
+
+    if (currentContent.length > 0) {
+      const existing = sections.get(currentSection) || '';
+      sections.set(currentSection, existing + currentContent.join('\n'));
+    }
+
+    const expectedSections = ['experience', 'education', 'skills', 'summary'];
+    let foundCount = 0;
+    for (const es of expectedSections) {
+      if (sections.has(es) && (sections.get(es) || '').trim().length > 0) foundCount++;
+    }
+    let confidence = 0.0;
+    if (foundCount >= 2) confidence = 0.8 + Math.min((foundCount - 2) * 0.05, 0.2);
+    if (sections.has('header') && (sections.get('header') || '').trim().length > 3) confidence = Math.max(confidence, 0.3);
+
+    this.logger.log(`detectSections: foundCount=${foundCount}, confidence=${confidence}, sections=${[...sections.keys()].join(', ')}, detectedOrder=[${detectedOrder.join(', ')}], unrecognized=[${unrecognized.join(', ')}]`);
+    return { sections, detectedOrder, unrecognized, confidence };
+  }
+
+  private mergeWrappedLines(lines: string[]): string[] {
+    const result: string[] = [];
+    for (let i = 0; i < lines.length; i++) {
+      const current = lines[i];
+      const next = lines[i + 1];
+      if (next && /^[a-z]/.test(next.trim()) && current.length > 30 && !current.match(/[.!?:]$/) && next.trim().length > 10) {
+        result.push(current + ' ' + next.trim());
+        i++;
+      } else {
+        result.push(current);
+      }
+    }
+    return result;
+  }
+
+  private isHeadingCandidate(line: string, isFirstLine: boolean, precededByBlank: boolean): boolean {
+    if (!isFirstLine && !precededByBlank) return false;
+    const trimmed = line.trim();
+    if (trimmed.length < 3 || trimmed.length > 45) return false;
+    if (trimmed.includes('@')) return false;
+    if (/http|www/i.test(trimmed)) return false;
+    if (/\b\d{4}\b/.test(trimmed) && /present|current|to|–|—|-/i.test(trimmed)) return false;
+    if (/^[-•*♦‣⁃◦‣\d.)]/.test(trimmed)) return false;
+    return true;
+  }
+
+  private matchSectionHeader(line: string, exactOnly = false): string | null {
+    const clean = line
+      .toLowerCase()
+      .replace(/[^a-z0-9\s/&]/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+
+    for (const [section, patterns] of Object.entries(SECTION_PATTERNS)) {
+      for (const pattern of patterns) {
+        if (clean === pattern) return section;
+        if (clean === pattern + 's') return section;
+        if (clean.endsWith(':') && clean.slice(0, -1).trim() === pattern) return section;
+        if (!exactOnly && this.fuzzyMatch(clean, pattern, 2)) return section;
+      }
+    }
+
+    return null;
+  }
+
+  private fuzzyMatch(text: string, keyword: string, threshold: number): boolean {
+    const clean = text.toLowerCase().trim();
+    const kw = keyword.toLowerCase().trim();
+    if (clean === kw) return true;
+    if (clean.includes(kw)) return true;
+    const words = clean.split(/[\s,;/]+/);
+    for (const word of words) {
+      if (word.length < 3) continue;
+      if (Math.abs(word.length - kw.length) > threshold) continue;
+      if (this.levenshtein(word, kw) <= threshold) return true;
+    }
+    return false;
   }
 
   private levenshtein(a: string, b: string): number {
@@ -178,218 +337,266 @@ export class ResumeParserService {
     return matrix[alen][blen];
   }
 
-  private fuzzyMatchKeyword(text: string, keyword: string, threshold: number): boolean {
-    const clean = text.toLowerCase().trim();
-    const kw = keyword.toLowerCase().trim();
-    if (clean === kw) return true;
-    if (clean.includes(kw)) return true;
-    const words = clean.split(/[\s,;/]+/);
-    for (const word of words) {
-      if (word.length < 3) continue;
-      if (Math.abs(word.length - kw.length) > threshold) continue;
-      if (this.levenshtein(word, kw) <= threshold) return true;
+  async parse(rawText: string): Promise<ParsedResume> {
+    this.logger.log(`parse: input length=${rawText.length}, preview="${rawText.slice(0, 120).replace(/\n/g, '\\n')}"`);
+
+    const sectionMap = this.detectSections(rawText);
+    const { sections } = sectionMap;
+    this.logger.log(`parse: sections detected=${sections.size}, order=[${sectionMap.detectedOrder.join(', ')}], confidence=${sectionMap.confidence}, unrecognized=[${sectionMap.unrecognized.join(', ')}]`);
+
+    const headerSection = sections.get('header') || rawText.split('\n').slice(0, 15).join('\n');
+
+    const [contactResult, summaryResult, experienceResult, educationResult, skillsResult, certsResult, langsResult] = await Promise.all([
+      Promise.resolve(this.parseContact(headerSection)),
+      Promise.resolve(this.parseSummary(sections)),
+      Promise.resolve(this.parseExperience(sections)),
+      Promise.resolve(this.parseEducation(sections)),
+      Promise.resolve(this.parseSkills(sections)),
+      Promise.resolve(this.parseCertifications(sections)),
+      Promise.resolve(this.parseLanguages(sections)),
+    ]);
+    this.logger.log(`parse: contact name="${contactResult.name}", email=${contactResult.email}, phone=${contactResult.phone}, linkedin=${contactResult.linkedin}, github=${contactResult.github}, website=${contactResult.website}, location=${contactResult.location}`);
+    this.logger.log(`parse: summary length=${summaryResult?.length || 0}, experience=${experienceResult.length} entries, education=${educationResult.length} entries, skills=${skillsResult.length} raw items, certifications=${certsResult.length}, languages=${langsResult.length}`);
+
+    const links = this.buildLinks(contactResult, rawText, sections);
+    this.logger.log(`parse: links built=${links.length}`);
+
+    const warnings: string[] = [];
+    if (sectionMap.confidence < 0.5) warnings.push('low-section-detection-confidence');
+    if (sectionMap.unrecognized.length > 0) warnings.push(`unrecognized-sections: ${sectionMap.unrecognized.join(', ')}`);
+
+    const experienceClean = this.cleanupExperience(experienceResult);
+    const educationClean = this.cleanupEducation(educationResult);
+    const skillsClean = this.deduplicateSkills(skillsResult);
+    this.logger.log(`parse: after cleanup — experience=${experienceClean.length}, education=${educationClean.length}, skills=${skillsClean.length}`);
+
+    const overallConfidence = this.calculateOverallConfidence(
+      contactResult.name,
+      contactResult.email,
+      experienceClean,
+      educationClean,
+      skillsClean,
+    );
+    this.logger.log(`parse: done — isResume=${sectionMap.confidence >= 0.3 || overallConfidence >= 0.3}, confidence=${overallConfidence}, warnings=[${warnings.join(', ')}]`);
+
+    return {
+      isResume: sectionMap.confidence >= 0.3 || overallConfidence >= 0.3,
+      name: contactResult.name,
+      contact: {
+        email: contactResult.email,
+        phone: contactResult.phone,
+        location: contactResult.location,
+        linkedin: contactResult.linkedin,
+        website: contactResult.website,
+        github: contactResult.github,
+      },
+      summary: summaryResult,
+      experience: experienceClean,
+      education: educationClean,
+      skills: skillsClean,
+      certifications: certsResult,
+      languages: langsResult,
+      links,
+      confidence: overallConfidence,
+      warnings,
+    };
+  }
+
+  parseContact(headerText: string): {
+    name: string | null;
+    email: string | null;
+    phone: string | null;
+    location: string | null;
+    linkedin: string | null;
+    website: string | null;
+    github: string | null;
+  } {
+    const lines = headerText.split('\n').map(l => l.trim()).filter(Boolean);
+    const headerJoined = lines.join(' ');
+    // Also join without spaces so split email addresses get reconstructed
+    const headerJoinedFlat = lines.join('');
+
+    const email = this.parseEmail(headerJoined, headerJoinedFlat);
+    const phone = this.parsePhone(headerJoined);
+    const linkedin = this.parseLinkedin(headerJoined);
+    const github = this.parseGithub(headerJoined);
+    const website = this.parseWebsite(headerJoined, linkedin, github);
+    const location = this.parseLocation(lines);
+    const name = this.parseName(lines, email, phone);
+
+    return { name, email, phone, location, linkedin, website, github };
+  }
+
+  private parseName(lines: string[], email: string | null, phone: string | null): string | null {
+    const firstLine = lines[0];
+    if (!firstLine) return null;
+
+    const name = firstLine.replace(/[,;].*$/, '').trim();
+    if (name.length < 3 || name.length > 60) return null;
+
+    const wordCount = name.split(/\s+/).length;
+    if (wordCount < 2 || wordCount > 5) return null;
+
+    if (name.includes('@') || /http/i.test(name) || /\d/.test(name)) return null;
+    if (phone && PHONE_RE.test(name)) return null;
+    if (EMAIL_RE.test(name)) return null;
+    if (/\b(19|20)\d{2}\b/.test(name)) return null;
+    if (ALL_SECTION_HEADERS.some(h => name.toLowerCase().includes(h))) return null;
+
+    const hasTitleCase = name.split(/\s+/).every(w => /^[A-Z]/.test(w));
+    const isAllUpper = name === name.toUpperCase() && name.length > 3;
+    if (!hasTitleCase && !isAllUpper) return null;
+
+    return name;
+  }
+
+  private parseEmail(joinedText: string, flatText?: string): string | null {
+    const joinedAddrs = [...joinedText.matchAll(EMAIL_RE)].map(m => m[0].toLowerCase()).filter(Boolean);
+    const flatAddrs = flatText ? [...flatText.matchAll(EMAIL_RE)].map(m => m[0].toLowerCase()).filter(Boolean) : [];
+
+    // Prefer a letter-starting email from the space-joined text (clean extraction)
+    for (const addr of joinedAddrs) {
+      if (/^[a-zA-Z]/.test(addr)) return addr;
     }
-    return false;
+
+    // Fall back to flat text (reconstructs emails split across lines)
+    for (const addr of flatAddrs) {
+      if (/^[a-zA-Z]/.test(addr)) return addr;
+    }
+
+    // Last resort: any match
+    return joinedAddrs[0] || flatAddrs[0] || null;
   }
 
-  private escapeRegex(s: string): string {
-    return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  private parsePhone(text: string): string | null {
+    const digits = text.replace(/\D/g, '');
+    if (digits.length >= 10 && digits.length <= 15) {
+      const match = text.match(PHONE_RE);
+      if (match) return match[0].trim();
+    }
+    return null;
   }
 
-  private extractSections(lines: string[]): Map<string, string[]> {
-    const sections = new Map<string, string[]>();
-    let currentSection = '_header';
-    const currentLines: string[] = [];
+  private parseLinkedin(text: string): string | null {
+    const match = text.match(LINKEDIN_RE);
+    if (match) return `https://${match[0].toLowerCase()}`;
+    const usernameMatch = text.match(/\blinkedin\s*[:/]\s*([a-zA-Z0-9_-]{3,50})\b/i);
+    if (usernameMatch) return `https://linkedin.com/in/${usernameMatch[1].toLowerCase()}`;
+    return null;
+  }
 
-    for (const line of lines) {
-      const header = this.matchSectionHeader(line);
-      if (header) {
-        if (currentLines.length > 0) {
-          sections.set(currentSection, [...currentLines]);
-        }
-        currentSection = header;
-        currentLines.length = 0;
-      } else {
-        currentLines.push(line);
+  private parseGithub(text: string): string | null {
+    const match = text.match(GITHUB_RE);
+    if (match) return `https://${match[0].toLowerCase()}`;
+    const bareMatch = text.match(BARE_GITHUB_RE);
+    if (bareMatch) return `https://${bareMatch[1].toLowerCase()}`;
+    return null;
+  }
+
+  private parseWebsite(text: string, linkedin: string | null, github: string | null): string | null {
+    const urls = [...text.matchAll(URL_RE)];
+    const excluded = new Set<string>();
+    if (linkedin) excluded.add(linkedin.toLowerCase());
+    if (github) excluded.add(github.toLowerCase());
+
+    for (const m of urls) {
+      const url = m[0].toLowerCase();
+      if (!excluded.has(url) && !url.includes('linkedin') && !url.includes('github')) {
+        return m[0];
       }
     }
-    if (currentLines.length > 0) {
-      sections.set(currentSection, [...currentLines]);
+
+    const bareDomains = [...text.matchAll(BARE_DOMAIN_RE)];
+    if (bareDomains.length > 0) {
+      return `https://${bareDomains[0][1].toLowerCase()}`;
     }
 
-    return sections;
+    return null;
   }
 
-  private matchSectionHeader(line: string): string | null {
-    const clean = line
-      .replace(/[^a-zA-Z\s-/&]/g, '')
-      .trim()
-      .toLowerCase()
-      .replace(/\s+/g, ' ');
+  private parseLocation(lines: string[]): string | null {
+    for (const line of lines.slice(0, 10)) {
+      if (/^remote$/i.test(line.trim())) return 'Remote';
+      if (/^hybrid$/i.test(line.trim())) return 'Hybrid';
 
-    for (const group of SECTION_HEADERS) {
-      for (const header of group as readonly string[]) {
-        if (clean === header) return header;
-        if (clean === header + 's') return header;
-        if (clean.endsWith(':') && clean.slice(0, -1) === header) return header;
-        if (clean.startsWith(header) && clean.length === header.length) return header;
+      const match = line.match(/([A-Z][a-zA-Z'-]+(?:[\s,]+[A-Z][a-zA-Z'-]+)*)\s*,\s*([A-Z]{2})\b/);
+      if (match) {
+        const firstWord = match[1].split(/[\s,]+/)[0].toLowerCase();
+        if (LOCATION_BLOCKLIST.has(firstWord)) continue;
+        return match[0].trim();
+      }
 
-        const threshold = header.length <= 5 ? 1 : header.length <= 8 ? 2 : 3;
-        if (this.fuzzyMatchKeyword(clean, header, threshold)) return header;
-
-        if (clean.includes(' ' + header + ' ') || clean.startsWith(header + ' ') || clean.endsWith(' ' + header)) return header;
-        if (clean.includes(' ' + header + 's ') || clean.endsWith(' ' + header + 's')) return header;
+      const fullMatch = line.match(/([A-Z][a-zA-Z]+(?:[\s,]+[A-Z][a-zA-Z'-]+)*)\s*,\s*([A-Z][a-zA-Z]+(?:\s[A-Z][a-zA-Z]+)*)\b/);
+      if (fullMatch) {
+        const firstWord = fullMatch[1].split(/[\s,]+/)[0].toLowerCase();
+        if (LOCATION_BLOCKLIST.has(firstWord)) continue;
+        return fullMatch[0].trim();
       }
     }
 
     return null;
   }
 
-  private getHeaderLines(sections: Map<string, string[]>): string[] {
-    return sections.get('_header') || [];
-  }
-
-  private extractName(headerLines: string[], allLines: string[]): string {
-    for (const candidate of [headerLines, allLines]) {
-      if (candidate.length === 0) continue;
-      const raw = candidate[0];
-      const name = raw.replace(/[,;].*$/, '').trim();
-      if (name.length > 0 && name.length < 80 &&
-          !EMAIL_RE.test(name) && !PHONE_RE.test(name) && !URL_RE.test(name) &&
-          !DEGREE_KEYWORDS.some(k => new RegExp(k.replace(/\./g, '\\.'), 'i').test(name))) {
-        return name;
-      }
-    }
-    return '';
-  }
-
-  private extractContact(lines: string[]): ParsedResume['contact'] {
-    const contact: ParsedResume['contact'] = {
-      email: '', phone: '', location: '', linkedin: '', website: '', github: '',
-    };
-
-    const headerText = lines.slice(0, 25).join(' ');
-
-    const emailMatch = headerText.match(EMAIL_RE);
-    if (emailMatch) contact.email = emailMatch[0];
-
-    const phoneMatch = headerText.match(PHONE_RE);
-    if (phoneMatch) contact.phone = phoneMatch[0].trim();
-
-    const linkedinMatch = headerText.match(LINKEDIN_RE);
-    if (linkedinMatch) contact.linkedin = `https://${linkedinMatch[0].toLowerCase()}`;
-
-    const githubMatch = headerText.match(GITHUB_RE);
-    if (githubMatch) contact.github = `https://${githubMatch[0].toLowerCase()}`;
-
-    const urlMatches = headerText.matchAll(URL_RE);
-    const foundUrls = new Set<string>();
-    for (const m of urlMatches) {
-      const url = m[0].toLowerCase();
-      if (url.includes('linkedin')) {
-        contact.linkedin = contact.linkedin || url;
-      } else if (url.includes('github')) {
-        contact.github = contact.github || url;
-      } else if (!foundUrls.has(url)) {
-        contact.website = contact.website || url;
-      }
-      foundUrls.add(url);
-    }
-
-    contact.location = this.extractLocation(lines);
-    return contact;
-  }
-
-  private extractLocation(lines: string[]): string {
-    const patterns = [
-      /([A-Z][a-zA-Z]+(?:[\s,]+[A-Z][a-zA-Z'-]+)*)\s*,\s*([A-Z]{2})\b/,
-      /([A-Z][a-zA-Z]+(?:[\s,]+[A-Z][a-zA-Z'-]+)*)\s*,\s*([A-Z][a-zA-Z]+(?:\s[A-Z][a-zA-Z]+)*)\b/,
-    ];
-
-    const locationBlocklist = new Set([
-      'rust', 'solana', 'solidity', 'node', 'react', 'angular', 'vue',
-      'python', 'java', 'ruby', 'go', 'c++', 'c#', 'typescript',
-      'javascript', 'html', 'css', 'sql', 'docker', 'kubernetes',
-      'aws', 'azure', 'gcp', 'linux', 'git', 'github',
-    ]);
-
-    for (const line of lines.slice(0, 10)) {
-      for (const pattern of patterns) {
-        const m = line.match(pattern);
-        if (m && !EMAIL_RE.test(line) && !PHONE_RE.test(line)) {
-          const candidate = m[0].trim();
-          const firstWord = candidate.split(/[\s,]+/)[0].toLowerCase();
-          if (locationBlocklist.has(firstWord)) continue;
-          return candidate;
-        }
-      }
-
-      const locationLabel = line.match(/^(location|based|resides?|from):\s*(.+)$/i);
-      if (locationLabel) return locationLabel[2].trim();
-
-      if (/^[A-Z][a-zA-Z]+(?:[\s,]+[A-Z][a-zA-Z]+)*,\s*[A-Z]{2}\b/.test(line)) {
-        const firstWord = line.split(/[\s,]+/)[0].toLowerCase();
-        if (locationBlocklist.has(firstWord)) continue;
-        return line.trim();
+  private parseSummary(sections: Map<string, string>): string | null {
+    const summaryHeaders = SECTION_PATTERNS.summary;
+    let content = '';
+    for (const h of summaryHeaders) {
+      const found = sections.get(h);
+      if (found && found.trim().length > 0) {
+        content = found;
+        break;
       }
     }
 
-    for (const line of lines.slice(0, 10)) {
-      if (/^[A-Z][a-zA-Z\s]+,\s*[A-Z]{2}\b/.test(line)) {
-        const firstWord = line.split(/[\s,]+/)[0].toLowerCase();
-        if (locationBlocklist.has(firstWord)) continue;
-        return line.trim();
-      }
+    if (!content || content.trim().length < 20) return null;
+
+    let cleaned = content;
+    const headingMatch = cleaned.match(/^(professional\s+)?(summary|profile|objective|about)/i);
+    if (headingMatch && headingMatch.index === 0) {
+      cleaned = cleaned.substring(headingMatch[0].length).trim();
     }
 
-    return '';
+    cleaned = cleaned.replace(/\n{3,}/g, '\n\n');
+    cleaned = cleaned.split('\n').filter(l => {
+      const t = l.trim();
+      if (t.length <= 1) return false;
+      if (/^[.\-–—=*_]+$/.test(t)) return false;
+      if (ALL_SECTION_HEADERS.some(h => t.toLowerCase() === h)) return false;
+      return true;
+    }).join('\n').trim();
+
+    if (cleaned.length < 20) return null;
+    return cleaned;
   }
 
-  private extractSectionText(sections: Map<string, string[]>, possibleHeaders: string[]): string {
-    for (const header of possibleHeaders) {
-      const lines = sections.get(header);
-      if (lines && lines.length > 0) {
-        return lines.join(' ').trim();
-      }
-    }
-    return '';
-  }
-
-  private extractExperience(sections: Map<string, string[]>, allLines: string[]): ParsedResume['experience'] {
-    const expHeaders = SECTION_HEADERS[0] as readonly string[];
-    let lines: string[] = [];
+  private parseExperience(sections: Map<string, string>): ParsedExperience[] {
+    const expHeaders = SECTION_PATTERNS.experience;
+    let content = '';
     for (const h of expHeaders) {
       const found = sections.get(h);
-      if (found) { lines = found; break; }
-    }
-
-    if (lines.length === 0) {
-      if (allLines.length > 20) {
-        lines = allLines.slice(5);
+      if (found && found.trim().length > 0) {
+        content = found;
+        break;
       }
     }
 
-    if (lines.length === 0) return [];
+    if (!content) return [];
 
-    const nonHeaderLines = lines.filter(l => {
-      if (EMAIL_RE.test(l) || PHONE_RE.test(l) || URL_RE.test(l)) return false;
-      if (l.length > 0 && l.length < 80 && /^[A-Z][a-zA-Z\s]{0,30}$/.test(l) && this.matchSectionHeader(l)) return false;
-      return true;
-    });
-
-    const experience = this.parseExperienceBlocks(nonHeaderLines.length >= 3 ? nonHeaderLines : lines);
-
-    const projHeaders = SECTION_HEADERS[6] as readonly string[];
-    let projLines: string[] = [];
+    const projHeaders = SECTION_PATTERNS.projects;
+    let projContent = '';
     for (const h of projHeaders) {
       const found = sections.get(h);
-      if (found) { projLines = found; break; }
+      if (found && found.trim().length > 0) {
+        projContent = found;
+        break;
+      }
     }
 
-    if (projLines.length > 0) {
-      const projects = this.parseExperienceBlocks(projLines);
+    const experience = this.parseExperienceBlocks(content);
+    if (projContent) {
+      const projects = this.parseExperienceBlocks(projContent);
       for (const p of projects) {
-        if (p.title && !experience.some(e => e.title === p.title && e.company === p.company)) {
+        if (p.title && !experience.some(e => e.title.toLowerCase() === p.title.toLowerCase() && e.company.toLowerCase() === p.company.toLowerCase())) {
           experience.push(p);
         }
       }
@@ -398,34 +605,67 @@ export class ResumeParserService {
     return experience;
   }
 
-  private parseExperienceBlocks(lines: string[]): ParsedResume['experience'] {
-    const blocks: ParsedResume['experience'] = [];
-    let current: ParsedResume['experience'][number] | null = null;
+  private parseExperienceBlocks(text: string): ParsedExperience[] {
+    const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
+    if (lines.length === 0) return [];
 
-    for (const line of lines) {
+    const blocks: ParsedExperience[] = [];
+    let current: ParsedExperience | null = null;
+
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+
       if (this.looksLikeJobEntry(line)) {
         if (current) blocks.push(current);
 
         const { title, company } = this.splitTitleCompany(line);
-        const dateRange = this.extractDateRange(line);
+        const dateRange = parseDateRange(line);
 
         current = {
           company,
           title,
-          startDate: dateRange.start,
-          endDate: dateRange.end,
+          startDate: dateRange.startDate,
+          endDate: dateRange.endDate,
           current: dateRange.current,
           bullets: [],
         };
         continue;
       }
 
+      const hasTitleOnly = this.matchesTitleKeyword(line) && !/\b(19|20)\d{2}\b/.test(line) && line.length > 3 && line.length < 80;
+      if (hasTitleOnly) {
+        const nextLine = lines[i + 1];
+        const nextHasDate = nextLine && /\b(19|20)\d{2}\b/.test(nextLine);
+        const nextTwo = lines[i + 2];
+        const nextTwoHasDate = nextTwo && /\b(19|20)\d{2}\b/.test(nextTwo);
+
+        if (nextHasDate || nextTwoHasDate) {
+          if (current) blocks.push(current);
+          const mergedLine = nextHasDate ? `${line} ${nextLine}` : `${line} ${nextLine} ${nextTwo}`;
+          const dateRange = parseDateRange(mergedLine);
+          current = {
+            company: '',
+            title: line,
+            startDate: dateRange.startDate,
+            endDate: dateRange.endDate,
+            current: dateRange.current,
+            bullets: [],
+          };
+          if (nextHasDate) i++;
+          else i += 2;
+          continue;
+        }
+      }
+
       if (current) {
-        const dateOnly = this.tryExtractDateLine(line);
-        if (dateOnly && !this.looksLikeJobEntry(line) && line.length < 60) {
-          current.startDate = current.startDate || dateOnly.start;
-          current.endDate = current.endDate || dateOnly.end;
-          current.current = current.current || dateOnly.current;
+        const hasDate = /\b(19|20)\d{2}\b/.test(line);
+        const isBullet = /^[-•*♦‣⁃◦‣]/.test(line) || /^\d+[.)]/.test(line);
+        const isDateRange = hasDate && /present|current|to|–|—|-|until/i.test(line);
+
+        if (isDateRange && !isBullet && line.length < 80) {
+          current.startDate = current.startDate || parseDateRange(line).startDate;
+          current.endDate = current.endDate || parseDateRange(line).endDate;
+          current.current = current.current || parseDateRange(line).current;
           continue;
         }
       }
@@ -433,10 +673,16 @@ export class ResumeParserService {
       if (current && line.length > 0) {
         if (/^[-•*♦‣⁃◦‣]/.test(line) || /^\d+[.)]/.test(line)) {
           const bullet = line.replace(/^[-•*♦‣⁃◦‣\d.)\s]+/, '').trim();
-          if (bullet) current.bullets.push(bullet);
-        } else if (line.length > 10 && !/^\d{4}\s/.test(line)) {
-          current.bullets.push(line);
-        } else if (line.length > 3 && this.matchesTitleKeyword(line)) {
+          if (bullet && bullet.length >= 10) current.bullets.push(bullet);
+        } else if (line.length > 20 && !/^\d{4}\s/.test(line)) {
+          if (this.matchesTitleKeyword(line) && line.length < 60 && /\b(19|20)\d{2}\b/.test(line)) {
+          } else if (this.looksLikeCompanyLine(line)) {
+            if (!current.company) current.company = line;
+            else current.bullets.push(line);
+          } else {
+            current.bullets.push(line);
+          }
+        } else if (line.length > 3 && this.matchesTitleKeyword(line) && !hasCurrentIndicators(line)) {
           current.bullets.push(line);
         }
       }
@@ -467,15 +713,14 @@ export class ResumeParserService {
   private matchesTitleKeyword(line: string): boolean {
     const lower = line.toLowerCase();
     for (const kw of TITLE_KEYWORDS) {
-      const escaped = kw.replace(/\./g, '\\.');
-      if (new RegExp(`\\b${escaped}`, 'i').test(lower)) return true;
+      if (new RegExp(`\\b${kw.replace(/\./g, '\\.')}`, 'i').test(lower)) return true;
     }
     const words = lower.split(/\s+/);
     for (const word of words) {
       if (word.length < 4) continue;
       for (const kw of TITLE_KEYWORDS) {
         if (Math.abs(word.length - kw.length) > 2) continue;
-        if (this.levenshtein(word, kw.toLowerCase()) <= 2) return true;
+        if (this.levenshtein(word, kw) <= 2) return true;
       }
     }
     return false;
@@ -485,9 +730,6 @@ export class ResumeParserService {
     if (line.length < 4 || line.length > 200) return false;
     if (/^(and|or|the|a|an|in|at|for|with|of|to)\b/i.test(line)) return false;
     if (/^[-•*♦‣⁃◦‣\d.)]/.test(line)) return false;
-    if (DEGREE_KEYWORDS.some(k => new RegExp(`\\b${k.replace(/\./g, '\\.')}`, 'i').test(line)) && !this.matchesTitleKeyword(line)) {
-      return false;
-    }
 
     const hasDate = /\b(19|20)\d{2}\b/.test(line);
     const hasTitle = this.matchesTitleKeyword(line);
@@ -496,10 +738,7 @@ export class ResumeParserService {
     if (hasTitle && hasDate) return true;
     if (hasSeparator && hasDate) return true;
     if (hasTitle && hasSeparator) return true;
-
-    if (hasDate && /^[A-Z]/.test(line) && line.split(/\s+/).length >= 2) {
-      return true;
-    }
+    if (hasDate && /^[A-Z]/.test(line) && line.split(/\s+/).length >= 2) return true;
 
     return false;
   }
@@ -509,7 +748,7 @@ export class ResumeParserService {
       const lower = s.toLowerCase();
       let count = 0;
       for (const kw of TITLE_KEYWORDS) {
-        if (new RegExp(`\\b${kw.replace(/\./g, '\\.')}`, 'i').test(lower)) count++;
+        if (new RegExp(`\\b${kw}`, 'i').test(lower)) count++;
       }
       return count;
     };
@@ -520,8 +759,7 @@ export class ResumeParserService {
       { sep: /\s+at\s+/i, before: true, after: true },
       { sep: /\s+@\s+/, before: true, after: true },
       { sep: /\s+[—–]\s+/, before: true, after: true },
-      { sep: /\s+,\s+(?=inc|llc|ltd|corp|co|technologies|tech|solutions|group|associates|partners|consulting|services|systems|software|digital)/i, before: true, after: false },
-      { sep: /,\s+(?=[A-Z][a-zA-Z]*(?:\s+(?:inc|llc|ltd|corp|co|technologies|tech|solutions|group|associates|partners|consulting|services|systems|software|digital))?$)/, before: true, after: false },
+      { sep: /\s+,\s+(?=inc|llc|ltd|corp|co|technologies|tech|solutions|group)/i, before: true, after: false },
     ];
 
     for (const { sep, before, after } of patterns) {
@@ -535,9 +773,7 @@ export class ResumeParserService {
           const company = before ? second : first;
           const titleScore = countTitleWords(title);
           const companyScore = countTitleWords(company);
-          if (companyScore > titleScore) {
-            return { title: company, company: title };
-          }
+          if (companyScore > titleScore) return { title: company, company: title };
           return { title, company };
         }
       }
@@ -552,149 +788,89 @@ export class ResumeParserService {
     return { title: line.replace(/[,;].*$/, '').trim(), company: '' };
   }
 
-  private tryExtractDateLine(line: string): { start: string; end: string; current: boolean } | null {
-    const datePattern = /\b(19|20)\d{2}\b/;
-    if (!datePattern.test(line)) return null;
-    if (line.length > 80) return null;
-    return this.extractDateRange(line);
+  private looksLikeCompanyLine(line: string): boolean {
+    const lower = line.toLowerCase();
+    const hasSuffix = COMPANY_SUFFIXES.some(s => new RegExp(`\\b${s}$`, 'i').test(lower));
+    if (hasSuffix) return true;
+    if (/^[A-Z][a-zA-Z]+\s*[—–]\s*[A-Z]/.test(line)) return false;
+    if (/^[A-Z][a-zA-Z'.\s]{2,40}$/.test(line) && !this.matchesTitleKeyword(line)) return true;
+    return false;
   }
 
-  private extractDateRange(text: string): { start: string; end: string; current: boolean } {
-    const current = /\b(present|current|now|ongoing)\b/i.test(text);
-
-    const monthNames = 'Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:tember)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?';
-    const datePattern = new RegExp(`(?:(${monthNames})\\s*[.\\s]*)?(\\d{4})\\b`, 'gi');
-    const rangePattern = /(?:from|between)?\s*(.+?)\s*(?:to|–|—|-|until|–)\s*(.+?)(?:\s|$)/i;
-
-    const rangeMatch = text.match(rangePattern);
-    if (rangeMatch) {
-      const startText = rangeMatch[1];
-      const endText = rangeMatch[2];
-      const startDates = this.extractDatesFromText(startText);
-      const endDates = this.extractDatesFromText(endText);
-      return {
-        start: startDates[0] || '',
-        end: current ? '' : (endDates[0] || ''),
-        current: current || /\b(present|current|now)\b/i.test(endText),
-      };
-    }
-
-    const dates = this.extractDatesFromText(text);
-    if (dates.length >= 2) {
-      return { start: dates[0], end: current ? '' : dates[dates.length - 1], current };
-    }
-    if (dates.length === 1) {
-      return { start: dates[0], end: '', current };
-    }
-
-    return { start: '', end: '', current };
-  }
-
-  private extractDatesFromText(text: string): string[] {
-    const monthNames = 'Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:tember)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?';
-    const fullDate = new RegExp(`(${monthNames})\\s*[.\\s]*(\\d{4})`, 'gi');
-    const mmYyyy = /\b(0[1-9]|1[0-2])\/(\d{4})\b/g;
-    const yearOnly = /\b(19|20)\d{2}\b/g;
-
-    const result: string[] = [];
-    const fullMatches = [...text.matchAll(fullDate)];
-    for (const m of fullMatches) {
-      const month = m[1].charAt(0).toUpperCase() + m[1].slice(1).toLowerCase().replace(/\.$/, '');
-      result.push(`${month} ${m[2]}`);
-    }
-
-    if (result.length === 0) {
-      const mmMatches = [...text.matchAll(mmYyyy)];
-      for (const m of mmMatches) {
-        const monthNames = ['', 'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-        const monthIdx = parseInt(m[1], 10);
-        result.push(`${monthNames[monthIdx] || m[1]} ${m[2]}`);
+  private parseEducation(sections: Map<string, string>): ParsedEducation[] {
+    const eduHeaders = SECTION_PATTERNS.education;
+    let content = '';
+    for (const h of eduHeaders) {
+      const found = sections.get(h);
+      if (found && found.trim().length > 0) {
+        content = found;
+        break;
       }
     }
 
-    if (result.length === 0) {
-      const yearMatches = [...text.matchAll(yearOnly)];
-      for (const m of yearMatches) result.push(m[0]);
-    }
+    if (!content) return [];
 
-    return result;
-  }
-
-  private extractEducation(sections: Map<string, string[]>): ParsedResume['education'] {
-    const eduHeaders = SECTION_HEADERS[1] as readonly string[];
-    let lines: string[] = [];
-    for (const h of eduHeaders) {
-      const found = sections.get(h);
-      if (found) { lines = found; break; }
-    }
-
-    if (lines.length === 0) return [];
-
-    const education: ParsedResume['education'] = [];
-    let current: ParsedResume['education'][number] | null = null;
+    const lines = content.split('\n').map(l => l.trim()).filter(Boolean);
+    const blocks: ParsedEducation[] = [];
+    let current: ParsedEducation | null = null;
 
     for (const line of lines) {
       const inst = this.matchInstitution(line);
       if (inst) {
-        if (current) education.push(current);
-        const parsed = this.parseEducationLine(line);
-        current = parsed;
-        continue;
-      }
-
-      const deg = this.matchDegree(line);
-      if (deg && current) {
-        current.degree = deg;
-        const degRegex = new RegExp(deg.replace(/\./g, '\\.'), 'i');
-        if (!degRegex.test(line)) {
-          const fuzzyMatch = line.match(new RegExp(`.{0,3}${deg[0]}.{0,${deg.length + 1}}`, 'i'));
-          if (fuzzyMatch) {
-            const rest = line.replace(fuzzyMatch[0], '').replace(/[,;].*$/, '').trim();
-            if (rest && !/^\d/.test(rest)) current.field = rest;
-          }
-        } else {
-          const rest = line.replace(degRegex, '').replace(/[,;].*$/, '').trim();
-          if (rest && !/^\d/.test(rest)) current.field = rest;
+        if (current) blocks.push(current);
+        current = { institution: inst, degree: '', field: null };
+        const deg = this.matchDegree(line);
+        if (deg) {
+          current.degree = deg;
+          current.field = this.extractField(line, inst, deg);
         }
         continue;
       }
 
-      const years = line.match(/\b(19|20)\d{2}\b/g);
-      if (years && current) {
-        if (years.length >= 2) {
-          current.startDate = years[0];
-          current.endDate = years[1];
-        } else if (!current.startDate) {
-          current.startDate = years[0];
-        } else {
-          current.endDate = years[0];
+      if (current) {
+        const deg = this.matchDegree(line);
+        if (deg && !current.degree) {
+          current.degree = deg;
+          current.field = current.field || this.extractField(line, '', deg);
+          continue;
         }
-        continue;
-      }
 
-      const gpaMatch = line.match(/\b(GPA|grade|g\.p\.a)[:\s]*(\d+\.?\d*)/i);
-      if (gpaMatch && current) {
-        current.gpa = gpaMatch[2];
+        const years = line.match(/\b(19|20)\d{2}\b/g);
+        if (years) {
+          if (years.length >= 2) { current.startDate = years[0]; current.endDate = years[1]; }
+          else if (!current.startDate) current.startDate = years[0];
+          else current.endDate = years[0];
+          continue;
+        }
+
+        const gpaMatch = line.match(/\b(GPA|grade)[:\s]*(\d+\.?\d*)/i);
+        if (gpaMatch) current.gpa = gpaMatch[2];
       }
     }
 
-    if (current) education.push(current);
-    return education;
+    if (current) blocks.push(current);
+    return blocks;
   }
 
   private matchInstitution(line: string): string | null {
-    if (line.length < 5 || /^[-•*♦\d.)]/.test(line)) return null;
+    if (line.length < 2 || /^[-•*♦\d.)]/.test(line)) return null;
 
-    const indicators = /\b(University|College|Institute|School|Academy|Institute of Technology|Polytechnic|Conservatory|Académie)\b/i;
+    const standaloneAbbrevs = /\b(MIT|UCL|LSE|KCL|LBS|Imperial|Oxford|Cambridge|Harvard|Stanford|Yale|Columbia|NYU|UCLA|UC Berkeley|UPenn|Cornell|Princeton|Duke)\b/;
+    const abMatch = line.match(standaloneAbbrevs);
+    if (abMatch && line.length < 50) return line.trim();
+
+    if (line.length < 5) return null;
+
+    const indicators = /\b(University|College|Institute|School|Academy|Polytechnic|Conservatory|Faculty|Seminary|Campus)\b/i;
     const match = line.match(indicators);
     if (match) {
       const idx = match.index!;
-      const fullName = line.substring(idx, idx + match[0].length + 30).replace(/[,;–—|].*$/, '').trim();
-      const sentinel = line.indexOf(',', idx);
-      if (sentinel > 0 && sentinel - idx < 30) {
-        return line.substring(idx, sentinel).trim();
-      }
-      return fullName || line.substring(idx, idx + match[0].length).trim();
+      const before = line.substring(0, idx);
+      const orEarlier = before.match(/\b([A-Z][a-zA-Z'.]+)\s*$/);
+      const start = orEarlier ? orEarlier.index! : idx;
+      const end = line.indexOf(',', idx);
+      const endIdx = end > 0 && end - idx < 40 ? end : idx + 40;
+      return line.substring(start, endIdx).replace(/[,;–—|].*$/, '').trim();
     }
 
     const commonPrefixes = ['university of', 'university at', 'state university of', 'institute of'];
@@ -709,191 +885,347 @@ export class ResumeParserService {
     return null;
   }
 
-  private parseEducationLine(line: string): ParsedResume['education'][number] {
-    const result: ParsedResume['education'][number] = { institution: '', degree: '', field: '' };
-    const inst = this.matchInstitution(line);
-    if (inst) result.institution = inst;
-
-    const deg = this.matchDegree(line);
-    if (deg) result.degree = deg;
-
-    if (inst && deg) {
-      let remainder = line.replace(inst, '');
-      const degRegex = new RegExp(deg.replace(/\./g, '\\.'), 'i');
-      if (!degRegex.test(remainder)) {
-        const fuzzyMatch = remainder.match(new RegExp(`.{0,3}${deg[0]}.{0,${deg.length + 1}}`, 'i'));
-        if (fuzzyMatch) remainder = remainder.replace(fuzzyMatch[0], '');
-      } else {
-        remainder = remainder.replace(degRegex, '');
-      }
-      const parts = remainder.replace(/[,;–—|].*$/, '').trim();
-      if (parts && !/^\d/.test(parts) && !this.matchInstitution(parts)) {
-        result.field = parts;
-      }
-    }
-
-    return result;
-  }
-
   private matchDegree(line: string): string | null {
-    const lower = line.toLowerCase();
-    for (const deg of DEGREE_KEYWORDS) {
-      const regex = new RegExp(`\\b${deg.replace(/\./g, '\\.')}\\b`, 'i');
-      if (regex.test(line)) {
-        const match = line.match(regex);
-        if (match) return match[0];
+    const patterns: RegExp[] = [
+      /\bbachelor\s+of\s+science\b/i, /\bbachelor\s+of\s+arts\b/i,
+      /\bbachelor\s+of\s+engineering\b/i, /\b(?:bsc|b\.sc\.?)\b/i,
+      /\b(?:ba|b\.a\.?)\b/i, /\b(?:beng|b\.eng\.?)\b/i,
+      /\b(?:bba|b\.b\.a\.?)\b/i, /\bllb\b/i, /\b(?:bfa|b\.f\.a\.?)\b/i,
+      /\bbachelor\b/i,
+      /\bmaster\s+of\s+science\b/i, /\bmaster\s+of\s+arts\b/i,
+      /\bmaster\s+of\s+business\s+administration\b/i,
+      /\b(?:msc|m\.sc\.?)\b/i, /\b(?:ma|m\.a\.?)\b/i,
+      /\b(?:meng|m\.eng\.?)\b/i, /\bmba\b/i, /\bllm\b/i,
+      /\b(?:mfa|m\.f\.a\.?)\b/i, /\bmphil\b/i, /\bmph\b/i,
+      /\bmaster\b/i,
+      /\bdoctor\s+of\s+philosophy\b/i, /\bphd\b/i, /\bdphil\b/i,
+      /\bmd\b/i, /\bjd\b/i, /\bedd\b/i, /\bdoctor(?:al|ate)?\b/i,
+      /\bhnd\b/i, /\bhnc\b/i, /\bbtec\b/i, /\bnvq\b/i,
+      /\bfoundation\s+degree\b/i, /\bassociate\s+degree\b/i,
+      /\bdiploma\b/i, /\bcertificate\b/i,
+    ];
+
+    const canonical: Record<string, string> = {
+      'bachelor of science': 'BSc', 'bachelor of arts': 'BA',
+      'bachelor of engineering': 'BEng', 'bsc': 'BSc', 'b.sc.': 'BSc',
+      'ba': 'BA', 'b.a.': 'BA', 'beng': 'BEng', 'b.eng.': 'BEng',
+      'bba': 'BBA', 'b.b.a.': 'BBA', 'llb': 'LLB', 'bfa': 'BFA',
+      'b.f.a.': 'BFA', 'bachelor': 'Bachelor',
+      'master of science': 'MSc', 'master of arts': 'MA',
+      'master of business administration': 'MBA',
+      'msc': 'MSc', 'm.sc.': 'MSc', 'ma': 'MA', 'm.a.': 'MA',
+      'meng': 'MEng', 'm.eng.': 'MEng', 'mba': 'MBA', 'llm': 'LLM',
+      'mfa': 'MFA', 'm.f.a.': 'MFA', 'mphil': 'MPhil', 'mph': 'MPH',
+      'master': 'Master',
+      'doctor of philosophy': 'PhD', 'phd': 'PhD', 'dphil': 'DPhil',
+      'md': 'MD', 'jd': 'JD', 'edd': 'EdD', 'doctor': 'Doctor',
+      'hnd': 'HND', 'hnc': 'HNC', 'btec': 'BTEC', 'nvq': 'NVQ',
+      'foundation degree': 'Foundation Degree',
+      'associate degree': 'Associate Degree',
+      'diploma': 'Diploma', 'certificate': 'Certificate',
+    };
+
+    for (const regex of patterns) {
+      const m = line.match(regex);
+      if (m) {
+        const lower = m[0].toLowerCase();
+        if (canonical[lower]) return canonical[lower];
+        return m[0].trim();
       }
     }
-    const words = lower.split(/[\s,;]+/);
-    for (const word of words) {
-      if (word.length < 4) continue;
-      for (const deg of DEGREE_KEYWORDS) {
-        const dk = deg.toLowerCase();
-        if (Math.abs(word.length - dk.length) > 2) continue;
-        if (this.levenshtein(word, dk) <= 2) return deg;
-      }
-    }
+
     return null;
   }
 
-  private extractSkills(sections: Map<string, string[]>): string[] {
-    const skillHeaders = SECTION_HEADERS[2] as readonly string[];
-    let lines: string[] = [];
+  private extractField(line: string, institution: string, degree: string): string | null {
+    let remainder = line;
+    if (institution) remainder = remainder.replace(institution, '');
+    const degRegex = new RegExp(degree.replace(/\./g, '\\.'), 'i');
+    remainder = remainder.replace(degRegex, '');
+
+    const field = remainder
+      .replace(/[,;–—|].*$/, '')
+      .replace(/^in\s+/i, '')
+      .replace(/^of\s+/i, '')
+      .trim();
+
+    if (field && field.length > 1 && field.length < 50 && !/^\d+$/.test(field)) return field;
+    return null;
+  }
+
+  private parseSkills(sections: Map<string, string>): string[] {
+    const skillHeaders = SECTION_PATTERNS.skills;
+    let content = '';
     for (const h of skillHeaders) {
       const found = sections.get(h);
-      if (found) { lines = found; break; }
+      if (found && found.trim().length > 0) {
+        content = found;
+        break;
+      }
     }
 
-    if (lines.length === 0) return [];
+    if (!content) return [];
 
-    const labelFilter = /^(languages|frontend|backend|blockchain|cloud|devops|databases|tools|practices|frameworks|libraries|platforms|technologies|stacks?|database|other):\s*/i;
-    const cleanedLines = lines.map(l => l.replace(labelFilter, '').trim()).filter(Boolean);
+    const allSkills = new Set<string>();
 
-    const allText = cleanedLines.join(', ');
-    const separators = /[,•·|;]+/;
-    const skillList = allText
-      .split(separators)
-      .map(s => s.replace(/\(.*?\)/g, '').trim())
-      .filter(s => s.length > 1 && s.length < 60)
-      .filter(s => !SECTION_HEADERS.flat().some(h => this.fuzzyMatch(s, h)))
-      .filter(s => !/^(languages|frontend|backend|blockchain|cloud|devops|databases|tools|practices|frameworks|libraries|platforms|technologies|stacks?|database|other)$/i.test(s));
+    const lines = content.split('\n').map(l => l.trim()).filter(Boolean);
 
-    if (skillList.length >= 2) return [...new Set(skillList)];
+    const categoryLabel = /^(languages|frontend|backend|blockchain|cloud|devops|databases|tools|practices|frameworks|libraries|platforms|technologies|stacks?|database|programming|methodologies|testing|design|data|other):\s*/i;
 
-    const byLine = cleanedLines
-      .map(l => l.replace(/^[-•*♦\d.)\s]+/, '').trim())
-      .filter(l => l.length > 0 && l.length < 60);
+    for (const line of lines) {
+      const cleaned = line.replace(categoryLabel, '').trim();
+      if (!cleaned) continue;
 
-    if (byLine.length >= 2) return [...new Set(byLine)];
+      const commaSkills = cleaned.split(/[,•·|;]+/).map(s => s.trim()).filter(Boolean);
+      for (const s of commaSkills) {
+        const normalized = this.matchSkill(s);
+        if (normalized) allSkills.add(normalized);
+      }
+    }
 
-    return [...new Set(skillList)];
+    const flat = [...allSkills].filter(s => s.length >= 2 && s.length <= 50);
+    return this.deduplicateSkills(flat);
   }
 
-  private fuzzyMatch(a: string, b: string): boolean {
-    return a.toLowerCase().trim() === b.toLowerCase().trim();
+  private matchSkill(text: string): string | null {
+    const clean = text.replace(/\(.*?\)/g, '').trim();
+    if (clean.length < 2 || clean.length > 60) return null;
+
+    const lower = clean.toLowerCase();
+    if (SKILL_DICTIONARY[lower]) return SKILL_DICTIONARY[lower];
+
+    for (const [key, value] of Object.entries(SKILL_DICTIONARY)) {
+      if (lower === key) return value;
+      if (lower.includes(key) && lower.length < key.length + 10) return value;
+    }
+
+    if (/^[A-Z][a-zA-Z+#.]+$/.test(clean) && !ALL_SECTION_HEADERS.some(h => clean.toLowerCase() === h)) {
+      return clean;
+    }
+
+    return null;
   }
 
-  private extractCertifications(sections: Map<string, string[]>): ParsedResume['certifications'] {
-    const certHeaders = SECTION_HEADERS[3] as readonly string[];
-    let lines: string[] = [];
+  private parseCertifications(sections: Map<string, string>): ParsedCertification[] {
+    const certHeaders = SECTION_PATTERNS.certifications;
+    let content = '';
     for (const h of certHeaders) {
       const found = sections.get(h);
-      if (found) { lines = found; break; }
+      if (found && found.trim().length > 0) {
+        content = found;
+        break;
+      }
     }
 
-    if (lines.length === 0) return [];
+    if (!content) return [];
 
-    return lines.map((line) => {
+    const lines = content.split('\n').map(l => l.trim()).filter(Boolean);
+    const certs: ParsedCertification[] = [];
+
+    const knownIssuers = [
+      'aws', 'amazon web services', 'google', 'microsoft', 'cisco',
+      'comptia', 'pmi', 'scrum alliance', 'hubspot', 'salesforce',
+      'oracle', 'ibm', 'adobe', 'meta', 'coursera', 'udemy', 'edx',
+      'linkedin learning', 'isaca', 'iapp', 'cfa institute', 'acca',
+      'cima', 'prince2', 'axelos', 'isc2', 'ec-council',
+      'offensive security', 'hashicorp', 'red hat', 'vmware',
+      'databricks', 'snowflake', 'tableau', 'pagerduty',
+      'nielsen norman group', 'ideo',
+      'interaction design foundation', 'freecodecamp',
+    ];
+
+    for (const line of lines) {
       const text = line.replace(/^[-•*♦\d.)\s]+/, '').trim();
-      if (!text) return { name: '', issuer: '' };
+      if (!text) continue;
 
-      const issuers = ['issued by', 'certified by', 'through', '|', '•', '·', '—', '–', '-'];
-      for (const sep of issuers) {
-        const idx = text.indexOf(sep);
-        if (idx > 0) {
-          const name = text.substring(0, idx).trim();
-          const issuer = text.substring(idx + sep.length).replace(/\b\d{4}\b.*$/, '').trim();
-          if (name) return { name, issuer };
+      const urlMatch = text.match(URL_RE);
+
+      let name = text;
+      let issuer: string | null = null;
+
+      for (const known of knownIssuers) {
+        const regex = new RegExp(`\\b${known}\\b`, 'gi');
+        const matches = [...text.matchAll(regex)];
+        if (matches.length > 0) {
+          const match = matches[matches.length - 1];
+          name = text.substring(0, match.index).replace(/[•·|—–-]\s*$/, '').trim();
+          issuer = match[0];
+          if (issuer === 'aws' || issuer === 'amazon web services') issuer = 'AWS';
+          else if (issuer === 'AWS') issuer = 'AWS';
+          break;
         }
       }
 
-      const knownIssuers = /\s+(Udemy|freeCodeCamp|Coursera|edX|LinkedIn Learning|Pluralsight|AWS|Microsoft|Google|IBM|Oracle|CompTIA|Cisco|(?:ISC)²|SANS|Offensive Security|Red Hat|Salesforce|HubSpot|Atlassian|Databricks|Snowflake|Airflow)\s*$/i;
-      const issuerMatch = text.match(knownIssuers);
-      if (issuerMatch) {
-        const name = text.substring(0, issuerMatch.index).trim();
-        const issuer = issuerMatch[1].trim();
-        if (name) return { name, issuer };
+      if (!issuer) {
+        const separators = ['issued by', 'certified by', 'through', '|', '•', '·', '—', '–'];
+        for (const sep of separators) {
+          const idx = text.indexOf(sep);
+          if (idx > 0) {
+            const candidateName = text.substring(0, idx).trim();
+            const candidateIssuer = text.substring(idx + sep.length).replace(/\b\d{4}\b.*$/, '').trim();
+            if (candidateName) {
+              name = candidateName;
+              issuer = candidateIssuer || null;
+              break;
+            }
+          }
+        }
       }
 
-      return { name: text, issuer: '' };
-    }).filter(c => c.name.length > 0);
-  }
-
-  private extractLanguages(sections: Map<string, string[]>): string[] {
-    const langHeaders = SECTION_HEADERS[4] as readonly string[];
-    let lines: string[] = [];
-    for (const h of langHeaders) {
-      const found = sections.get(h);
-      if (found) { lines = found; break; }
+      const date = this.extractCertDate(text);
+      const cleanedName = name.replace(/^[-•*♦\s]+/, '').trim();
+      if (cleanedName) {
+        certs.push({ name: cleanedName, issuer, date });
+      }
     }
 
-    if (lines.length === 0) return [];
-
-    const labelFilter = /^(frontend|backend|blockchain|cloud|devops|databases|tools|practices|languages|frameworks|libraries|platforms|technologies|stacks?|database):\s*/i;
-    const allText = lines
-      .map(l => l.replace(labelFilter, '').trim())
-      .join(', ');
-    return allText
-      .split(/[,•·|;/\n]+/)
-      .map(s => s.replace(/\(.*?\)/g, '').replace(/[–—].*$/, '').trim())
-      .filter(s => s.length > 1 && s.length < 40)
-      .filter((s, i, arr) => arr.indexOf(s) === i)
-      .filter(s => !/^\d+(\.\d+)?$/.test(s))
-      .filter(s => !/^(frontend|backend|blockchain|cloud|devops|databases|tools|practices|languages|frameworks|libraries|platforms|technologies|stacks?|database)$/i.test(s));
+    return certs;
   }
 
-  private extractLinks(
-    contact: ParsedResume['contact'],
-    allLines: string[],
-    sections: Map<string, string[]>,
-  ): Array<{ title: string; url: string }> {
-    const links: Array<{ title: string; url: string }> = [];
+  private extractCertDate(text: string): string | null {
+    const yearMatch = text.match(/\b(19|20)\d{2}\b/);
+    if (yearMatch) return yearMatch[0];
+    return null;
+  }
 
-    if (contact.linkedin) links.push({ title: 'LinkedIn', url: contact.linkedin });
-    if (contact.github) links.push({ title: 'GitHub', url: contact.github });
-    if (contact.website) links.push({ title: 'Website', url: contact.website });
+  private parseLanguages(sections: Map<string, string>): ParsedLanguage[] {
+    const langHeaders = SECTION_PATTERNS.languages;
+    let content = '';
+    for (const h of langHeaders) {
+      const found = sections.get(h);
+      if (found && found.trim().length > 0) {
+        content = found;
+        break;
+      }
+    }
 
-    const linkHeaders = SECTION_HEADERS[10] as readonly string[];
-    for (const h of linkHeaders) {
-      const lines = sections.get(h);
-      if (lines) {
-        for (const line of lines) {
-          const urls = [...line.matchAll(URL_RE)];
-          for (const m of urls) {
-            const url = m[0].toLowerCase();
-            if (!links.some(l => l.url.toLowerCase() === url)) {
-              const label = line.replace(url, '').replace(/^[-•*♦\d.)\s]+/, '').replace(/[:,;]\s*$/, '').trim();
-              links.push({ title: label || url, url: m[0] });
+    if (!content) return [];
+
+    const results: ParsedLanguage[] = [];
+    const lines = content.split('\n').map(l => l.trim()).filter(Boolean);
+
+    for (const line of lines) {
+      const parts = line.split(/[,•·|;]+/).map(s => s.trim()).filter(Boolean);
+
+      for (const part of parts) {
+        const lower = part.toLowerCase();
+
+        for (const [langKey, langName] of Object.entries(LANGUAGE_DICTIONARY)) {
+          const langRegex = new RegExp(`\\b${langKey}\\b`, 'i');
+          if (langRegex.test(lower)) {
+            let proficiency: string | null = null;
+
+            for (const [profKey, profValue] of Object.entries(PROFICIENCY_MAP)) {
+              const profRegex = new RegExp(`\\b${profKey}\\b`, 'i');
+              if (profRegex.test(part)) {
+                proficiency = profValue;
+                break;
+              }
             }
+
+            if (!results.some(r => r.language.toLowerCase() === langName.toLowerCase())) {
+              results.push({ language: langName, proficiency });
+            }
+            break;
           }
         }
       }
     }
 
-    const headerText = allLines.slice(0, 15).join(' ');
-    const extraUrls = [...headerText.matchAll(URL_RE)];
-    for (const m of extraUrls) {
-      const url = m[0].toLowerCase();
-      if (!links.some(l => l.url.toLowerCase() === url)) {
-        let label = '';
-        if (url.includes('linkedin')) label = 'LinkedIn';
-        else if (url.includes('github')) label = 'GitHub';
-        else if (url.includes('portfolio')) label = 'Portfolio';
-        else label = url;
-        links.push({ title: label, url: m[0] });
+    return results;
+  }
+
+  private buildLinks(contact: {
+    linkedin: string | null;
+    github: string | null;
+    website: string | null;
+  }, rawText: string, sections: Map<string, string>): ParsedLinks[] {
+    const links: ParsedLinks[] = [];
+
+    if (contact.linkedin) links.push({ title: 'LinkedIn', url: contact.linkedin });
+    if (contact.github) links.push({ title: 'GitHub', url: contact.github });
+    if (contact.website) links.push({ title: 'Website', url: contact.website });
+
+    for (const h of SECTION_PATTERNS.links) {
+      const content = sections.get(h);
+      if (content) {
+        const urls = [...content.matchAll(URL_RE)];
+        for (const m of urls) {
+          const url = m[0].toLowerCase();
+          if (!links.some(l => l.url.toLowerCase() === url)) {
+            const label = content.replace(url, '').replace(/^[-•*♦\d.)\s]+/, '').replace(/[:,;]\s*$/, '').trim();
+            links.push({ title: label || url, url: m[0] });
+          }
+        }
       }
     }
 
     return links;
   }
+
+  private cleanupExperience(entries: ParsedExperience[]): ParsedExperience[] {
+    const sorted = entries
+      .filter(e => e.title || e.company)
+      .sort((a, b) => {
+        if (a.current !== b.current) return a.current ? -1 : 1;
+        const aStart = a.startDate || '0000-00';
+        const bStart = b.startDate || '0000-00';
+        return bStart.localeCompare(aStart);
+      });
+
+    const deduped: ParsedExperience[] = [];
+    for (const entry of sorted) {
+      const isDup = deduped.some(e =>
+        e.title.toLowerCase() === entry.title.toLowerCase() &&
+        e.company.toLowerCase() === entry.company.toLowerCase() &&
+        e.startDate === entry.startDate,
+      );
+      if (!isDup) deduped.push(entry);
+    }
+
+    return deduped;
+  }
+
+  private cleanupEducation(entries: ParsedEducation[]): ParsedEducation[] {
+    return entries
+      .filter(e => e.institution || e.degree)
+      .sort((a, b) => {
+        const aEnd = a.endDate || a.startDate || '0000';
+        const bEnd = b.endDate || b.startDate || '0000';
+        return bEnd.localeCompare(aEnd);
+      });
+  }
+
+  private deduplicateSkills(skills: string[]): string[] {
+    const seen = new Map<string, string>();
+    for (const skill of skills) {
+      const key = skill.toLowerCase();
+      if (!seen.has(key)) {
+        seen.set(key, skill);
+      }
+    }
+    return [...seen.values()].filter(s => s.length >= 2 && s.length <= 50);
+  }
+
+  private calculateOverallConfidence(
+    name: string | null,
+    email: string | null,
+    experience: ParsedExperience[],
+    education: ParsedEducation[],
+    skills: string[],
+  ): number {
+    const weights = [
+      { value: name ? 1 : 0, weight: 0.15 },
+      { value: email ? 1 : 0, weight: 0.15 },
+      { value: (experience.some(e => e.title && e.company)) ? 1 : 0, weight: 0.35 },
+      { value: (education.some(e => e.institution && e.degree)) ? 1 : 0, weight: 0.20 },
+      { value: skills.length >= 3 ? 1 : 0, weight: 0.15 },
+    ];
+
+    return weights.reduce((sum, w) => sum + w.value * w.weight, 0);
+  }
+}
+
+function hasCurrentIndicators(line: string): boolean {
+  return /\b(present|current|now|ongoing)\b/i.test(line);
 }

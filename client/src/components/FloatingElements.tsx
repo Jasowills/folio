@@ -35,7 +35,6 @@ function ResumeDoc({ width, height }: { width: number; height: number }) {
 }
 
 function StickyNote({ size }: { size: number }) {
-  const clip = `polygon(0 0, ${size - 8}px 0, ${size}px 8px, ${size}px ${size}px, 0 ${size}px)`
   return (
     <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
       <defs>
@@ -113,15 +112,15 @@ export default function FloatingElements() {
       </DriftWrapper>
 
       {/* Sticky notes */}
-      <DriftWrapper duration={4.5} delay={0.3} className="top-[18%] left-[12%]" style={{ transform: 'rotate(-3deg)' }}>
+      <DriftWrapper duration={4.5} delay={0.3} className="top-[18%] left-[12%] -rotate-3">
         <StickyNote size={70} />
       </DriftWrapper>
-      <DriftWrapper duration={5} delay={1.5} className="bottom-[30%] right-[12%]" style={{ transform: 'rotate(2deg)' }}>
+      <DriftWrapper duration={5} delay={1.5} className="bottom-[30%] right-[12%] rotate-2">
         <StickyNote size={55} />
       </DriftWrapper>
 
       {/* Paper airplane */}
-      <DriftWrapper duration={6} delay={0.8} className="bottom-[40%] left-[3%]" style={{ transform: 'rotate(15deg)' }}>
+      <DriftWrapper duration={6} delay={0.8} className="bottom-[40%] left-[3%] rotate-[15deg]">
         <PaperAirplane size={40} />
       </DriftWrapper>
 

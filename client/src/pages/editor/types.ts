@@ -54,6 +54,6 @@ export interface ResumeShim {
   certifications?: Array<{ name: string; issuer?: string }>
   languages?: string[]
   links?: Array<{ title: string; url: string }>
-  redFlags?: Array<{ message: string; severity: 'low' | 'medium' | 'high'; section: string }>
+  redFlags?: Array<{ message: string; severity: 'low' | 'medium' | 'high'; section?: string }>
   quality?: { overallQuality: number; strengths: string[]; issues: string[]; suggestions: string[] }
 }

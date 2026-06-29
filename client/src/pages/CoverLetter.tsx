@@ -4,7 +4,7 @@ import { useAuth } from '../hooks/useAuth'
 import { useResumes, useCoverLetters } from '../lib/queries'
 import { Button } from '../components/ui/button'
 import { Select } from '../components/ui/select'
-import { Wand2, FileText, Copy, RefreshCw, FileDown, ChevronRight, X } from 'lucide-react'
+import { IconWand, IconFileText, IconCopy, IconRefresh, IconFileDownload, IconChevronRight, IconX } from '@tabler/icons-react'
 
 const tones = ['Professional', 'Confident', 'Creative']
 
@@ -129,7 +129,7 @@ export default function CoverLetter() {
             onClick={() => setShowLetters(true)}
           >
             My letters
-            <ChevronRight className="h-4 w-4 ml-1" />
+            <IconChevronRight className="h-4 w-4 ml-1" />
           </Button>
         </div>
 
@@ -220,7 +220,7 @@ export default function CoverLetter() {
                   <span className="font-display text-lg animate-pulse">&amp;</span>
                 ) : (
                   <>
-                    <Wand2 className="h-4 w-4 mr-1.5" />
+                    <IconWand className="h-4 w-4 mr-1.5" />
                     Generate letter
                   </>
                 )}
@@ -233,7 +233,7 @@ export default function CoverLetter() {
             {!displayedContent && !isStreaming ? (
               <div className="flex-1 flex items-center justify-center">
                 <div className="text-center">
-                  <FileText className="h-12 w-12 text-border mx-auto mb-4" />
+                  <IconFileText className="h-12 w-12 text-border mx-auto mb-4" />
                   <p className="text-sm text-muted">
                     Your cover letter will appear here.
                   </p>
@@ -283,21 +283,21 @@ export default function CoverLetter() {
                     onClick={handleCopy}
                     className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs text-muted hover:text-ink hover:bg-paper rounded-lg transition-colors"
                   >
-                    <Copy className="h-3.5 w-3.5" />
+                    <IconCopy className="h-3.5 w-3.5" />
                     Copy
                   </button>
                   <button
                     onClick={handleRegenerate}
                     className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs text-muted hover:text-ink hover:bg-paper rounded-lg transition-colors"
                   >
-                    <RefreshCw className="h-3.5 w-3.5" />
+                    <IconRefresh className="h-3.5 w-3.5" />
                     Regenerate
                   </button>
                   <button
                     onClick={() => window.print()}
                     className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs text-muted hover:text-ink hover:bg-paper rounded-lg transition-colors cursor-pointer"
                   >
-                    <FileDown className="h-3.5 w-3.5" />
+                    <IconFileDownload className="h-3.5 w-3.5" />
                     Export PDF
                   </button>
                 </div>
@@ -332,7 +332,7 @@ export default function CoverLetter() {
                   onClick={() => setShowLetters(false)}
                   className="p-1 rounded-lg text-muted hover:text-ink hover:bg-paper transition-colors"
                 >
-                  <X className="h-4 w-4" />
+                  <IconX className="h-4 w-4" />
                 </button>
               </div>
               <div className="flex-1 overflow-y-auto p-5">

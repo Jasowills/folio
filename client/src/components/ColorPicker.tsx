@@ -1,5 +1,4 @@
 import { COLOR_THEMES } from '../templates'
-import type { ResumeColorTheme } from '../templates/types'
 
 interface ColorPickerProps {
   selected: string

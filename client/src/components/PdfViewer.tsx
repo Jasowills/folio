@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react'
 import { Document, Page, pdfjs } from 'react-pdf'
-import { Loader2, AlertTriangle } from 'lucide-react'
+import { IconLoader2, IconAlertTriangle } from '@tabler/icons-react'
 import 'react-pdf/dist/Page/AnnotationLayer.css'
 
 // CDN worker — Vite's new URL resolution can't handle bare specifiers for node_modules files
@@ -14,7 +14,7 @@ interface PdfViewerProps {
 
 export default function PdfViewer({ resumeId, fileUrl, className = '' }: PdfViewerProps) {
   const [numPages, setNumPages] = useState<number | null>(null)
-  const [pageNumber, setPageNumber] = useState(1)
+  const [, setPageNumber] = useState(1)
 
   const token = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null
 
@@ -50,12 +50,12 @@ export default function PdfViewer({ resumeId, fileUrl, className = '' }: PdfView
         onLoadError={onLoadError}
         loading={
           <div className="flex items-center justify-center py-16">
-            <Loader2 className="h-6 w-6 text-muted animate-spin" />
+            <IconLoader2 className="h-6 w-6 text-muted animate-spin" />
           </div>
         }
         error={
           <div className="flex flex-col items-center justify-center py-16 text-center">
-            <AlertTriangle className="h-8 w-8 text-danger mb-3" />
+            <IconAlertTriangle className="h-8 w-8 text-danger mb-3" />
             <p className="text-sm text-muted">Failed to load PDF preview</p>
           </div>
         }

@@ -1,45 +1,22 @@
 import { useState } from 'react'
 import { NavLink, useNavigate } from 'react-router-dom'
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu'
-import {
-  LayoutDashboard,
-  FileText,
-  Target,
-  Mail,
-  Globe,
-  Download,
-  Briefcase,
-  MessageSquare,
-  ChevronDown,
-  User,
-  Settings,
-  CreditCard,
-  HelpCircle,
-  LogOut,
-  Menu,
-  X,
-} from 'lucide-react'
+import { IconLayoutDashboard, IconFileText, IconTargetArrow, IconMail, IconGlobe, IconDownload, IconBriefcase, IconMessage, IconChevronDown, IconUser, IconSettings, IconCreditCard, IconHelpCircle, IconLogout, IconMenu2, IconX,  } from '@tabler/icons-react'
 import { useAuth } from '../../hooks/useAuth'
 import { useResumes } from '../../lib/queries'
 import { cn } from '../../lib/utils'
 
 const mainNavItems = [
-  { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-  { to: '/resumes', label: 'My Resumes', icon: FileText, badge: true },
-  { to: '/ats', label: 'ATS Scorer', icon: Target },
-  { to: '/cover-letter/new', label: 'Cover Letter', icon: Mail },
-  { to: '/portfolio', label: 'Portfolio', icon: Globe },
+  { to: '/dashboard', label: 'Dashboard', icon: IconLayoutDashboard },
+  { to: '/resumes', label: 'My Resumes', icon: IconFileText, badge: true },
+  { to: '/ats', label: 'ATS Scorer', icon: IconTargetArrow },
+  { to: '/cover-letter/new', label: 'Cover Letter', icon: IconMail },
+  { to: '/portfolio', label: 'Portfolio', icon: IconGlobe },
 ]
 
-function useExportLink() {
-  const { data: resumes } = useResumes()
-  const firstId = resumes?.[0]?._id
-  return { to: firstId ? `/export/${firstId}` : null }
-}
-
 const comingSoonItems = [
-  { label: 'Job Tracker', icon: Briefcase },
-  { label: 'Interview Prep', icon: MessageSquare },
+  { label: 'Job Tracker', icon: IconBriefcase },
+  { label: 'Interview Prep', icon: IconMessage },
 ]
 
 export default function AppShell({ children }: { children: React.ReactNode }) {
@@ -92,7 +69,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
             onClick={() => setMobileNavOpen(false)}
             className="lg:hidden p-1 text-muted hover:text-ink transition-colors cursor-pointer"
           >
-            <X className="h-4 w-4" />
+            <IconX className="h-4 w-4" />
           </button>
         </div>
 
@@ -132,7 +109,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
           </span>
           {(() => {
             const exportId = resumes?.[0]?._id
-            const item = { icon: Download, label: 'Export Resume' }
+            const item = { icon: IconDownload, label: 'Export Resume' }
             if (!exportId) {
               return (
                 <div className="flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-muted/40 cursor-not-allowed select-none">
@@ -203,7 +180,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                   </div>
                   <p className="text-[11px] text-muted truncate leading-tight mt-0.5">{user.email}</p>
                 </div>
-                <ChevronDown className={cn(
+                <IconChevronDown className={cn(
                   'h-3.5 w-3.5 text-muted transition-transform duration-200 shrink-0',
                   menuOpen && 'rotate-180',
                 )} />
@@ -221,21 +198,21 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                   onSelect={() => navigate('/settings')}
                   className="flex items-center gap-2.5 px-3 py-2 rounded-md text-sm text-ink hover:bg-paper-dark/50 cursor-pointer outline-none transition-colors"
                 >
-                  <User className="h-3.5 w-3.5 text-muted" />
+                  <IconUser className="h-3.5 w-3.5 text-muted" />
                   Profile
                 </DropdownMenu.Item>
                 <DropdownMenu.Item
                   onSelect={() => navigate('/settings')}
                   className="flex items-center gap-2.5 px-3 py-2 rounded-md text-sm text-ink hover:bg-paper-dark/50 cursor-pointer outline-none transition-colors"
                 >
-                  <Settings className="h-3.5 w-3.5 text-muted" />
+                  <IconSettings className="h-3.5 w-3.5 text-muted" />
                   Settings
                 </DropdownMenu.Item>
                 <DropdownMenu.Item
                   onSelect={() => {}}
                   className="flex items-center gap-2.5 px-3 py-2 rounded-md text-sm text-ink hover:bg-paper-dark/50 cursor-pointer outline-none transition-colors"
                 >
-                  <CreditCard className="h-3.5 w-3.5 text-muted" />
+                  <IconCreditCard className="h-3.5 w-3.5 text-muted" />
                   Billing
                 </DropdownMenu.Item>
                 <DropdownMenu.Separator className="my-1 h-px bg-border" />
@@ -243,7 +220,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                   onSelect={() => {}}
                   className="flex items-center gap-2.5 px-3 py-2 rounded-md text-sm text-ink hover:bg-paper-dark/50 cursor-pointer outline-none transition-colors"
                 >
-                  <HelpCircle className="h-3.5 w-3.5 text-muted" />
+                  <IconHelpCircle className="h-3.5 w-3.5 text-muted" />
                   Help & Support
                 </DropdownMenu.Item>
                 <DropdownMenu.Separator className="my-1 h-px bg-border" />
@@ -251,7 +228,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                   onSelect={logout}
                   className="flex items-center gap-2.5 px-3 py-2 rounded-md text-sm text-danger hover:bg-danger-light cursor-pointer outline-none transition-colors"
                 >
-                  <LogOut className="h-3.5 w-3.5" />
+                  <IconLogout className="h-3.5 w-3.5" />
                   Sign out
                 </DropdownMenu.Item>
               </DropdownMenu.Content>
@@ -266,7 +243,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
           onClick={() => setMobileNavOpen(true)}
           className="lg:hidden fixed top-3 left-3 z-30 p-2 rounded-lg bg-surface border border-border shadow-sm text-muted hover:text-ink transition-colors cursor-pointer"
         >
-          <Menu className="h-5 w-5" />
+          <IconMenu2 className="h-5 w-5" />
         </button>
         {children}
       </main>

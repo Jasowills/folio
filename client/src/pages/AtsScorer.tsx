@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { useResumes, useAtsScore, useAtsHistory, useAtsResult } from '../lib/queries'
 import { ScoreRing } from '../components/ScoreRing'
 import { Button } from '../components/ui/button'
-import { CheckCircle2, XCircle, Target, History } from 'lucide-react'
+import { IconCircleCheck, IconCircleX, IconTargetArrow, IconHistory } from '@tabler/icons-react'
 
 function getHeadline(score: number): string {
   if (score >= 85) return "Excellent fit. You're well positioned."
@@ -217,7 +217,7 @@ export default function AtsScorer() {
                   <span className="font-display text-white/80 animate-pulse">&amp;</span>
                 ) : (
                   <>
-                    <Target className="h-4 w-4 mr-2" />
+                    <IconTargetArrow className="h-4 w-4 mr-2" />
                     Check my fit
                   </>
                 )}
@@ -243,7 +243,7 @@ export default function AtsScorer() {
             {history && history.length > 0 && (
               <div className="card">
                 <div className="section-title mb-3">
-                  <History className="h-3.5 w-3.5 text-muted" />
+                  <IconHistory className="h-3.5 w-3.5 text-muted" />
                   Recent checks
                 </div>
                 <div className="space-y-0.5">
@@ -341,7 +341,7 @@ export default function AtsScorer() {
 
                   <div className="card">
                     <div className="section-title mb-3">
-                      <CheckCircle2 className="h-4 w-4 text-success" />
+                      <IconCircleCheck className="h-4 w-4 text-success" />
                       Keywords matched ({matchedCount})
                     </div>
                     <div className="flex flex-wrap gap-1.5">
@@ -361,7 +361,7 @@ export default function AtsScorer() {
 
                   <div className="card">
                     <div className="section-title mb-3">
-                      <XCircle className="h-4 w-4 text-danger" />
+                      <IconCircleX className="h-4 w-4 text-danger" />
                       Missing keywords ({missingCount})
                     </div>
                     <div className="flex flex-wrap gap-1.5">
@@ -398,7 +398,7 @@ export default function AtsScorer() {
                   {suggestions.length > 0 && (
                     <div className="card">
                       <div className="section-title mb-4">
-                        <Target className="h-4 w-4 text-teal" />
+                        <IconTargetArrow className="h-4 w-4 text-teal" />
                         Priority fixes
                       </div>
                       <ol className="space-y-2.5">
@@ -417,7 +417,7 @@ export default function AtsScorer() {
                   {history && history.length > 0 && (
                     <div className="card lg:hidden">
                       <div className="section-title mb-3">
-                        <History className="h-3.5 w-3.5 text-muted" />
+                        <IconHistory className="h-3.5 w-3.5 text-muted" />
                         Recent checks
                       </div>
                       <div className="space-y-0.5">

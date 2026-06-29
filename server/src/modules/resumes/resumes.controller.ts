@@ -32,8 +32,16 @@ import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import type { UserDocument } from '../users/schemas/user.schema';
 import { ResumesService } from './resumes.service';
+import { ResumeParserService } from './resume-parser.service';
 import { StorageService } from '../storage/storage.service';
 import mammoth from 'mammoth';
+import pdfParse from 'pdf-parse';
+import { execFile } from 'child_process';
+import { promisify } from 'util';
+import * as path from 'path';
+import * as fs from 'fs';
+
+const execFileAsync = promisify(execFile);
 
 @ApiTags('Resumes')
 @Controller('resumes')
@@ -43,6 +51,7 @@ export class ResumesController {
   constructor(
     private resumesService: ResumesService,
     private storage: StorageService,
+    private resumeParser: ResumeParserService,
   ) {}
 
   @UseGuards(JwtAuthGuard)
@@ -305,17 +314,43 @@ export class ResumesController {
     }
     try {
       if (file.mimetype === 'application/pdf') {
-        this.logger.log(`extractText: parsing PDF (${file.size} bytes)`);
-        const pdfjsLib = await import('pdfjs-dist');
-        const doc = await pdfjsLib.getDocument({ data: new Uint8Array(file.buffer) }).promise;
-        let text = '';
-        for (let i = 1; i <= doc.numPages; i++) {
-          const page = await doc.getPage(i);
-          const content = await page.getTextContent();
-          text += content.items.map((item: any) => item.str).join(' ') + '\n';
+        this.logger.log(`extractText: parsing PDF with pdf-parse (${file.size} bytes)`);
+        const data = await pdfParse(file.buffer);
+        let text = data.text || '';
+        const totalPages = data.numpages || 1;
+        this.logger.log(`extractText: pdf-parse returned ${text.length} chars, ${totalPages} pages`);
+
+        const quality = this.resumeParser.assessQuality(text, totalPages);
+        this.logger.log(`extractText: quality score = ${quality.score}, issues = ${quality.issues.join(', ')}, requiresFallback = ${quality.requiresFallback}`);
+
+        if (quality.requiresFallback) {
+          this.logger.log('extractText: attempting pdfplumber fallback');
+          const pythonScript = path.resolve(__dirname, '..', '..', '..', 'scripts', 'extract_pdf.py');
+          if (fs.existsSync(pythonScript)) {
+            try {
+              const tempFile = path.join(process.cwd(), `temp_pdf_${Date.now()}_${Math.random().toString(36).slice(2)}.pdf`);
+              fs.writeFileSync(tempFile, file.buffer);
+              const { stdout } = await execFileAsync('python3', [pythonScript, tempFile], { timeout: 30000 });
+              fs.unlinkSync(tempFile);
+              const fallbackResult = JSON.parse(stdout);
+              if (fallbackResult.text && !fallbackResult.error) {
+                text = fallbackResult.text;
+                this.logger.log(`extractText: pdfplumber returned ${text.length} chars, ${fallbackResult.pages} pages`);
+                const fallbackQuality = this.resumeParser.assessQuality(text, fallbackResult.pages || totalPages);
+                if (fallbackQuality.score < 0.4) {
+                  this.logger.error('extractText: quality < 0.4 even after pdfplumber fallback');
+                }
+              } else {
+                this.logger.error(`extractText: pdfplumber error — ${fallbackResult.error || 'empty result'}`);
+              }
+            } catch (fallbackErr) {
+              this.logger.error(`extractText: pdfplumber fallback failed: ${(fallbackErr as Error).message}`);
+            }
+          } else {
+            this.logger.warn(`extractText: pdfplumber script not found at ${pythonScript}`);
+          }
         }
-        await doc.destroy();
-        this.logger.log(`extractText: PDF parsing returned ${text.length} chars`);
+
         return text.trim();
       }
       this.logger.log(`extractText: parsing DOCX (${file.size} bytes)`);

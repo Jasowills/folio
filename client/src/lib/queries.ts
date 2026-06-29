@@ -19,19 +19,19 @@ export function useStats() {
 }
 
 interface ResumeContact {
-  email?: string | null
-  phone?: string | null
-  location?: string | null
-  linkedin?: string | null
-  website?: string | null
-  github?: string | null
+  email?: string
+  phone?: string
+  location?: string
+  linkedin?: string
+  website?: string
+  github?: string
 }
 
 interface ResumeExperience {
   company: string
   title: string
-  startDate?: string | null
-  endDate?: string | null
+  startDate?: string
+  endDate?: string
   current?: boolean
   bullets: string[]
 }
@@ -39,16 +39,16 @@ interface ResumeExperience {
 interface ResumeEducation {
   institution: string
   degree: string
-  field?: string | null
-  startDate?: string | null
-  endDate?: string | null
-  gpa?: string | null
+  field?: string
+  startDate?: string
+  endDate?: string
+  gpa?: string
 }
 
 interface ResumeCertification {
   name: string
-  issuer?: string | null
-  date?: string | null
+  issuer?: string
+  date?: string
 }
 
 export interface Resume {

@@ -3,23 +3,9 @@ import { useParams, Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { useResume } from '../lib/queries'
 import { Button } from '../components/ui/button'
-import {
-  FileText,
-  FileDown,
-  Download,
-  Share2,
-  ExternalLink,
-  ArrowLeft,
-  CheckCircle,
-  Loader2,
-} from 'lucide-react'
+import { IconDownload, IconShare, IconArrowLeft, IconCircleCheck, IconLoader2 } from '@tabler/icons-react'
 
-type Format = 'pdf'
 type Template = 'minimal' | 'modern' | 'executive'
-
-const FORMATS: { value: Format; label: string; icon: typeof FileText; desc: string }[] = [
-  { value: 'pdf', label: 'PDF', icon: FileText, desc: 'Best for sharing, printing, and submitting applications' },
-]
 
 const TEMPLATES: { value: Template; label: string }[] = [
   { value: 'minimal', label: 'Minimal' },
@@ -173,7 +159,7 @@ export default function ExportResume() {
           </div>
           <Link to={`/resume/${resumeId}`}>
             <Button variant="ghost" size="sm">
-              <ArrowLeft className="h-4 w-4 mr-1.5" />
+              <IconArrowLeft className="h-4 w-4 mr-1.5" />
               Back
             </Button>
           </Link>
@@ -205,7 +191,7 @@ export default function ExportResume() {
                   <TemplatePreview template={tmpl.value} />
                   <div className="flex items-center justify-between px-3 py-2.5 border-t border-border bg-paper">
                     <span className="text-xs font-semibold text-ink">{tmpl.label}</span>
-                    {isSelected && <CheckCircle className="h-4 w-4 text-teal" />}
+                    {isSelected && <IconCircleCheck className="h-4 w-4 text-teal" />}
                   </div>
                 </div>
               )
@@ -231,13 +217,13 @@ export default function ExportResume() {
             >
               {downloading ? (
                 <span className="inline-flex items-center gap-2">
-                  <Loader2 className="h-4 w-4 animate-spin" />
+                  <IconLoader2 className="h-4 w-4 animate-spin" />
                   Generating PDF...
                 </span>
               ) : (
                 <>
                   Download PDF
-                  <Download className="h-4 w-4 ml-2" />
+                  <IconDownload className="h-4 w-4 ml-2" />
                 </>
               )}
             </Button>
@@ -246,7 +232,7 @@ export default function ExportResume() {
               disabled={downloading}
               className="h-12 w-12 rounded-lg border border-border flex items-center justify-center text-muted hover:text-ink hover:bg-paper-dark/50 transition-colors shrink-0 disabled:opacity-50 cursor-pointer"
             >
-              <Share2 className="h-4 w-4" />
+              <IconShare className="h-4 w-4" />
             </button>
           </div>
         </div>

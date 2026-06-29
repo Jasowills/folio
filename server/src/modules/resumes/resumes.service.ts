@@ -82,7 +82,9 @@ export class ResumesService {
     if (fileUrl) resume.fileUrl = fileUrl;
     if (cloudinaryPublicId) resume.cloudinaryPublicId = cloudinaryPublicId;
 
-    const parsed = this.resumeParser.parse(rawText);
+    const parsed = await this.resumeParser.parse(rawText);
+    this.logger.log(`uploadFile: parse done — name="${parsed.name}", exp=${parsed.experience.length}, edu=${parsed.education.length}, skills=${parsed.skills.length}, certs=${parsed.certifications.length}, langs=${parsed.languages.length}, confidence=${parsed.confidence}`);
+
     resume.set({
       name: parsed.name,
       contact: parsed.contact,
@@ -106,7 +108,7 @@ export class ResumesService {
     const resume = await this.findById(id, userId);
     const rawText = resume.rawText || '';
 
-    const parsed = this.resumeParser.parse(rawText);
+    const parsed = await this.resumeParser.parse(rawText);
     this.logger.log(`analyzeResume: parsed name="${parsed.name}", exp=${parsed.experience.length}, edu=${parsed.education.length}, skills=${parsed.skills.length}`);
 
     resume.set({
@@ -137,7 +139,7 @@ export class ResumesService {
     if (!rawText) throw new BadRequestException('No extracted text to analyze');
 
     onProgress('extracting', 'Extracting resume data...');
-    const parsed = this.resumeParser.parse(rawText);
+    const parsed = await this.resumeParser.parse(rawText);
     this.logger.log(`analyzeWithProgress: parsed name="${parsed.name}", exp=${parsed.experience.length}, edu=${parsed.education.length}, skills=${parsed.skills.length}`);
 
     resume.set({
@@ -167,7 +169,7 @@ export class ResumesService {
   ): Promise<Record<string, unknown>> {
     this.logger.log(`guestExtractFromText: rawText length = ${rawText.length}, first 200 chars: "${rawText.slice(0, 200).replace(/\n/g, '\\n')}"`);
 
-    const parsed = this.resumeParser.parse(rawText);
+    const parsed = await this.resumeParser.parse(rawText);
     this.logger.log(`guestExtractFromText: parsed name="${parsed.name}", exp=${parsed.experience.length}, edu=${parsed.education.length}, skills=${parsed.skills.length}`);
 
     if (!parsed.isResume) {

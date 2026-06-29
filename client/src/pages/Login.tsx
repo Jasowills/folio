@@ -5,7 +5,6 @@ import { useAuth } from '../hooks/useAuth'
 import { Button } from '../components/ui/button'
 import { Input } from '../components/ui/input'
 import api from '../lib/api'
-import { Mail } from 'lucide-react'
 
 const quotes = [
   { text: 'Your resume is not a list of what you did. It is a story of what you made happen.', author: '— &Folio' },

@@ -1,9 +1,24 @@
+export type HeaderStyle = 'center' | 'dark-block' | 'thin-line' | 'left-accent' | 'top-stripe' | 'centered-line' | 'minimal' | 'paper'
+export type HeadingStyle = 'underline' | 'uppercase' | 'left-bar' | 'badge' | 'small-caps' | 'dot-accent'
+export type BulletStyle = 'dot' | 'dash' | 'arrow' | 'hyphen' | 'check'
+export type FontStyle = 'sans' | 'serif' | 'display' | 'mono'
+export type SpacingStyle = 'compact' | 'normal' | 'airy'
+
+export interface TemplateStyle {
+  header: HeaderStyle
+  heading: HeadingStyle
+  bullet: BulletStyle
+  font: FontStyle
+  spacing: SpacingStyle
+}
+
 export interface ResumeTemplate {
   id: string
   name: string
   description: string
   layout: 'single-column' | 'two-column' | 'sidebar'
   preview: string
+  style: TemplateStyle
 }
 
 export interface ResumeColorTheme {

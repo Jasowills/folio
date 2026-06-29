@@ -4,7 +4,7 @@ import { useResumes, useAnalyzePortfolio, usePortfolioStatus, useStats } from '.
 import { ScoreRing } from '../components/ScoreRing'
 import { Button } from '../components/ui/button'
 import { Select } from '../components/ui/select'
-import { CheckCircle2, AlertTriangle, ExternalLink } from 'lucide-react'
+import { IconCircleCheck, IconAlertTriangle, IconExternalLink } from '@tabler/icons-react'
 
 const statusLabels: Record<string, string> = {
   pending: 'Starting analysis...',
@@ -49,7 +49,7 @@ export default function PortfolioAnalysis() {
   const { data: result, error: statusError, isLoading: statusLoading } = usePortfolioStatus(analysisId)
 
   const [animatedScore, setAnimatedScore] = useState(0)
-  const animFrameRef = useRef<number>()
+  const animFrameRef = useRef<number>(undefined)
 
   const isComplete = result?.status === 'completed'
   const isFailed = result?.status === 'failed'
@@ -186,7 +186,7 @@ export default function PortfolioAnalysis() {
             className="max-w-xl mx-auto pt-12"
           >
             <div className="card text-center space-y-4">
-              <AlertTriangle className="h-10 w-10 text-danger mx-auto" />
+              <IconAlertTriangle className="h-10 w-10 text-danger mx-auto" />
               <div>
                 <h3 className="font-display text-h4 text-ink mb-1">
                   Analysis failed
@@ -239,7 +239,7 @@ export default function PortfolioAnalysis() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="card">
                 <div className="section-title mb-3">
-                  <CheckCircle2 className="h-4 w-4 text-success" />
+                  <IconCircleCheck className="h-4 w-4 text-success" />
                   Skills confirmed
                 </div>
                 <div className="flex flex-wrap gap-1.5">
@@ -257,7 +257,7 @@ export default function PortfolioAnalysis() {
 
               <div className="card">
                 <div className="section-title mb-3">
-                  <AlertTriangle className="h-4 w-4 text-amber" />
+                  <IconAlertTriangle className="h-4 w-4 text-amber" />
                   Skills missing
                 </div>
                 <div className="flex flex-wrap gap-1.5">
@@ -300,7 +300,7 @@ export default function PortfolioAnalysis() {
                             rel="noopener noreferrer"
                             className="text-muted hover:text-teal transition-colors shrink-0"
                           >
-                            <ExternalLink className="h-3.5 w-3.5" />
+                            <IconExternalLink className="h-3.5 w-3.5" />
                           </a>
                         )}
                       </div>

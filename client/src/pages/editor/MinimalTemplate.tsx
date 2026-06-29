@@ -1,5 +1,7 @@
 import { cn } from '../../lib/utils'
 import type { LocalData, ResumeShim, SectionName } from './types'
+import type { TemplateStyle } from '../../templates/types'
+import { fontClass, spacingClass, renderHeader, headingClass, headingStyle, bulletChar } from './template-utils'
 
 interface Props {
   resume: ResumeShim
@@ -8,6 +10,7 @@ interface Props {
   primaryColor?: string
   showSections?: Set<SectionName>
   pageIndex?: number
+  templateStyle: TemplateStyle
 }
 
 function hasBulletFlag(redFlags: ResumeShim['redFlags'], text: string): boolean {
@@ -20,42 +23,42 @@ function section(s: SectionName, show?: Set<SectionName>): boolean {
   return !show || show.has(s)
 }
 
-export function MinimalTemplate({ resume, localData, redFlags, primaryColor, showSections, pageIndex }: Props) {
+export function MinimalTemplate({ resume, localData, redFlags, primaryColor, showSections, pageIndex, templateStyle }: Props) {
   const hasIssue = (text?: string) => text && (redFlags || []).some((rf) => rf.message.includes(text || ''))
   const accentColor = primaryColor || '#0F6E56'
-  const showHeader = pageIndex === undefined || pageIndex === 0
   const links = (localData.links && localData.links.length > 0 ? localData.links : resume.links || []).filter(l => l.title || l.url)
+  const bullet = bulletChar(templateStyle)
+  const hClass = headingClass(templateStyle, accentColor)
+  const hStyle = headingStyle(templateStyle, accentColor)
+
+  const contactLines = (
+    <>
+      {localData.contact?.email || resume.contact?.email || ''}
+      {localData.contact?.phone || resume.contact?.phone ? ` | ${localData.contact?.phone || resume.contact?.phone || ''}` : ''}
+      {localData.contact?.location || resume.contact?.location ? ` | ${localData.contact?.location || resume.contact?.location || ''}` : ''}
+      {links.map((link, i) => (
+        <span key={i}>
+          {i > 0 && ' | '}
+          <a href={link.url} target="_blank" rel="noopener noreferrer" className="underline decoration-from-font" style={{ color: accentColor }}>{link.title || link.url}</a>
+        </span>
+      ))}
+    </>
+  )
+
   return (
-    <div className="font-sans text-[11px] leading-relaxed text-ink">
-      {showHeader && (
-      <div className="text-center mb-6">
-        <h1 className="font-display text-[22px] font-bold text-ink mb-1">
-          {localData.name || resume.name || 'Your Name'}
-        </h1>
-        <p className="text-[10px] text-muted">
-          {localData.contact?.email || resume.contact?.email || ''}
-          {localData.contact?.phone || resume.contact?.phone ? ` | ${localData.contact?.phone || resume.contact?.phone || ''}` : ''}
-          {localData.contact?.location || resume.contact?.location ? ` | ${localData.contact?.location || resume.contact?.location || ''}` : ''}
-          {links.map((link, i) => (
-            <span key={i}>
-              {i > 0 && ' | '}
-              <a href={link.url} target="_blank" rel="noopener noreferrer" style={{ color: accentColor }} className="underline decoration-from-font">{link.title || link.url}</a>
-            </span>
-          ))}
-        </p>
-      </div>
-      )}
+    <div className={cn(fontClass(templateStyle.font), 'leading-relaxed text-ink', spacingClass(templateStyle.spacing))}>
+      {renderHeader(templateStyle, localData.name || resume.name || 'Your Name', contactLines, accentColor, pageIndex)}
 
       {section('summary', showSections) && (localData.summary || resume.summary) && (
-        <div data-section="summary" className={cn('mb-5', hasIssue('summary') && 'border-l-2 border-amber pl-3 bg-amber/5')}>
-          <h2 className="font-display text-[13px] font-semibold uppercase tracking-wider mb-1.5" style={{ color: accentColor }}>Summary</h2>
-          <p className="text-[11px] text-muted leading-relaxed">{localData.summary || resume.summary}</p>
+        <div data-section="summary" className={cn('mb-5 break-inside-avoid', hasIssue('summary') && 'border-l-2 border-amber pl-3 bg-amber/5')}>
+          <h2 className={hClass} style={hStyle}>Summary</h2>
+          <p className="text-muted leading-relaxed mt-2">{localData.summary || resume.summary}</p>
         </div>
       )}
 
       {section('experience', showSections) && (localData.experience && localData.experience.length > 0 ? localData.experience : resume.experience || []).length > 0 && (
-        <div data-section="experience" className="mb-5">
-          <h2 className="font-display text-[13px] font-semibold uppercase tracking-wider mb-2" style={{ color: accentColor }}>Experience</h2>
+        <div data-section="experience" className="mb-5 break-inside-avoid">
+          <h2 className={hClass} style={hStyle}>Experience</h2>
           <div className="space-y-3">
             {((localData.experience && localData.experience.length > 0 ? localData.experience : resume.experience || [])).map((exp, i) => (
               <div key={i} className={cn(exp.bullets?.some((b: string) => hasBulletFlag(redFlags, b)) && 'border-l-2 border-amber pl-3 bg-amber/5')}>
@@ -71,8 +74,8 @@ export function MinimalTemplate({ resume, localData, redFlags, primaryColor, sho
                 {exp.bullets && exp.bullets.length > 0 && (
                   <ul className="mt-1 space-y-0.5">
                     {exp.bullets.filter((b: any) => typeof b === 'string').map((b: string, j: number) => (
-                      <li key={j} className="flex items-start gap-1.5 text-[11px] text-muted">
-                        <span className="text-muted mt-0.5">•</span>
+                      <li key={j} className="flex items-start gap-1.5 text-muted">
+                        <span className="text-muted mt-0.5 shrink-0">{bullet}</span>
                         <span>{b}</span>
                       </li>
                     ))}
@@ -85,8 +88,8 @@ export function MinimalTemplate({ resume, localData, redFlags, primaryColor, sho
       )}
 
       {section('education', showSections) && (localData.education && localData.education.length > 0 ? localData.education : resume.education || []).length > 0 && (
-        <div data-section="education" className="mb-5">
-          <h2 className="font-display text-[13px] font-semibold uppercase tracking-wider mb-2" style={{ color: accentColor }}>Education</h2>
+        <div data-section="education" className="mb-5 break-inside-avoid">
+          <h2 className={hClass} style={hStyle}>Education</h2>
           <div className="space-y-2">
             {((localData.education && localData.education.length > 0 ? localData.education : resume.education || [])).map((edu, i) => (
               <div key={i}>
@@ -100,7 +103,7 @@ export function MinimalTemplate({ resume, localData, redFlags, primaryColor, sho
 
       {section('skills', showSections) && (localData.skills && localData.skills.length > 0 ? localData.skills : resume.skills || []).length > 0 && (
         <div data-section="skills" className="mb-5">
-          <h2 className="font-display text-[13px] font-semibold uppercase tracking-wider mb-1.5" style={{ color: accentColor }}>Skills</h2>
+          <h2 className={hClass} style={hStyle}>Skills</h2>
           <div className="flex flex-wrap gap-1">
             {(localData.skills && localData.skills.length > 0 ? localData.skills : resume.skills || []).filter(Boolean).map((s, i) => (
               <span key={i} className="text-[10px] bg-paper px-2 py-0.5 rounded text-muted">{s}</span>
@@ -111,7 +114,7 @@ export function MinimalTemplate({ resume, localData, redFlags, primaryColor, sho
 
       {section('certifications', showSections) && (localData.certifications && localData.certifications.length > 0 ? localData.certifications : resume.certifications || []).length > 0 && (
         <div data-section="certifications" className="mb-5">
-          <h2 className="font-display text-[13px] font-semibold uppercase tracking-wider mb-1.5" style={{ color: accentColor }}>Certifications</h2>
+          <h2 className={hClass} style={hStyle}>Certifications</h2>
           <div className="space-y-1">
             {((localData.certifications && localData.certifications.length > 0 ? localData.certifications : resume.certifications || [])).map((c, i) => (
               <p key={i} className="text-[11px]">
@@ -124,11 +127,11 @@ export function MinimalTemplate({ resume, localData, redFlags, primaryColor, sho
       )}
 
       {section('languages', showSections) && (localData.languages && localData.languages.length > 0 ? localData.languages : resume.languages || []).length > 0 && (
-        <div data-section="languages">
-          <h2 className="font-display text-[13px] font-semibold uppercase tracking-wider mb-1.5" style={{ color: accentColor }}>Languages</h2>
+        <div data-section="languages" className="mb-5">
+          <h2 className={hClass} style={hStyle}>Languages</h2>
           <div className="flex flex-wrap gap-1.5">
             {(localData.languages && localData.languages.length > 0 ? localData.languages : resume.languages || []).filter(Boolean).map((l, i) => (
-              <span key={i} className="text-[11px] text-muted">{l}</span>
+              <span key={i} className="text-muted">{l}</span>
             ))}
           </div>
         </div>
@@ -136,10 +139,10 @@ export function MinimalTemplate({ resume, localData, redFlags, primaryColor, sho
 
       {section('links', showSections) && (localData.links && localData.links.length > 0 ? localData.links : resume.links || []).filter(l => l.title || l.url).length > 0 && (
         <div data-section="links" className="mt-5">
-          <h2 className="font-display text-[13px] font-semibold uppercase tracking-wider mb-1.5" style={{ color: accentColor }}>Links</h2>
+          <h2 className={hClass} style={hStyle}>Links</h2>
           <div className="space-y-1">
             {(localData.links && localData.links.length > 0 ? localData.links : resume.links || []).filter(l => l.title || l.url).map((link, i) => (
-              <p key={i} className="text-[11px]">
+              <p key={i}>
                 <a href={link.url} target="_blank" rel="noopener noreferrer" style={{ color: accentColor }} className="underline decoration-from-font">{link.title || link.url}</a>
                 {link.title && link.url ? <span className="text-muted"> — {link.url}</span> : null}
               </p>

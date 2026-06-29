@@ -1,6 +1,6 @@
 import { createContext, useContext, useState, useCallback, useEffect, type ReactNode } from 'react'
 import * as RadixToast from '@radix-ui/react-toast'
-import { X, AlertCircle, CheckCircle2, Info, AlertTriangle } from 'lucide-react'
+import { IconX, IconAlertCircle, IconCircleCheck, IconInfoCircle, IconAlertTriangle } from '@tabler/icons-react'
 import { cn } from '../../lib/utils'
 
 type ToastType = 'success' | 'error' | 'info' | 'warning'
@@ -23,10 +23,10 @@ interface ToastContextValue {
 const ToastContext = createContext<ToastContextValue | null>(null)
 
 const icons: Record<ToastType, ReactNode> = {
-  success: <CheckCircle2 className="h-4 w-4 text-teal" />,
-  error: <AlertCircle className="h-4 w-4 text-danger" />,
-  warning: <AlertTriangle className="h-4 w-4 text-amber" />,
-  info: <Info className="h-4 w-4 text-sky" />,
+  success: <IconCircleCheck className="h-4 w-4 text-teal" />,
+  error: <IconAlertCircle className="h-4 w-4 text-danger" />,
+  warning: <IconAlertTriangle className="h-4 w-4 text-amber" />,
+  info: <IconInfoCircle className="h-4 w-4 text-sky" />,
 }
 
 let toastId = 0
@@ -96,7 +96,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
                 )}
               </div>
               <RadixToast.Close className="shrink-0 p-0.5 text-muted hover:text-ink transition-colors">
-                <X className="h-3.5 w-3.5" />
+                <IconX className="h-3.5 w-3.5" />
               </RadixToast.Close>
             </div>
           </RadixToast.Root>
