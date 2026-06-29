@@ -130,6 +130,20 @@ export function useAnalyzeResume() {
   })
 }
 
+export function useReExtractResume() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { data } = await api.post(`/resumes/${id}/re-extract`)
+      return data.data || data
+    },
+    onSettled: (_data, _err, id) => {
+      qc.invalidateQueries({ queryKey: ['resume', id] })
+      qc.invalidateQueries({ queryKey: ['resumes'] })
+    },
+  })
+}
+
 export function useCreateResume() {
   const qc = useQueryClient()
   return useMutation({
@@ -302,6 +316,41 @@ export function useAnalyzePortfolio() {
     mutationFn: async (body: { resumeId: string; portfolioUrl: string }) => {
       const { data } = await api.post('/crawler/analyze', body)
       return (data.data || data) as { analysisId: string }
+    },
+  })
+}
+
+export function useUpdateProfile() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (data: { name?: string; email?: string }) => {
+      const res = await api.patch('/users/me', data)
+      return res.data.data || res.data
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['user'] })
+    },
+  })
+}
+
+export function useChangePassword() {
+  return useMutation({
+    mutationFn: async (data: { currentPassword: string; newPassword: string }) => {
+      const res = await api.post('/users/me/change-password', data)
+      return res.data.data || res.data
+    },
+  })
+}
+
+export function useDeleteAccount() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async () => {
+      await api.delete('/users/me')
+    },
+    onSuccess: () => {
+      qc.clear()
+      localStorage.removeItem('accessToken')
     },
   })
 }

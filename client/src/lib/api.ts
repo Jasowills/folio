@@ -1,5 +1,11 @@
 import axios from 'axios'
 
+let sessionExpiredHandler: (() => void) | null = null
+
+export function onSessionExpired(handler: () => void) {
+  sessionExpiredHandler = handler
+}
+
 const api = axios.create({
   baseURL: '/api',
   headers: { 'Content-Type': 'application/json' },
@@ -29,8 +35,9 @@ api.interceptors.response.use(
         original.headers.Authorization = `Bearer ${localStorage.getItem('accessToken')}`
         return api(original)
       } catch {
+        sessionExpiredHandler?.()
         localStorage.removeItem('accessToken')
-        window.location.href = '/login'
+        setTimeout(() => { window.location.href = '/login' }, 3000)
       }
     }
     return Promise.reject(error)

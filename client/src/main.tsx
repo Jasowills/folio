@@ -3,7 +3,12 @@ import { createRoot } from 'react-dom/client'
 import { QueryClient, QueryClientProvider, MutationCache } from '@tanstack/react-query'
 import App from './App'
 import { ToastProvider, showToast } from './components/ui/toast'
+import { onSessionExpired } from './lib/api'
 import './index.css'
+
+onSessionExpired(() => {
+  showToast('warning', 'Session expired', 'Signing out…')
+})
 
 const queryClient = new QueryClient({
   defaultOptions: {

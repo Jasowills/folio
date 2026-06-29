@@ -162,6 +162,31 @@ export class ResumesService {
     return resume;
   }
 
+  async reExtract(id: string, userId: string): Promise<ResumeDocument> {
+    const resume = await this.findById(id, userId);
+    const rawText = resume.rawText || '';
+    if (!rawText) throw new BadRequestException('No raw text to extract from');
+
+    this.logger.log(`reExtract: re-running parser on resume ${id}`);
+    const parsed = await this.resumeParser.parse(rawText);
+    this.logger.log(`reExtract: parsed name="${parsed.name}", exp=${parsed.experience.length}, edu=${parsed.education.length}, skills=${parsed.skills.length}, certs=${parsed.certifications.length}, langs=${parsed.languages.length}`);
+
+    resume.set({
+      name: parsed.name,
+      contact: parsed.contact,
+      summary: parsed.summary,
+      experience: parsed.experience,
+      education: parsed.education,
+      skills: parsed.skills,
+      certifications: parsed.certifications,
+      languages: parsed.languages,
+      links: parsed.links,
+    });
+    this.normalizeContactUrls(resume as any);
+
+    return resume.save();
+  }
+
   async guestExtractFromText(
     rawText: string,
     fileUrl?: string,

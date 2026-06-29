@@ -60,22 +60,29 @@ export class AiService {
     this.cooldowns.set(key, Date.now() + ttl);
   }
 
-  private get baseUrl(): string {
+  /** Whether Ollama is configured as the primary provider */
+  private get ollamaConfigured(): boolean {
+    return !!process.env.OLLAMA_BASE_URL;
+  }
+
+  private get ollamaBaseUrl(): string {
+    return process.env.OLLAMA_BASE_URL || 'http://localhost:11434/v1';
+  }
+
+  private get ollamaDefaultModel(): string {
+    return process.env.OLLAMA_DEFAULT_MODEL || 'llama3.2';
+  }
+
+  private get openrouterBaseUrl(): string {
     return process.env.OPENROUTER_BASE_URL || 'https://openrouter.ai/api/v1';
   }
 
-  private get defaultModel(): string {
-    return (
-      process.env.OPENROUTER_DEFAULT_MODEL ||
-      'openrouter/free'
-    );
+  private get openrouterDefaultModel(): string {
+    return process.env.OPENROUTER_DEFAULT_MODEL || 'openrouter/free';
   }
 
-  private get fallbackModel(): string {
-    return (
-      process.env.OPENROUTER_FALLBACK_MODEL ||
-      'google/gemma-4-31b-it:free'
-    );
+  private get openrouterFallbackModel(): string {
+    return process.env.OPENROUTER_FALLBACK_MODEL || 'google/gemma-4-31b-it:free';
   }
 
   private get maxTokens(): number {
@@ -83,7 +90,7 @@ export class AiService {
     return Number.isFinite(val) && val >= 0 ? val : 1024;
   }
 
-  private get apiKey(): string {
+  private get openrouterApiKey(): string {
     return process.env.OPENROUTER_API_KEY || '';
   }
 
@@ -131,7 +138,8 @@ export class AiService {
     user: string,
     model?: string,
   ): Promise<Record<string, unknown>> {
-    const cacheKey = this.cache.makeKey(system, user, model || this.defaultModel);
+    const resolvedModel = model || (this.ollamaConfigured ? this.ollamaDefaultModel : this.openrouterDefaultModel);
+    const cacheKey = this.cache.makeKey(system, user, resolvedModel);
 
     const cached = this.cache.get(cacheKey);
     if (cached) {
@@ -168,19 +176,38 @@ export class AiService {
       { role: 'user', content: user },
     ];
 
-    const selectedModel = model || this.defaultModel;
-    const url = `${this.baseUrl}/chat/completions`;
+    const selectedModel = model || (this.ollamaConfigured ? this.ollamaDefaultModel : this.openrouterDefaultModel);
+
+    if (this.ollamaConfigured) {
+      return this.streamFromProvider(this.ollamaBaseUrl, selectedModel, messages, false);
+    }
+
+    return this.streamFromProvider(this.openrouterBaseUrl, selectedModel, messages, true);
+  }
+
+  private async streamFromProvider(
+    baseUrl: string,
+    model: string,
+    messages: ChatMessage[],
+    isOpenRouter: boolean,
+  ): Promise<ReadableStream<Uint8Array>> {
+    const url = `${baseUrl}/chat/completions`;
+
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+    };
+
+    if (isOpenRouter) {
+      headers['Authorization'] = `Bearer ${this.openrouterApiKey}`;
+      headers['HTTP-Referer'] = 'https://folio.app';
+      headers['X-Title'] = 'Folio &';
+    }
 
     const res = await fetch(url, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${this.apiKey}`,
-        'HTTP-Referer': 'https://folio.app',
-        'X-Title': 'Folio &',
-      },
+      headers,
       body: JSON.stringify({
-        model: selectedModel,
+        model,
         max_tokens: this.maxTokens,
         stream: true,
         messages,
@@ -188,7 +215,7 @@ export class AiService {
     });
 
     if (!res.ok || !res.body) {
-      throw new Error(`OpenRouter stream error: ${res.status}`);
+      throw new Error(`${isOpenRouter ? 'OpenRouter' : 'Ollama'} stream error: ${res.status}`);
     }
 
     return res.body;
@@ -208,39 +235,63 @@ export class AiService {
     return this.parseJson(raw);
   }
 
+  private providerKey(provider: string, model: string): string {
+    return `${provider}:${model}`;
+  }
+
+  private async tryProvider(
+    provider: 'ollama' | 'openrouter',
+    model: string,
+    messages: ChatMessage[],
+  ): Promise<string | null> {
+    const key = this.providerKey(provider, model);
+
+    if (this.isOnCooldown(key)) {
+      this.logger.debug(`Skipping ${provider}/${model} (circuit open)`);
+      return null;
+    }
+
+    try {
+      if (provider === 'ollama') {
+        return await this.callOllama(model, messages);
+      }
+      return await this.callOpenRouter(model, messages);
+    } catch (err) {
+      const msg = (err as Error)?.message || String(err);
+      const is429 = msg.includes('429');
+      if (is429) {
+        this.setCooldown(key, CIRCUIT_BREAKER_TTL);
+        this.logger.warn(`${provider}/${model} rate-limited, circuit open for 30s`);
+      }
+      if (!is429) this.logger.warn(`${provider}/${model} error: ${msg}`);
+      return null;
+    }
+  }
+
   private async callWithRetry(
     messages: ChatMessage[],
     model?: string,
   ): Promise<string> {
-    const primaryModel = model || this.defaultModel;
-    const primaryKey = `openrouter:${primaryModel}`;
-    const fallbackKey = `openrouter:${this.fallbackModel}`;
+    const usesOllama = this.ollamaConfigured;
 
-    const tryModel = async (m: string, key: string): Promise<string | null> => {
-      if (this.isOnCooldown(key)) {
-        this.logger.debug(`Skipping ${m} (circuit open)`);
-        return null;
-      }
-      try {
-        return await this.callOpenRouter(m, messages);
-      } catch (err) {
-        const msg = (err as Error)?.message || String(err);
-        const is429 = msg.includes('429');
-        if (is429) {
-          this.setCooldown(key, CIRCUIT_BREAKER_TTL);
-          this.logger.warn(`${m} rate-limited, circuit open for 30s`);
-        }
-        if (!is429) this.logger.warn(`${m} error: ${msg}`);
-        return null;
-      }
-    };
+    const primaryProvider = usesOllama ? 'ollama' : 'openrouter';
+    const primaryModel = model || (usesOllama ? this.ollamaDefaultModel : this.openrouterDefaultModel);
+    const fallbackModel = this.openrouterFallbackModel;
 
     for (let attempt = 1; attempt <= 3; attempt++) {
-      const r1 = await tryModel(primaryModel, primaryKey);
+      // Try primary provider
+      const r1 = await this.tryProvider(primaryProvider, primaryModel, messages);
       if (r1 !== null) return r1;
 
-      const r2 = await tryModel(this.fallbackModel, fallbackKey);
-      if (r2 !== null) return r2;
+      // If Ollama is primary, try OpenRouter as fallback
+      if (usesOllama) {
+        const r2 = await this.tryProvider('openrouter', this.openrouterDefaultModel, messages);
+        if (r2 !== null) return r2;
+      }
+
+      // Try OpenRouter fallback model
+      const r3 = await this.tryProvider('openrouter', fallbackModel, messages);
+      if (r3 !== null) return r3;
 
       if (attempt < 3) {
         const delay = 3000 + Math.random() * 2000;
@@ -256,7 +307,7 @@ export class AiService {
     model: string,
     messages: ChatMessage[],
   ): Promise<string> {
-    const url = `${this.baseUrl}/chat/completions`;
+    const url = `${this.openrouterBaseUrl}/chat/completions`;
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 30_000);
 
@@ -270,7 +321,7 @@ export class AiService {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${this.apiKey}`,
+          Authorization: `Bearer ${this.openrouterApiKey}`,
           'HTTP-Referer': 'https://folio.app',
           'X-Title': 'Folio &',
         },
@@ -301,6 +352,49 @@ export class AiService {
         );
         this.recordUsage(data.usage.total_tokens || 0);
       }
+
+      return data.choices[0]?.message?.content || '';
+    } catch (e) {
+      finish();
+      throw e;
+    }
+  }
+
+  private async callOllama(
+    model: string,
+    messages: ChatMessage[],
+  ): Promise<string> {
+    const url = `${this.ollamaBaseUrl}/chat/completions`;
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 60_000);
+
+    const finish = () => clearTimeout(timeout);
+
+    try {
+      this.logger.log(`Calling Ollama ${model} at ${this.ollamaBaseUrl}`);
+
+      const res = await fetch(url, {
+        signal: controller.signal,
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model,
+          max_tokens: this.maxTokens,
+          stream: false,
+          messages,
+        } as OpenRouterRequest),
+      });
+
+      finish();
+
+      if (!res.ok) {
+        const body = await res.text().catch(() => '');
+        throw new Error(`Ollama API error: ${res.status}${body ? ` — ${body.slice(0, 200)}` : ''}`);
+      }
+
+      const data = (await res.json()) as OpenRouterResponse;
+
+      this.logger.log(`Ollama ${model} response received`);
 
       return data.choices[0]?.message?.content || '';
     } catch (e) {

@@ -176,6 +176,16 @@ export class ResumesController {
     return this.resumesService.analyzeResume(id, user._id.toString());
   }
 
+  @Post(':id/re-extract')
+  @Throttle({ default: { limit: 10, ttl: 60000 } })
+  @ApiOperation({ summary: 'Re-run extraction only (no AI) on an existing resume' })
+  async reExtract(
+    @Param('id') id: string,
+    @CurrentUser() user: UserDocument,
+  ) {
+    return this.resumesService.reExtract(id, user._id.toString());
+  }
+
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @Get(':id/review-stream')

@@ -1,5 +1,5 @@
 export function validateEnv() {
-  const required = [
+  const required: [string, string][] = [
     ['MONGODB_URI', 'MongoDB connection string'],
     ['JWT_SECRET', 'JWT signing secret'],
     ['JWT_REFRESH_SECRET', 'JWT refresh token secret'],
@@ -7,9 +7,13 @@ export function validateEnv() {
     ['CLOUDINARY_API_KEY', 'Cloudinary API key'],
     ['CLOUDINARY_API_SECRET', 'Cloudinary API secret'],
     ['GOOGLE_CLIENT_ID', 'Google OAuth client ID'],
-    ['OPENROUTER_API_KEY', 'OpenRouter API key for AI calls'],
     ['CLIENT_URL', 'Client application URL'],
-  ] as const;
+  ];
+
+  // OPENROUTER_API_KEY is required unless Ollama is configured as the primary provider
+  if (!process.env.OLLAMA_BASE_URL && !process.env.OPENROUTER_API_KEY) {
+    required.push(['OPENROUTER_API_KEY', 'OpenRouter API key for AI calls — not needed if OLLAMA_BASE_URL is set']);
+  }
 
   const missing: string[] = [];
 

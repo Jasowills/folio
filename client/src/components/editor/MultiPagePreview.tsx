@@ -76,11 +76,13 @@ export function MultiPagePreview({ children, zoom, singlePage, contentKey }: Pro
 
     const distribution: SectionName[][] = [[]]
     let current = 0
+    let isFirstPage = true
     for (const { name, height } of heights) {
-      const limit = distribution.length === 0 ? availablePage0 : available
+      const limit = isFirstPage ? availablePage0 : available
       if (current + height > limit && current > 0) {
         distribution.push([])
         current = 0
+        isFirstPage = false
       }
       distribution[distribution.length - 1].push(name)
       current += height

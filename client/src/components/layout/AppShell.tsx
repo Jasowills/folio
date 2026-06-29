@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { NavLink, useNavigate } from 'react-router-dom'
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu'
-import { IconLayoutDashboard, IconFileText, IconTargetArrow, IconMail, IconGlobe, IconDownload, IconBriefcase, IconMessage, IconChevronDown, IconUser, IconSettings, IconCreditCard, IconHelpCircle, IconLogout, IconMenu2, IconX,  } from '@tabler/icons-react'
+import { IconLayoutDashboard, IconFileText, IconTargetArrow, IconMail, IconGlobe, IconBriefcase, IconMessage, IconFlask, IconChevronDown, IconUser, IconSettings, IconCreditCard, IconHelpCircle, IconLogout, IconMenu2, IconX } from '@tabler/icons-react'
 import { useAuth } from '../../hooks/useAuth'
 import { useResumes } from '../../lib/queries'
 import { cn } from '../../lib/utils'
@@ -12,6 +12,7 @@ const mainNavItems = [
   { to: '/ats', label: 'ATS Scorer', icon: IconTargetArrow },
   { to: '/cover-letter/new', label: 'Cover Letter', icon: IconMail },
   { to: '/portfolio', label: 'Portfolio', icon: IconGlobe },
+  { to: '/research', label: 'Research', icon: IconFlask },
 ]
 
 const comingSoonItems = [
@@ -105,46 +106,6 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
           ))}
 
           <span className="text-[10px] font-semibold uppercase tracking-widest text-muted/60 px-3 pb-1 pt-4">
-            Export
-          </span>
-          {(() => {
-            const exportId = resumes?.[0]?._id
-            const item = { icon: IconDownload, label: 'Export Resume' }
-            if (!exportId) {
-              return (
-                <div className="flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-muted/40 cursor-not-allowed select-none">
-                  <item.icon className="h-4 w-4 shrink-0" />
-                  <span>{item.label}</span>
-                </div>
-              )
-            }
-            return (
-              <NavLink
-                to={`/export/${exportId}`}
-                onClick={() => setMobileNavOpen(false)}
-                className={({ isActive }) =>
-                  cn(
-                    'flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-all duration-150 group relative',
-                    isActive
-                      ? 'bg-teal-light text-teal font-semibold'
-                      : 'text-muted hover:text-ink hover:bg-paper-dark/50',
-                  )
-                }
-              >
-                {({ isActive }) => (
-                  <>
-                    {isActive && (
-                      <span className="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-5 bg-teal rounded-full" />
-                    )}
-                    <item.icon className={cn('h-4 w-4 shrink-0', isActive ? 'text-teal' : 'text-muted group-hover:text-ink transition-colors')} />
-                    <span>{item.label}</span>
-                  </>
-                )}
-              </NavLink>
-            )
-          })()}
-
-          <span className="text-[10px] font-semibold uppercase tracking-widest text-muted/60 px-3 pb-1 pt-4">
             Coming Soon
           </span>
           {comingSoonItems.map((item) => (
@@ -160,6 +121,31 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
               </span>
             </div>
           ))}
+
+          <div className="mt-auto pt-2">
+            <NavLink
+              to="/settings"
+              onClick={() => setMobileNavOpen(false)}
+              className={({ isActive }) =>
+                cn(
+                  'flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-all duration-150 group relative',
+                  isActive
+                    ? 'bg-teal-light text-teal font-semibold'
+                    : 'text-muted hover:text-ink hover:bg-paper-dark/50',
+                )
+              }
+            >
+              {({ isActive }) => (
+                <>
+                  {isActive && (
+                    <span className="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-5 bg-teal rounded-full" />
+                  )}
+                  <IconSettings className={cn('h-4 w-4 shrink-0', isActive ? 'text-teal' : 'text-muted group-hover:text-ink transition-colors')} />
+                  <span>Settings</span>
+                </>
+              )}
+            </NavLink>
+          </div>
         </nav>
 
         <div className="border-t border-border shrink-0">

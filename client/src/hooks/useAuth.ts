@@ -12,6 +12,7 @@ export interface User {
 interface AuthState {
   user: User | null
   loading: boolean
+  setUser: (user: User | null) => void
   googleLogin: (credential: string) => Promise<void>
   emailLogin: (email: string, password: string) => Promise<void>
   signup: (email: string, password: string, name: string) => Promise<void>
@@ -22,6 +23,8 @@ interface AuthState {
 export const useAuth = create<AuthState>((set) => ({
   user: null,
   loading: true,
+
+  setUser: (user) => set({ user }),
 
   fetchUser: async () => {
     const token = localStorage.getItem('accessToken')

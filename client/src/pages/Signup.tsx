@@ -187,6 +187,12 @@ export default function Signup() {
               Already have an account?{' '}
               <Link to="/login" className="text-teal hover:underline">Sign in</Link>
             </p>
+            <p className="text-[10px] text-muted/60 text-center leading-relaxed">
+              By creating an account, you agree to our{' '}
+              <Link to="/privacy" className="text-teal hover:underline">Privacy Policy</Link>
+              {' '}and{' '}
+              <Link to="/terms" className="text-teal hover:underline">Terms &amp; Conditions</Link>.
+            </p>
           </form>
         </motion.div>
       </div>

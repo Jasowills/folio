@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
-import { useResume, useRewriteBullet, useUpdateResume, useAnalyzeResume } from '../lib/queries'
+import { useResume, useRewriteBullet, useUpdateResume, useReExtractResume } from '../lib/queries'
 import { Button } from '../components/ui/button'
 import { cn } from '../lib/utils'
 import { MultiPagePreview } from '../components/editor/MultiPagePreview'
@@ -167,7 +167,7 @@ function ResumeEditorInner() {
   const [aiRewrites, setAiRewrites] = useState<string[]>([])
   const [aiRewritesLoading, setAiRewritesLoading] = useState(false)
   const rewriteBullet = useRewriteBullet()
-  const analyzeResume = useAnalyzeResume()
+  const reExtractResume = useReExtractResume()
   const [mobilePanel, setMobilePanel] = useState<'edit' | 'preview'>('edit')
   const [localData, setLocalData] = useState<LocalData>(makeLocalData())
   const saveAttemptRef = useRef(0)
@@ -206,9 +206,9 @@ function ResumeEditorInner() {
   useEffect(() => {
     if (resume?.rawText && !hasStructuredData && !analysingRef.current && !isLoading) {
       analysingRef.current = true
-      analyzeResume.mutate(resume._id!)
+      reExtractResume.mutate(resume._id!)
     }
-  }, [resume?.rawText, hasStructuredData, isLoading, analyzeResume])
+  }, [resume?.rawText, hasStructuredData, isLoading, reExtractResume])
 
   const redFlags: Array<{ message: string; severity: 'low' | 'medium' | 'high'; section?: string }> = resume?.redFlags || []
   const sectionRedFlags = getRedFlagsForSection(redFlags, activeTab)
