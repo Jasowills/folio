@@ -5,6 +5,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import { useResumes, useUploadResume, useDeleteResume, useAnalyzeResume, useCreateResume } from '../lib/queries'
 import api from '../lib/api'
 import type { Resume } from '../lib/queries'
+import { getScoreRingColor } from '../lib/utils'
 import { IconFileText, IconTrash, IconDownload, IconSearch, IconUpload, IconPlus, IconX, IconFilePlus, IconDots, IconAlertTriangle, IconCircleCheck, IconEye, IconChartBar, IconFilePencil, IconCopy, IconRefresh } from '@tabler/icons-react'
 
 const MAX_FILE_SIZE = 15 * 1024 * 1024
@@ -45,12 +46,6 @@ function getStatus(r: Resume): { label: string; dot: string; bg: string; text: s
   if (r.redFlags && r.redFlags.length > 0) return { label: 'Needs attention', dot: 'bg-danger', bg: 'bg-danger-light', text: 'text-danger', key: 'attention' }
   if (isAnalysed) return { label: 'Analysed', dot: 'bg-teal', bg: 'bg-teal-light', text: 'text-teal', key: 'analysed' }
   return { label: 'Draft', dot: 'bg-muted-light', bg: 'bg-paper', text: 'text-muted', key: 'draft' }
-}
-
-function getScoreRingColor(score: number): string {
-  if (score >= 75) return '#2D6A2D'
-  if (score >= 50) return '#BA7517'
-  return '#9B2335'
 }
 
 function CardThumbnail({ statusKey }: { statusKey: string }) {

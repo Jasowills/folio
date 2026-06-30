@@ -117,7 +117,7 @@ export class AiService {
   }
 
   private promptCategory(system: string): string {
-    if (system.includes('resume parsing expert')) return 'extraction';
+    if (system.includes('resume data extraction and gap-filling')) return 'extraction';
     if (system.includes('career analyst')) return 'roleDetection';
     if (system.includes('resume design expert')) return 'quality';
     if (system.includes('expert recruiter') && system.includes('identify issues')) return 'redFlag';
@@ -127,6 +127,12 @@ export class AiService {
     if (system.includes('cover letter writer')) return 'coverLetter';
     if (system.includes('senior technical recruiter') && system.includes('portfolio')) return 'portfolio';
     return 'default';
+  }
+
+  /** Higher token limit for extraction (lots of nested content) */
+  private get extractionMaxTokens(): number {
+    const val = Number(process.env.AI_EXTRACTION_MAX_TOKENS);
+    return Number.isFinite(val) && val >= 0 ? val : 4096;
   }
 
   private ttlFor(system: string): number {
@@ -231,7 +237,10 @@ export class AiService {
       { role: 'user', content: user },
     ];
 
-    const raw = await this.callWithRetry(messages, model);
+    const category = this.promptCategory(system);
+    const maxTokens = category === 'extraction' ? this.extractionMaxTokens : this.maxTokens;
+
+    const raw = await this.callWithRetry(messages, model, maxTokens);
     return this.parseJson(raw);
   }
 
@@ -243,6 +252,7 @@ export class AiService {
     provider: 'ollama' | 'openrouter',
     model: string,
     messages: ChatMessage[],
+    maxTokens?: number,
   ): Promise<string | null> {
     const key = this.providerKey(provider, model);
 
@@ -253,9 +263,9 @@ export class AiService {
 
     try {
       if (provider === 'ollama') {
-        return await this.callOllama(model, messages);
+        return await this.callOllama(model, messages, maxTokens);
       }
-      return await this.callOpenRouter(model, messages);
+      return await this.callOpenRouter(model, messages, maxTokens);
     } catch (err) {
       const msg = (err as Error)?.message || String(err);
       const is429 = msg.includes('429');
@@ -271,8 +281,10 @@ export class AiService {
   private async callWithRetry(
     messages: ChatMessage[],
     model?: string,
+    maxTokens?: number,
   ): Promise<string> {
     const usesOllama = this.ollamaConfigured;
+    const tokens = maxTokens ?? this.maxTokens;
 
     const primaryProvider = usesOllama ? 'ollama' : 'openrouter';
     const primaryModel = model || (usesOllama ? this.ollamaDefaultModel : this.openrouterDefaultModel);
@@ -280,17 +292,17 @@ export class AiService {
 
     for (let attempt = 1; attempt <= 3; attempt++) {
       // Try primary provider
-      const r1 = await this.tryProvider(primaryProvider, primaryModel, messages);
+      const r1 = await this.tryProvider(primaryProvider, primaryModel, messages, tokens);
       if (r1 !== null) return r1;
 
       // If Ollama is primary, try OpenRouter as fallback
       if (usesOllama) {
-        const r2 = await this.tryProvider('openrouter', this.openrouterDefaultModel, messages);
+        const r2 = await this.tryProvider('openrouter', this.openrouterDefaultModel, messages, tokens);
         if (r2 !== null) return r2;
       }
 
       // Try OpenRouter fallback model
-      const r3 = await this.tryProvider('openrouter', fallbackModel, messages);
+      const r3 = await this.tryProvider('openrouter', fallbackModel, messages, tokens);
       if (r3 !== null) return r3;
 
       if (attempt < 3) {
@@ -306,12 +318,15 @@ export class AiService {
   private async callOpenRouter(
     model: string,
     messages: ChatMessage[],
+    maxTokens?: number,
   ): Promise<string> {
     const url = `${this.openrouterBaseUrl}/chat/completions`;
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 30_000);
 
     const finish = () => clearTimeout(timeout);
+
+    const effectiveMaxTokens = maxTokens ?? this.maxTokens;
 
     try {
       this.checkDailyBudget();
@@ -327,7 +342,7 @@ export class AiService {
         },
         body: JSON.stringify({
           model,
-          max_tokens: this.maxTokens,
+          max_tokens: effectiveMaxTokens,
           stream: false,
           messages,
         } as OpenRouterRequest),
@@ -363,6 +378,7 @@ export class AiService {
   private async callOllama(
     model: string,
     messages: ChatMessage[],
+    maxTokens?: number,
   ): Promise<string> {
     const url = `${this.ollamaBaseUrl}/chat/completions`;
     const controller = new AbortController();
@@ -379,7 +395,7 @@ export class AiService {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           model,
-          max_tokens: this.maxTokens,
+          max_tokens: maxTokens ?? this.maxTokens,
           stream: false,
           messages,
         } as OpenRouterRequest),

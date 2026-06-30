@@ -17,15 +17,7 @@ export default function TemplatePicker({ selected, onChange }: TemplatePickerPro
 
   return (
     <div className="flex flex-col gap-2 min-w-0">
-      {expanded && (
-        <button
-          onClick={() => setExpanded(false)}
-          className="flex items-center gap-1 text-[11px] text-muted hover:text-teal transition-colors self-start cursor-pointer shrink-0"
-        >
-          <IconChevronUp className="h-3 w-3" /> Show fewer
-        </button>
-      )}
-      <div className={`${expanded ? 'grid grid-cols-[repeat(auto-fill,90px)] sm:grid-cols-[repeat(auto-fill,105px)] gap-2 overflow-y-auto max-h-[50vh]' : 'flex gap-2 flex-wrap'}`}>
+      <div className={`${expanded ? 'grid grid-cols-[repeat(auto-fill,90px)] sm:grid-cols-[repeat(auto-fill,105px)] gap-2 overflow-y-auto max-h-[60vh]' : 'flex gap-2 flex-wrap'}`}>
         {visible.map((tpl) => {
           const isActive = selected === tpl.id
           const svg = TEMPLATE_PREVIEWS[tpl.id]

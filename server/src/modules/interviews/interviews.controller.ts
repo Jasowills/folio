@@ -1,0 +1,72 @@
+import { Controller, Post, Get, Delete, Body, Param, UseGuards, Logger } from '@nestjs/common'
+import { ApiBearerAuth, ApiTags } from '@nestjs/swagger'
+import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard'
+import { CurrentUser } from '../../common/decorators/current-user.decorator'
+import type { UserDocument } from '../users/schemas/user.schema'
+import { InterviewsService } from './interviews.service'
+
+@ApiTags('Interviews')
+@ApiBearerAuth()
+@UseGuards(JwtAuthGuard)
+@Controller('interviews')
+export class InterviewsController {
+  private readonly logger = new Logger(InterviewsController.name)
+
+  constructor(private interviewsService: InterviewsService) {}
+
+  @Post('sessions')
+  async createSession(
+    @CurrentUser() user: UserDocument,
+    @Body()
+    body: {
+      resumeId: string
+      role: string
+      level: string
+      interviewTypes: string[]
+      company?: { name: string; url?: string }
+      techStack?: string[]
+      includesCoding?: boolean
+      difficulty?: string
+      plannedDuration: number
+    },
+  ) {
+    const session = await this.interviewsService.createSession(user._id.toString(), body)
+    return { success: true, data: session }
+  }
+
+  @Get('sessions/:id')
+  async getSession(@CurrentUser() user: UserDocument, @Param('id') id: string) {
+    const session = await this.interviewsService.getSession(id, user._id.toString())
+    return { success: true, data: session }
+  }
+
+  @Post('sessions/:id/persona')
+  async generatePersona(@CurrentUser() user: UserDocument, @Param('id') id: string) {
+    const persona = await this.interviewsService.generatePersona(id, user._id.toString())
+    return { success: true, data: persona }
+  }
+
+  @Post('sessions/:id/start')
+  async startSession(@CurrentUser() user: UserDocument, @Param('id') id: string) {
+    const session = await this.interviewsService.startSession(id, user._id.toString())
+    return { success: true, data: session }
+  }
+
+  @Post('sessions/:id/end')
+  async endSession(@CurrentUser() user: UserDocument, @Param('id') id: string) {
+    const session = await this.interviewsService.endSession(id, user._id.toString())
+    return { success: true, data: session }
+  }
+
+  @Get('sessions/:id/results')
+  async getResults(@CurrentUser() user: UserDocument, @Param('id') id: string) {
+    const results = await this.interviewsService.getResults(id, user._id.toString())
+    return { success: true, data: results }
+  }
+
+  @Delete('sessions/:id')
+  async deleteSession(@CurrentUser() user: UserDocument, @Param('id') id: string) {
+    await this.interviewsService.deleteSession(id, user._id.toString())
+    return { success: true }
+  }
+}

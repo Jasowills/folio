@@ -12,6 +12,8 @@ import { CoverLettersModule } from './modules/cover-letters/cover-letters.module
 import { AtsModule } from './modules/ats/ats.module';
 import { StatsModule } from './modules/stats/stats.module';
 import { ExportModule } from './modules/export/export.module';
+import { InterviewsModule } from './modules/interviews/interviews.module';
+import { ResearchModule } from './modules/research/research.module';
 import { PerUserThrottlerGuard } from './common/guards/per-user-throttler.guard';
 
 @Module({
@@ -42,6 +44,8 @@ import { PerUserThrottlerGuard } from './common/guards/per-user-throttler.guard'
     AtsModule,
     StatsModule,
     ExportModule,
+    InterviewsModule,
+    ResearchModule,
   ],
   providers: [
     {

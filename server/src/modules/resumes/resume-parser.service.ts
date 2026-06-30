@@ -325,6 +325,18 @@ export class ResumeParserService {
       }
     }
 
+    // Fallback: check if space-stripped clean text contains any section pattern
+    // Handles spaced-caps that normalised to e.g. "professionalsummary"
+    if (!exactOnly) {
+      const compact = clean.replace(/\s+/g, '');
+      for (const [section, patterns] of Object.entries(SECTION_PATTERNS)) {
+        for (const pattern of patterns) {
+          const patternCompact = pattern.replace(/\s+/g, '');
+          if (patternCompact.length >= 4 && compact.includes(patternCompact)) return section;
+        }
+      }
+    }
+
     return null;
   }
 

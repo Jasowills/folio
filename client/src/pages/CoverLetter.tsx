@@ -4,7 +4,7 @@ import { useAuth } from '../hooks/useAuth'
 import { useResumes, useCoverLetters } from '../lib/queries'
 import { Button } from '../components/ui/button'
 import { Select } from '../components/ui/select'
-import { IconWand, IconFileText, IconCopy, IconRefresh, IconFileDownload, IconChevronRight, IconX } from '@tabler/icons-react'
+import { IconWand, IconFileText, IconCopy, IconRefresh, IconFileDownload, IconChevronRight, IconX, IconAlertTriangle } from '@tabler/icons-react'
 
 const tones = ['Professional', 'Confident', 'Creative']
 
@@ -22,6 +22,7 @@ export default function CoverLetter() {
   const [isStreaming, setIsStreaming] = useState(false)
   const [isEditing, setIsEditing] = useState(false)
   const [showLetters, setShowLetters] = useState(false)
+  const [error, setError] = useState('')
 
   const editorRef = useRef<HTMLDivElement>(null)
   const abortRef = useRef<AbortController | null>(null)
@@ -31,9 +32,13 @@ export default function CoverLetter() {
     setGenerated(null)
     setDisplayedContent('')
     setIsStreaming(true)
+    setError('')
 
     abortRef.current?.abort()
     abortRef.current = new AbortController()
+
+    let content = ''
+    let streamEnded = false
 
     try {
       const token = localStorage.getItem('accessToken')
@@ -57,14 +62,17 @@ export default function CoverLetter() {
 
       const reader = res.body.getReader()
       const decoder = new TextDecoder()
-      let content = ''
+      let buffer = ''
 
       while (true) {
         const { done, value } = await reader.read()
         if (done) break
-        const chunk = decoder.decode(value, { stream: true })
-        const lines = chunk.split('\n').filter((l) => l.startsWith('data: '))
+        buffer += decoder.decode(value, { stream: true })
+        const lines = buffer.split('\n')
+        buffer = lines.pop() || ''
+
         for (const line of lines) {
+          if (!line.startsWith('data: ')) continue
           const json = line.slice(6).trim()
           if (!json) continue
           try {
@@ -78,14 +86,19 @@ export default function CoverLetter() {
               setGenerated(content)
               setDisplayedContent(content)
               setIsStreaming(false)
+              streamEnded = true
             }
           } catch {
             // skip
           }
         }
       }
-    } catch {
-      setIsStreaming(false)
+    } catch (err) {
+      if ((err as Error)?.name !== 'AbortError') {
+        setError((err as Error)?.message || 'Generation failed')
+      }
+    } finally {
+      if (!streamEnded) setIsStreaming(false)
     }
   }, [resumeId, jobTitle, company, jobDescription, tone])
 
@@ -99,6 +112,14 @@ export default function CoverLetter() {
     const text = editorRef.current?.innerText || displayedContent
     if (text) await navigator.clipboard.writeText(text)
   }, [displayedContent])
+
+  const handleEdit = useCallback(() => {
+    const text = editorRef.current?.innerText || ''
+    if (text) {
+      setDisplayedContent(text)
+      setGenerated(text)
+    }
+  }, [])
 
   const handleRegenerate = useCallback(() => {
     handleGenerate()
@@ -209,6 +230,13 @@ export default function CoverLetter() {
                 </div>
               </div>
 
+              {error && (
+                <div className="flex items-start gap-2 p-3 rounded-lg bg-red-50 border border-red-200">
+                  <IconAlertTriangle className="h-4 w-4 text-red-500 mt-0.5 shrink-0" />
+                  <p className="text-xs text-red-600">{error}</p>
+                </div>
+              )}
+
               <Button
                 variant="primary"
                 size="lg"
@@ -261,7 +289,11 @@ export default function CoverLetter() {
                         contentEditable={isEditing}
                         suppressContentEditableWarning
                         onClick={() => !isEditing && setIsEditing(true)}
-                        onBlur={() => setIsEditing(false)}
+                        onBlur={() => {
+                          handleEdit()
+                          setIsEditing(false)
+                        }}
+                        onInput={handleEdit}
                         className={`text-[13px] leading-relaxed text-ink space-y-4 outline-none ${
                           isEditing ? 'ring-1 ring-teal rounded -m-2 p-2' : 'cursor-pointer'
                         }`}
@@ -281,14 +313,14 @@ export default function CoverLetter() {
                 <div className="border-t border-border bg-surface px-6 py-3 flex items-center justify-center gap-2 shrink-0">
                   <button
                     onClick={handleCopy}
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs text-muted hover:text-ink hover:bg-paper rounded-lg transition-colors"
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs text-muted hover:text-ink hover:bg-paper rounded-lg transition-colors cursor-pointer"
                   >
                     <IconCopy className="h-3.5 w-3.5" />
                     Copy
                   </button>
                   <button
                     onClick={handleRegenerate}
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs text-muted hover:text-ink hover:bg-paper rounded-lg transition-colors"
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs text-muted hover:text-ink hover:bg-paper rounded-lg transition-colors cursor-pointer"
                   >
                     <IconRefresh className="h-3.5 w-3.5" />
                     Regenerate
@@ -357,7 +389,9 @@ export default function CoverLetter() {
                           setJobTitle(letter.jobTitle)
                           setCompany(letter.company)
                           setTone(
-                            letter.tone.charAt(0).toUpperCase() + letter.tone.slice(1),
+                            letter.tone
+                              ? letter.tone.charAt(0).toUpperCase() + letter.tone.slice(1)
+                              : 'Professional',
                           )
                           setGenerated(letter.content)
                           setDisplayedContent(letter.content)

@@ -7,7 +7,7 @@ interface ColorPickerProps {
 
 export default function ColorPicker({ selected, onChange }: ColorPickerProps) {
   return (
-    <div className="flex flex-wrap gap-1 max-w-[180px]">
+    <div className="flex flex-wrap gap-1">
       {COLOR_THEMES.map((theme) => (
         <button
           key={theme.id}

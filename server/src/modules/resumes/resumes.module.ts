@@ -17,6 +17,6 @@ import { AiModule } from '../ai/ai.module';
   ],
   controllers: [ResumesController],
   providers: [ResumesService, ResumeParserService],
-  exports: [ResumesService],
+  exports: [ResumesService, ResumeParserService],
 })
 export class ResumesModule {}

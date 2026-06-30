@@ -13,11 +13,11 @@ const mainNavItems = [
   { to: '/cover-letter/new', label: 'Cover Letter', icon: IconMail },
   { to: '/portfolio', label: 'Portfolio', icon: IconGlobe },
   { to: '/research', label: 'Research', icon: IconFlask },
+  { to: '/interview/new', label: 'Interview Prep', icon: IconMessage },
 ]
 
 const comingSoonItems = [
   { label: 'Job Tracker', icon: IconBriefcase },
-  { label: 'Interview Prep', icon: IconMessage },
 ]
 
 export default function AppShell({ children }: { children: React.ReactNode }) {

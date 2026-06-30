@@ -576,7 +576,7 @@ export default function ResumeReview() {
 
   return (
     <div className="page-container">
-      <div className="max-w-2xl mx-auto">
+      <div className="max-w-4xl mx-auto">
         <motion.div
           initial={{ opacity: 0, y: 6 }}
           animate={{ opacity: 1, y: 0 }}
@@ -635,11 +635,6 @@ export default function ResumeReview() {
               <NextActionsBlock suggestions={qualitySuggestions} />
             </motion.div>
           )}
-
-          {/* 7. Review History */}
-          <motion.div variants={itemVariants}>
-            <ReviewHistoryBlock />
-          </motion.div>
 
           {/* Bottom actions */}
           <motion.div variants={itemVariants} className="flex items-center justify-center gap-4 pt-2 pb-6">

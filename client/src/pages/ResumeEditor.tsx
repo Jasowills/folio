@@ -12,6 +12,7 @@ import { TEMPLATES } from '../templates'
 import type { ResumeTemplate } from '../templates/types'
 import { MinimalTemplate } from './editor/MinimalTemplate'
 import { ModernTemplate } from './editor/ModernTemplate'
+import { ExecutiveTemplate } from './editor/ExecutiveTemplate'
 import type { LocalData, ResumeShim } from './editor/types'
 import { IconWand, IconChevronLeft, IconDownload, IconPlus, IconX, IconAlertTriangle, IconEye, IconZoomIn, IconZoomOut, IconCircleCheck, IconRefresh, IconEdit, IconLoader2, IconFileText, IconLayout } from '@tabler/icons-react'
 
@@ -173,6 +174,7 @@ function ResumeEditorInner() {
   const saveAttemptRef = useRef(0)
   const [previewMode, setPreviewMode] = useState<'template' | 'original'>('template')
   const autoSwitchedRef = useRef(false)
+  const userToggledPreview = useRef(false)
 
   const localRef = useRef(localData)
   localRef.current = localData
@@ -193,9 +195,9 @@ function ResumeEditorInner() {
     }
   }, [resume, hasStructuredData])
 
-  // Auto-switch to template preview when structured data arrives
+  // Auto-switch to template preview when structured data arrives (only if user hasn't manually toggled)
   useEffect(() => {
-    if (hasStructuredData && previewMode === 'original' && !autoSwitchedRef.current) {
+    if (hasStructuredData && previewMode === 'original' && !autoSwitchedRef.current && !userToggledPreview.current) {
       autoSwitchedRef.current = true
       setPreviewMode('template')
     }
@@ -305,10 +307,31 @@ function ResumeEditorInner() {
     setSaved(false)
   }
 
+  function removeExperience(index: number) {
+    setLocalData((prev) => ({
+      ...prev,
+      experience: prev.experience.filter((_, i) => i !== index),
+    }))
+    setExpandedJobs((prev) => {
+      const next = new Set(prev)
+      next.delete(index)
+      return next
+    })
+    setSaved(false)
+  }
+
   function addEducation() {
     setLocalData((prev) => ({
       ...prev,
       education: [...prev.education, { institution: '', degree: '', field: '' }],
+    }))
+    setSaved(false)
+  }
+
+  function removeEducation(index: number) {
+    setLocalData((prev) => ({
+      ...prev,
+      education: prev.education.filter((_, i) => i !== index),
     }))
     setSaved(false)
   }
@@ -398,7 +421,7 @@ function ResumeEditorInner() {
   }
 
   function handleSkillsChange(value: string) {
-    const skills = value.split(',').map((s) => s.trim()).filter(Boolean)
+    const skills = value.split(',').map((s) => s.trim()).filter(s => s.length > 0)
     updateLocal('skills', skills)
   }
 
@@ -634,9 +657,10 @@ function ResumeEditorInner() {
                         hasFlagged && 'border-amber/40',
                       )}
                     >
+                      <div className="flex items-center">
                       <button
                         onClick={() => toggleJobExpanded(i)}
-                        className="w-full flex items-center justify-between px-4 py-3 text-left hover:bg-paper-dark/30 transition-colors cursor-pointer"
+                        className="flex-1 flex items-center justify-between px-4 py-3 text-left hover:bg-paper-dark/30 transition-colors cursor-pointer min-w-0"
                       >
                         <div className="min-w-0 flex-1">
                           <p className="text-[13px] font-semibold text-ink truncate">
@@ -653,6 +677,14 @@ function ResumeEditorInner() {
                           <IconChevronLeft className="h-3.5 w-3.5 text-muted shrink-0" />
                         </motion.div>
                       </button>
+                      <button
+                        onClick={() => removeExperience(i)}
+                        className="p-3 text-muted hover:text-danger transition-colors shrink-0 cursor-pointer"
+                        title="Remove experience"
+                      >
+                        <IconX className="h-3.5 w-3.5" />
+                      </button>
+                      </div>
                       <AnimatePresence>
                         {isOpen && (
                           <motion.div
@@ -772,6 +804,15 @@ function ResumeEditorInner() {
               <div className="p-4 space-y-3">
                 {localData.education.map((edu, i) => (
                   <div key={i} className="rounded-lg border border-border bg-paper p-4 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <p className="text-xs font-medium text-muted">Education {i + 1}</p>
+                      <button
+                        onClick={() => removeEducation(i)}
+                        className="p-1 text-muted hover:text-danger transition-colors cursor-pointer"
+                      >
+                        <IconX className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
                     <div>
                       <label className="label-uppercase text-muted block mb-1">Institution</label>
                       <input
@@ -959,10 +1000,16 @@ function ResumeEditorInner() {
               variant="primary"
               size="sm"
               className="flex-1 cursor-pointer"
-              onClick={() => setAiDrawerOpen(true)}
+              onClick={() => {
+                const firstExp = localData.experience.find(e => e.bullets.length > 0)
+                if (firstExp) {
+                  openAiDrawer(localData.experience.indexOf(firstExp), 0)
+                }
+              }}
+              disabled={!localData.experience.some(e => e.bullets.length > 0)}
             >
               <IconWand className="h-3.5 w-3.5 mr-1" />
-              Rewrite all
+              Rewrite
             </Button>
           </div>
 
@@ -1036,7 +1083,7 @@ function ResumeEditorInner() {
                 <span className="h-5 w-px bg-border shrink-0" />
                 <div className="flex items-center gap-0.5 bg-paper border border-border rounded-lg p-0.5">
                   <button
-                    onClick={() => setPreviewMode('template')}
+                    onClick={() => { setPreviewMode('template'); userToggledPreview.current = true }}
                     className={cn(
                       'flex items-center gap-1 px-2 py-1 rounded text-[11px] font-medium transition-colors cursor-pointer whitespace-nowrap',
                       previewMode === 'template' ? 'text-teal bg-white shadow-sm' : 'text-muted hover:text-ink',
@@ -1047,7 +1094,7 @@ function ResumeEditorInner() {
                   </button>
                   {canShowOriginal && (
                     <button
-                      onClick={() => setPreviewMode('original')}
+                      onClick={() => { setPreviewMode('original'); userToggledPreview.current = true }}
                       className={cn(
                         'flex items-center gap-1 px-2 py-1 rounded text-[11px] font-medium transition-colors cursor-pointer whitespace-nowrap',
                         previewMode === 'original' ? 'text-teal bg-white shadow-sm' : 'text-muted hover:text-ink',
@@ -1077,6 +1124,9 @@ function ResumeEditorInner() {
                   console.log('[ResumeEditor] rendering template:', template.id, template.name, template.layout, template.style)
                   if (template.layout === 'sidebar' || template.layout === 'two-column') {
                     return <ModernTemplate {...commonProps} />
+                  }
+                  if (template.style.header === 'dark-block' && template.style.font === 'serif') {
+                    return <ExecutiveTemplate {...commonProps} />
                   }
                   return <MinimalTemplate {...commonProps} />
                 }}

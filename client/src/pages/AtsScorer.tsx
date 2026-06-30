@@ -4,7 +4,8 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { useResumes, useAtsScore, useAtsHistory, useAtsResult } from '../lib/queries'
 import { ScoreRing } from '../components/ScoreRing'
 import { Button } from '../components/ui/button'
-import { IconCircleCheck, IconCircleX, IconTargetArrow, IconHistory } from '@tabler/icons-react'
+import { Select } from '../components/ui/select'
+import { IconCircleCheck, IconCircleX, IconTargetArrow, IconHistory, IconAlertTriangle } from '@tabler/icons-react'
 
 function getHeadline(score: number): string {
   if (score >= 85) return "Excellent fit. You're well positioned."
@@ -60,6 +61,7 @@ export default function AtsScorer() {
   const [jobUrl, setJobUrl] = useState('')
   const [progressStep, setProgressStep] = useState(0)
   const [showProgress, setShowProgress] = useState(false)
+  const [error, setError] = useState('')
 
   const result = persistedResult ?? null
   const isPending = atsScore.isPending
@@ -83,6 +85,7 @@ export default function AtsScorer() {
   const handleSubmit = async () => {
     if (!resumeId || isPending) return
     setSearchParams({})
+    setError('')
     try {
       const res = await atsScore.mutateAsync({
         resumeId,
@@ -90,9 +93,10 @@ export default function AtsScorer() {
         jobUrl: jobUrl || undefined,
       })
       setSearchParams({ result: res._id })
-    } catch {
+    } catch (err) {
       setShowProgress(false)
       setProgressStep(0)
+      setError((err as Error)?.message || 'Check failed. Please try again.')
     }
   }
 
@@ -106,7 +110,7 @@ export default function AtsScorer() {
 
   const matchedCount = result?.matchedKeywords?.length ?? 0
   const missingCount = result?.missingKeywords?.length ?? 0
-  const sectionScores = result?.sectionScores as Record<string, number> | undefined
+  const sectionScores = result?.sectionScores as Record<string, number> | null | undefined
   const suggestions = result?.suggestions ?? []
 
   return (
@@ -152,23 +156,26 @@ export default function AtsScorer() {
                 Check your resume against a job
               </h2>
 
+              {error && (
+                <div className="flex items-start gap-2 p-3 rounded-lg bg-red-50 border border-red-200">
+                  <IconAlertTriangle className="h-4 w-4 text-red-500 mt-0.5 shrink-0" />
+                  <p className="text-xs text-red-600">{error}</p>
+                </div>
+              )}
+
               <div>
                 <label className="label-uppercase text-muted block mb-1.5">
                   Select resume
                 </label>
-                <select
+                <Select
                   value={resumeId}
-                  onChange={(e) => setResumeId(e.target.value)}
-                  className="input-field"
-                  disabled={isPending}
-                >
-                  <option value="">Choose a resume...</option>
-                  {resumes?.map((r) => (
-                    <option key={r._id} value={r._id}>
-                      {r.title}
-                    </option>
-                  ))}
-                </select>
+                  onChange={setResumeId}
+                  options={[
+                    { value: '', label: 'Choose a resume...' },
+                    ...(resumes?.map((r) => ({ value: r._id, label: r.title })) || []),
+                  ]}
+                  placeholder="Choose a resume..."
+                />
               </div>
 
               <div>
@@ -414,36 +421,7 @@ export default function AtsScorer() {
                     </div>
                   )}
 
-                  {history && history.length > 0 && (
-                    <div className="card lg:hidden">
-                      <div className="section-title mb-3">
-                        <IconHistory className="h-3.5 w-3.5 text-muted" />
-                        Recent checks
-                      </div>
-                      <div className="space-y-0.5">
-                        {history.slice(0, 5).map((h) => (
-                          <button
-                            key={h._id}
-                            onClick={() => handleLoadResult(h._id)}
-                            className="w-full flex items-center justify-between py-2 px-2.5 rounded-lg hover:bg-paper transition-colors -mx-1"
-                          >
-                            <div className="text-left min-w-0 flex-1">
-                              <p className="text-xs text-ink truncate font-medium">
-                                {h.jobTitle || 'ATS Check'}
-                              </p>
-                              <p className="text-[10px] text-muted">
-                                {new Date(h.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                                {h.companyName && <> &middot; {h.companyName}</>}
-                              </p>
-                            </div>
-                            <span className={`text-xs font-bold ml-3 shrink-0 ${scoreBadgeClass(h.score)}`}>
-                              {h.score}%
-                            </span>
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  )}
+
                 </motion.div>
               )}
             </AnimatePresence>

@@ -355,6 +355,119 @@ export function useDeleteAccount() {
   })
 }
 
+// Interview Prep
+export interface InterviewSessionData {
+  _id: string
+  role: string
+  level: string
+  company?: { name: string; url?: string }
+  interviewTypes: string[]
+  techStack?: string[]
+  includesCoding?: boolean
+  difficulty?: string
+  plannedDuration: number
+  status: 'setup' | 'in_progress' | 'paused' | 'completed' | 'abandoned'
+  interviewerPersona?: unknown
+  questionPlan?: unknown[]
+  startedAt?: string
+  endedAt?: string
+  actualDuration?: number
+  pausesRemaining?: number
+  pauseSecondsRemaining?: number
+}
+
+export interface InterviewResultsData {
+  session: InterviewSessionData
+  transcript: { turns: Array<{ speaker: string; text: string; timestamp: number; duration: number }> } | null
+  proctoring: { events: unknown[]; integrityScore?: number; summary?: string } | null
+  results: {
+    overallScore: number
+    headline?: string
+    dimensionScores?: Array<{ name: string; score: number }>
+    confidenceLevel?: string
+    perQuestionScores?: Array<{ questionPlanRef: number; score: number; feedback: string; modelAnswer: string }>
+    nextSteps?: string[]
+  } | null
+}
+
+export function useCreateInterviewSession() {
+  return useMutation({
+    mutationFn: async (data: {
+      resumeId: string
+      role: string
+      level: string
+      interviewTypes: string[]
+      company?: { name: string; url?: string }
+      techStack?: string[]
+      includesCoding?: boolean
+      difficulty?: string
+      plannedDuration: number
+    }) => {
+      const res = await api.post('/interviews/sessions', data)
+      return (res.data.data || res.data) as InterviewSessionData
+    },
+  })
+}
+
+export function useGeneratePersona() {
+  return useMutation({
+    mutationFn: async (sessionId: string) => {
+      const res = await api.post(`/interviews/sessions/${sessionId}/persona`)
+      return res.data.data || res.data
+    },
+  })
+}
+
+export function useStartSession() {
+  return useMutation({
+    mutationFn: async (sessionId: string) => {
+      const res = await api.post(`/interviews/sessions/${sessionId}/start`)
+      return (res.data.data || res.data) as InterviewSessionData
+    },
+  })
+}
+
+export function useSession(sessionId: string | undefined) {
+  return useQuery({
+    queryKey: ['interview-session', sessionId],
+    queryFn: async () => {
+      const { data } = await api.get(`/interviews/sessions/${sessionId}`)
+      return (data.data || data) as InterviewSessionData
+    },
+    enabled: !!sessionId,
+  })
+}
+
+export function useInterviewResults(sessionId: string | undefined) {
+  return useQuery({
+    queryKey: ['interview-results', sessionId],
+    queryFn: async () => {
+      const { data } = await api.get(`/interviews/sessions/${sessionId}/results`)
+      return (data.data || data) as InterviewResultsData
+    },
+    enabled: !!sessionId,
+  })
+}
+
+export function useEndSession() {
+  return useMutation({
+    mutationFn: async (sessionId: string) => {
+      const res = await api.post(`/interviews/sessions/${sessionId}/end`)
+      return (res.data.data || res.data) as InterviewSessionData
+    },
+  })
+}
+
+export function useDeleteInterviewSession() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (sessionId: string) => {
+      await api.delete(`/interviews/sessions/${sessionId}`)
+    },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['interview-session'] }) },
+  })
+}
+
 export function usePortfolioStatus(analysisId: string | null) {
   return useQuery({
     queryKey: ['portfolio', analysisId],
@@ -367,6 +480,72 @@ export function usePortfolioStatus(analysisId: string | null) {
       const result = query.state.data
       if (result?.status === 'completed' || result?.status === 'failed') return false
       return 3000
+    },
+  })
+}
+
+// Company Research
+export interface ResearchBrief {
+  atAGlance: string
+  foundedYear: string | null
+  fundingStage: string | null
+  teamSizeEstimate: string | null
+  headquarters: string | null
+  industry: string | null
+  companySizeSignal: string | null
+  mission: string | null
+  values: string[] | null
+  whatTheyBuild: string
+  roleConnection: string | null
+  recentNews: Array<{ headline: string; date: string; sourceUrl: string }>
+  interviewStyle: { summary: string; confidenceSource: 'careers_page' | 'inferred' }
+  questionsToAsk: Array<{ question: string; rationale: string }>
+  redFlags: Array<{ flag: string; source: string }> | null
+}
+
+export interface ResearchJob {
+  _id: string
+  companyName: string
+  companyUrl?: string
+  roleContext?: { roleTitle: string; resumeId?: string }
+  status: 'queued' | 'crawling' | 'analysing' | 'completed' | 'failed'
+  brief?: ResearchBrief
+  createdAt: string
+  error?: string
+  usedGeneralKnowledge?: boolean
+}
+
+export function useStartResearch() {
+  return useMutation({
+    mutationFn: async (body: { companyName: string; companyUrl?: string; roleContext?: { roleTitle: string; resumeId?: string } }) => {
+      const { data } = await api.post('/research/analyze', body)
+      return (data.data || data) as { analysisId: string; status: string }
+    },
+  })
+}
+
+export function useResearchStatus(analysisId: string | null) {
+  return useQuery({
+    queryKey: ['research', analysisId],
+    queryFn: async () => {
+      const { data } = await api.get(`/research/status/${analysisId}`)
+      return (data.data || data) as ResearchJob
+    },
+    enabled: !!analysisId,
+    refetchInterval: (query) => {
+      const result = query.state.data
+      if (result?.status === 'completed' || result?.status === 'failed') return false
+      return 3000
+    },
+  })
+}
+
+export function useResearchHistory() {
+  return useQuery({
+    queryKey: ['research-history'],
+    queryFn: async () => {
+      const { data } = await api.get('/research/history')
+      return (data.data || data) as { jobs: ResearchJob[]; total: number }
     },
   })
 }

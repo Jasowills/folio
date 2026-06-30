@@ -14,8 +14,13 @@ import ResumeReview from './pages/ResumeReview'
 import AtsScorer from './pages/AtsScorer'
 import CoverLetter from './pages/CoverLetter'
 import PortfolioAnalysis from './pages/PortfolioAnalysis'
+import Research from './pages/Research'
 import Settings from './pages/Settings'
 import Legal from './pages/Legal'
+import InterviewNew from './pages/InterviewNew'
+import InterviewPrep from './pages/InterviewPrep'
+import InterviewLive from './pages/InterviewLive'
+import InterviewResults from './pages/InterviewResults'
 
 class ErrorBoundary extends Component<
   { children: React.ReactNode },
@@ -94,8 +99,12 @@ function AppRoutes() {
         <Route path="/cover-letters" element={<ProtectedRoute><CoverLetter /></ProtectedRoute>} />
         <Route path="/cover-letter/new" element={<ProtectedRoute><CoverLetter /></ProtectedRoute>} />
         <Route path="/portfolio" element={<ProtectedRoute><PortfolioAnalysis /></ProtectedRoute>} />
-        <Route path="/research" element={<ProtectedRoute><PlaceholderPage title="Research" /></ProtectedRoute>} />
+        <Route path="/research" element={<ProtectedRoute><Research /></ProtectedRoute>} />
         <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
+        <Route path="/interview/new" element={<ProtectedRoute><InterviewNew /></ProtectedRoute>} />
+        <Route path="/interview/new/prep" element={<ProtectedRoute><InterviewPrep /></ProtectedRoute>} />
+        <Route path="/interview/:sessionId/live" element={<ProtectedRoute><InterviewLive /></ProtectedRoute>} />
+        <Route path="/interview/:sessionId/results" element={<ProtectedRoute><InterviewResults /></ProtectedRoute>} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </ErrorBoundary>

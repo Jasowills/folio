@@ -12,17 +12,9 @@ export function fontClass(font: FontStyle): string {
 
 export function spacingClass(spacing: TemplateStyle['spacing']): string {
   switch (spacing) {
-    case 'compact': return 'space-y-2 [&_section]:mb-3 text-[10px]'
-    case 'airy': return 'space-y-5 [&_section]:mb-6 text-[12px] leading-relaxed'
-    default: return 'space-y-3 [&_section]:mb-5 text-[11px]'
-  }
-}
-
-export function headerPadding(spacing: TemplateStyle['spacing']): string {
-  switch (spacing) {
-    case 'compact': return 'py-4'
-    case 'airy': return 'py-10'
-    default: return 'py-6'
+    case 'compact': return 'space-y-2 text-[10px]'
+    case 'airy': return 'space-y-5 text-[12px] leading-relaxed'
+    default: return 'space-y-3 text-[11px]'
   }
 }
 

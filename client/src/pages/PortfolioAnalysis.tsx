@@ -4,7 +4,7 @@ import { useResumes, useAnalyzePortfolio, usePortfolioStatus, useStats } from '.
 import { ScoreRing } from '../components/ScoreRing'
 import { Button } from '../components/ui/button'
 import { Select } from '../components/ui/select'
-import { IconCircleCheck, IconAlertTriangle, IconExternalLink } from '@tabler/icons-react'
+import { IconCircleCheck, IconAlertTriangle, IconExternalLink, IconLoader } from '@tabler/icons-react'
 
 const statusLabels: Record<string, string> = {
   pending: 'Starting analysis...',
@@ -45,6 +45,7 @@ export default function PortfolioAnalysis() {
   const [resumeId, setResumeId] = useState('')
   const [portfolioUrl, setPortfolioUrl] = useState('')
   const [analysisId, setAnalysisId] = useState<string | null>(null)
+  const [error, setError] = useState('')
 
   const { data: result, error: statusError, isLoading: statusLoading } = usePortfolioStatus(analysisId)
 
@@ -57,18 +58,9 @@ export default function PortfolioAnalysis() {
   const currentIdx = statusOrder.indexOf(status)
   const hasPastAnalyses = (stats?.portfolioAnalyses ?? 0) > 0
 
-  console.log('[Portfolio] Render state:', {
-    analysisId,
-    resultStatus: result?.status,
-    statusError: statusError ? ((statusError as any)?.message || String(statusError)) : null,
-    statusLoading,
-    isComplete,
-    isFailed,
-  })
-
   useEffect(() => {
-    if (isComplete) {
-      const target = result!.overallScore
+    if (isComplete && result) {
+      const target = result.overallScore
       const duration = 800
       const start = performance.now()
       function tick(now: number) {
@@ -82,28 +74,24 @@ export default function PortfolioAnalysis() {
       return () => { if (animFrameRef.current) cancelAnimationFrame(animFrameRef.current) }
     }
     setAnimatedScore(0)
-  }, [isComplete, result?.overallScore])
+  }, [isComplete, result])
 
   const handleAnalyze = async () => {
-    if (!resumeId || !portfolioUrl) {
-      console.log('[Portfolio] handleAnalyze: missing resumeId or portfolioUrl', { resumeId, portfolioUrl })
-      return
-    }
-    console.log('[Portfolio] Starting analysis', { resumeId, portfolioUrl })
+    if (!resumeId || !portfolioUrl) return
+    setError('')
     try {
       const res = await analyze.mutateAsync({ resumeId, portfolioUrl })
-      console.log('[Portfolio] Analysis created', res)
       setAnalysisId(res.analysisId)
     } catch (err) {
-      console.error('[Portfolio] Analysis failed:', err)
+      setError((err as Error)?.message || 'Analysis failed to start. Please try again.')
     }
   }
 
   const handleReset = () => {
-    console.log('[Portfolio] Resetting analysis')
     setAnalysisId(null)
     setPortfolioUrl('')
     setResumeId('')
+    setError('')
   }
 
   return (
@@ -134,6 +122,13 @@ export default function PortfolioAnalysis() {
             </div>
 
             <div className="card space-y-4">
+              {error && (
+                <div className="flex items-start gap-2 p-3 rounded-lg bg-red-50 border border-red-200">
+                  <IconAlertTriangle className="h-4 w-4 text-red-500 mt-0.5 shrink-0" />
+                  <p className="text-xs text-red-600">{error}</p>
+                </div>
+              )}
+
               <div>
                 <label className="label-uppercase text-muted block mb-1.5">
                   Select resume
@@ -167,7 +162,11 @@ export default function PortfolioAnalysis() {
                     disabled={!resumeId || !portfolioUrl || analyze.isPending}
                     className="shrink-0"
                   >
-                    Analyse
+                    {analyze.isPending ? (
+                      <IconLoader className="h-4 w-4 animate-spin" />
+                    ) : (
+                      'Analyse'
+                    )}
                   </Button>
                 </div>
               </div>
@@ -192,7 +191,9 @@ export default function PortfolioAnalysis() {
                   Analysis failed
                 </h3>
                 <p className="text-sm text-muted">
-                  Could not complete the portfolio analysis. Try again.
+                  {statusError
+                    ? (statusError as any)?.message || 'Could not complete the portfolio analysis.'
+                    : 'Could not complete the portfolio analysis. Try again.'}
                 </p>
               </div>
               <Button variant="primary" size="md" onClick={handleReset}>
@@ -224,14 +225,14 @@ export default function PortfolioAnalysis() {
                   Portfolio alignment score
                 </p>
                 <h2 className="font-display text-h3 text-white mb-2 leading-tight">
-                  {scoreInterpretation(result!.overallScore)}
+                  {scoreInterpretation(result.overallScore)}
                 </h2>
                 <p className="text-sm text-white/60 leading-relaxed">
-                  {result!.confirmedSkills.length > 0
-                    ? `Your portfolio confirms ${result!.confirmedSkills.length} skill${result!.confirmedSkills.length > 1 ? 's' : ''} from your resume.`
+                  {result.confirmedSkills.length > 0
+                    ? `Your portfolio confirms ${result.confirmedSkills.length} skill${result.confirmedSkills.length > 1 ? 's' : ''} from your resume.`
                     : 'Your portfolio did not confirm any skills from your resume.'}
-                  {result!.missingSkills.length > 0 &&
-                    ` ${result!.missingSkills.length} skill${result!.missingSkills.length > 1 ? 's' : ''} listed on your resume lack supporting projects.`}
+                  {result.missingSkills.length > 0 &&
+                    ` ${result.missingSkills.length} skill${result.missingSkills.length > 1 ? 's' : ''} listed on your resume lack supporting projects.`}
                 </p>
               </div>
             </div>
@@ -243,8 +244,8 @@ export default function PortfolioAnalysis() {
                   Skills confirmed
                 </div>
                 <div className="flex flex-wrap gap-1.5">
-                  {result!.confirmedSkills.length > 0 ? (
-                    result!.confirmedSkills.map((s: string) => (
+                  {result.confirmedSkills.length > 0 ? (
+                    result.confirmedSkills.map((s: string) => (
                       <span key={s} className="badge badge-success">
                         {s}
                       </span>
@@ -261,8 +262,8 @@ export default function PortfolioAnalysis() {
                   Skills missing
                 </div>
                 <div className="flex flex-wrap gap-1.5">
-                  {result!.missingSkills.length > 0 ? (
-                    result!.missingSkills.map((s: string) => (
+                  {result.missingSkills.length > 0 ? (
+                    result.missingSkills.map((s: string) => (
                       <span key={s} className="badge badge-danger">
                         {s}
                       </span>
@@ -271,7 +272,7 @@ export default function PortfolioAnalysis() {
                     <p className="text-xs text-muted">All resume skills are evidenced.</p>
                   )}
                 </div>
-                {result!.missingSkills.length > 0 && (
+                {result.missingSkills.length > 0 && (
                   <p className="text-xs text-muted mt-3 leading-relaxed">
                     You list these skills on your resume but your portfolio has no projects
                     that evidence them. Add a case study for each.
@@ -280,13 +281,13 @@ export default function PortfolioAnalysis() {
               </div>
             </div>
 
-            {result!.projects && result!.projects.length > 0 && (
+            {result.projects && result.projects.length > 0 && (
               <div className="card">
                 <div className="section-title mb-4">
-                  Projects found ({result!.projects.length})
+                  Projects found ({result.projects.length})
                 </div>
                 <div className="space-y-3">
-                  {result!.projects.map((p, i) => (
+                  {result.projects.map((p, i) => (
                     <div
                       key={i}
                       className="p-4 rounded-lg bg-paper border border-border"
@@ -320,13 +321,13 @@ export default function PortfolioAnalysis() {
               </div>
             )}
 
-            {result!.suggestions && result!.suggestions.length > 0 && (
+            {result.suggestions && result.suggestions.length > 0 && (
               <div className="card">
                 <div className="section-title mb-4">
                   How to improve your portfolio
                 </div>
                 <ol className="space-y-3">
-                  {result!.suggestions.map((s: string, i: number) => (
+                  {result.suggestions.map((s: string, i: number) => (
                     <li key={i} className="flex items-start gap-3">
                       <span className="h-6 w-6 rounded-full bg-teal text-white text-xs font-bold flex items-center justify-center shrink-0 mt-0.5">
                         {i + 1}
