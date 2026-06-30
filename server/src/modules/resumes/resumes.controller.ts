@@ -176,9 +176,11 @@ export class ResumesController {
     return this.resumesService.analyzeResume(id, user._id.toString());
   }
 
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
   @Post(':id/re-extract')
   @Throttle({ default: { limit: 10, ttl: 60000 } })
-  @ApiOperation({ summary: 'Re-run extraction only (no AI) on an existing resume' })
+  @ApiOperation({ summary: 'Re-run extraction on an existing resume (AI-assisted if Ollama available)' })
   async reExtract(
     @Param('id') id: string,
     @CurrentUser() user: UserDocument,

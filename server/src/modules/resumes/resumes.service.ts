@@ -4,12 +4,13 @@ import { Model } from 'mongoose';
 import { Resume, ResumeDocument } from './schemas/resume.schema';
 import { GuestResult, GuestResultDocument } from './schemas/guest-result.schema';
 import { AiService } from '../ai/ai.service';
-import { ResumeParserService } from './resume-parser.service';
+import { ResumeParserService, ParsedResume } from './resume-parser.service';
 import {
   RED_FLAG_SYSTEM,
   ROLE_DETECTION_SYSTEM,
   RESUME_QUALITY_SYSTEM,
   BULLET_REWRITER_SYSTEM,
+  RESUME_EXTRACTION_SYSTEM,
 } from '../ai/prompts';
 import { randomUUID } from 'crypto';
 
@@ -82,8 +83,11 @@ export class ResumesService {
     if (fileUrl) resume.fileUrl = fileUrl;
     if (cloudinaryPublicId) resume.cloudinaryPublicId = cloudinaryPublicId;
 
-    const parsed = await this.resumeParser.parse(rawText);
-    this.logger.log(`uploadFile: parse done — name="${parsed.name}", exp=${parsed.experience.length}, edu=${parsed.education.length}, skills=${parsed.skills.length}, certs=${parsed.certifications.length}, langs=${parsed.languages.length}, confidence=${parsed.confidence}`);
+    let parsed = await this.resumeParser.parse(rawText);
+    this.logger.log(`uploadFile: rule-based parse done — name="${parsed.name}", exp=${parsed.experience.length}, edu=${parsed.education.length}, skills=${parsed.skills.length}, certs=${parsed.certifications.length}, langs=${parsed.languages.length}, confidence=${parsed.confidence}`);
+
+    parsed = await this.enrichWithAi(parsed, rawText);
+    this.logger.log(`uploadFile: after AI enrichment — name="${parsed.name}", exp=${parsed.experience.length}, edu=${parsed.education.length}, skills=${parsed.skills.length}`);
 
     resume.set({
       name: parsed.name,
@@ -108,8 +112,11 @@ export class ResumesService {
     const resume = await this.findById(id, userId);
     const rawText = resume.rawText || '';
 
-    const parsed = await this.resumeParser.parse(rawText);
-    this.logger.log(`analyzeResume: parsed name="${parsed.name}", exp=${parsed.experience.length}, edu=${parsed.education.length}, skills=${parsed.skills.length}`);
+    let parsed = await this.resumeParser.parse(rawText);
+    this.logger.log(`analyzeResume: rule-based parse done — name="${parsed.name}", exp=${parsed.experience.length}, edu=${parsed.education.length}, skills=${parsed.skills.length}`);
+
+    parsed = await this.enrichWithAi(parsed, rawText);
+    this.logger.log(`analyzeResume: after AI enrichment — name="${parsed.name}", exp=${parsed.experience.length}, edu=${parsed.education.length}, skills=${parsed.skills.length}`);
 
     resume.set({
       name: parsed.name,
@@ -162,14 +169,134 @@ export class ResumesService {
     return resume;
   }
 
+  private async enrichWithAi(
+    parsed: ParsedResume,
+    rawText: string,
+  ): Promise<ParsedResume> {
+    // Only attempt when the AI service is reachable (Ollama or OpenRouter)
+    if (!process.env.OLLAMA_BASE_URL && !process.env.OPENROUTER_API_KEY) {
+      this.logger.log('enrichWithAi: no AI provider configured, skipping');
+      return parsed;
+    }
+
+    try {
+      this.logger.log('enrichWithAi: calling AI extraction');
+      const aiResult = await this.aiService.chat(RESUME_EXTRACTION_SYSTEM, rawText);
+
+      if (!aiResult || Object.keys(aiResult).length === 0) {
+        this.logger.log('enrichWithAi: AI returned empty result, using rule-based parse');
+        return parsed;
+      }
+
+      const merged = { ...parsed };
+
+      // Override contact fields where AI found something the parser missed
+      if (aiResult.contact && typeof aiResult.contact === 'object') {
+        const aiContact = aiResult.contact as Record<string, unknown>;
+        if (!merged.contact) merged.contact = { email: null, phone: null, location: null, linkedin: null, website: null, github: null };
+        for (const field of ['email', 'phone', 'location', 'linkedin', 'website', 'github'] as const) {
+          if (aiContact[field] && typeof aiContact[field] === 'string' && aiContact[field] !== null) {
+            const aiVal = aiContact[field] as string;
+            if (!merged.contact[field] || aiVal !== parsed.contact[field]) {
+              this.logger.log(`enrichWithAi: contact.${field} — parser="${parsed.contact[field]}", ai="${aiVal}"`);
+              merged.contact[field] = aiVal;
+            }
+          }
+        }
+      }
+
+      // Override name if AI found something better
+      if (aiResult.name && typeof aiResult.name === 'string' && aiResult.name.length > 2) {
+        if (!merged.name || parsed.name !== aiResult.name) {
+          this.logger.log(`enrichWithAi: name — parser="${parsed.name}", ai="${aiResult.name}"`);
+          merged.name = aiResult.name as string;
+        }
+      }
+
+      // Override summary if AI found one and parser didn't
+      if (aiResult.summary && typeof aiResult.summary === 'string' && aiResult.summary.length > 20) {
+        if (!merged.summary || merged.summary.length < 20) {
+          this.logger.log(`enrichWithAi: summary — parser="${parsed.summary?.slice(0, 50)}", ai="${(aiResult.summary as string).slice(0, 50)}"`);
+          merged.summary = aiResult.summary as string;
+        }
+      }
+
+      // Merge experience — prefer AI results for completeness
+      if (Array.isArray(aiResult.experience) && aiResult.experience.length > 0) {
+        const aiExp = aiResult.experience as Array<Record<string, unknown>>;
+        if (aiExp.length >= parsed.experience.length) {
+          this.logger.log(`enrichWithAi: experience — parser=${parsed.experience.length}, ai=${aiExp.length}, using AI`);
+          merged.experience = aiExp.map((e) => ({
+            company: String(e.company || ''),
+            title: String(e.title || ''),
+            startDate: (e.startDate as string) || null,
+            endDate: (e.endDate as string) || null,
+            current: Boolean(e.current),
+            bullets: Array.isArray(e.bullets) ? e.bullets.map(String) : [],
+          }));
+        }
+      }
+
+      // Merge skills — union of both
+      if (Array.isArray(aiResult.skills)) {
+        const aiSkills = (aiResult.skills as string[]).filter((s): s is string => typeof s === 'string');
+        if (aiSkills.length > 0) {
+          const combined = new Set([...parsed.skills, ...aiSkills]);
+          merged.skills = [...combined];
+          this.logger.log(`enrichWithAi: skills — parser=${parsed.skills.length}, ai=${aiSkills.length}, merged=${merged.skills.length}`);
+        }
+      }
+
+      // Merge education — prefer AI if it found more
+      if (Array.isArray(aiResult.education) && aiResult.education.length > 0) {
+        const aiEdu = aiResult.education as Array<Record<string, unknown>>;
+        if (aiEdu.length >= parsed.education.length) {
+          this.logger.log(`enrichWithAi: education — parser=${parsed.education.length}, ai=${aiEdu.length}, using AI`);
+          merged.education = aiEdu.map((e) => ({
+            institution: String(e.institution || ''),
+            degree: String(e.degree || ''),
+            field: (e.field as string) || null,
+            startDate: (e.startDate as string) || null,
+            endDate: (e.endDate as string) || null,
+            gpa: (e.gpa as string) || null,
+          }));
+        }
+      }
+
+      // Merge certifications — union
+      if (Array.isArray(aiResult.certifications)) {
+        const aiCerts = aiResult.certifications as Array<Record<string, unknown>>;
+        if (aiCerts.length > 0) {
+          const existingNames = new Set(parsed.certifications.map((c) => c.name.toLowerCase()));
+          for (const c of aiCerts) {
+            const name = String(c.name || '');
+            if (name && !existingNames.has(name.toLowerCase())) {
+              merged.certifications.push({ name, issuer: (c.issuer as string) || null, date: (c.date as string) || null });
+              existingNames.add(name.toLowerCase());
+            }
+          }
+          this.logger.log(`enrichWithAi: certifications — parser=${parsed.certifications.length}, merged=${merged.certifications.length}`);
+        }
+      }
+
+      return merged;
+    } catch (err) {
+      this.logger.warn(`enrichWithAi: failed — ${(err as Error).message}, falling back to rule-based parse`);
+      return parsed;
+    }
+  }
+
   async reExtract(id: string, userId: string): Promise<ResumeDocument> {
     const resume = await this.findById(id, userId);
     const rawText = resume.rawText || '';
     if (!rawText) throw new BadRequestException('No raw text to extract from');
 
     this.logger.log(`reExtract: re-running parser on resume ${id}`);
-    const parsed = await this.resumeParser.parse(rawText);
-    this.logger.log(`reExtract: parsed name="${parsed.name}", exp=${parsed.experience.length}, edu=${parsed.education.length}, skills=${parsed.skills.length}, certs=${parsed.certifications.length}, langs=${parsed.languages.length}`);
+    let parsed = await this.resumeParser.parse(rawText);
+    this.logger.log(`reExtract: rule-based parse done — name="${parsed.name}", exp=${parsed.experience.length}, edu=${parsed.education.length}, skills=${parsed.skills.length}, certs=${parsed.certifications.length}, langs=${parsed.languages.length}`);
+
+    parsed = await this.enrichWithAi(parsed, rawText);
+    this.logger.log(`reExtract: after AI enrichment — name="${parsed.name}", exp=${parsed.experience.length}, edu=${parsed.education.length}, skills=${parsed.skills.length}, certs=${parsed.certifications.length}, langs=${parsed.languages.length}`);
 
     resume.set({
       name: parsed.name,

@@ -178,10 +178,36 @@ export class ResumeParserService {
     return result;
   }
 
+  private normalizeSpacedCaps(lines: string[]): string[] {
+    return lines.map((line) => {
+      const trimmed = line.trim();
+      if (!trimmed) return line;
+
+      // Only process lines with no lowercase letters
+      if (/[a-z]/.test(trimmed)) return line;
+
+      // Check if the line consists mostly of single uppercase letters separated by spaces
+      // e.g. "P R O F E S S I O N A L   S U M M A R Y" or "T E C H N I C A L   S K I L L S"
+      const tokens = trimmed.split(/\s+/);
+      const singleLetterTokens = tokens.filter((t) => /^[A-Z]$/.test(t)).length;
+
+      // At least 90% of tokens must be single letters, and at least 3 such tokens
+      if (singleLetterTokens < tokens.length * 0.9) return line;
+      if (singleLetterTokens < 3) return line;
+
+      // Remove single inter-letter spaces, collapse multiple spaces
+      return trimmed
+        .replace(/([A-Z]) (?=[A-Z])/g, '$1')
+        .replace(/\s+/g, ' ');
+    });
+  }
+
   detectSections(text: string): SectionMap {
     const rawLines = text.split('\n');
     const mergedLines = this.mergeWrappedLines(rawLines);
-    const lines = mergedLines.map(l => l.trim());
+    let lines = mergedLines.map(l => l.trim());
+
+    lines = this.normalizeSpacedCaps(lines);
 
     const headings: Array<{ index: number; line: string; section: string | null }> = [];
 

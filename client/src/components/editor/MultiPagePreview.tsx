@@ -44,11 +44,16 @@ export function MultiPagePreview({ children, zoom, singlePage, contentKey }: Pro
     })
 
     const heights: { name: SectionName; height: number }[] = []
-    mainSectionEls.forEach((el) => {
+    mainSectionEls.forEach((el, i) => {
       const name = el.getAttribute('data-section') as SectionName | null
-      if (name) {
-        heights.push({ name, height: el.offsetHeight })
-      }
+      if (!name) return
+      const next = mainSectionEls[i + 1]
+      // Measure from this section's top to the next section's top so inter-section
+      // margins (space-y, mb-*, mt-*) are included. Last section has no gap after it.
+      const h = next
+        ? next.getBoundingClientRect().top - el.getBoundingClientRect().top
+        : el.offsetHeight
+      heights.push({ name, height: h })
     })
 
     if (heights.length === 0) {

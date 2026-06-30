@@ -1,6 +1,7 @@
 import { useState, useCallback, useEffect, useRef } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
+import { IconShieldLock, IconFileDescription } from '@tabler/icons-react'
 import { UploadZone } from '../components/UploadZone'
 import ThreeBackground from '../components/ThreeBackground'
 import FloatingElements from '../components/FloatingElements'
@@ -198,7 +199,8 @@ export default function Home() {
   }, [user, navigate, guestUpload])
 
   return (
-    <AnimatePresence mode="wait">
+    <>
+      <AnimatePresence mode="wait">
       {phase === 'processing' && (
         <LoadingScreen key="loading" currentStep={currentStep} progress={progress} />
       )}
@@ -301,5 +303,26 @@ export default function Home() {
         </motion.div>
       )}
     </AnimatePresence>
+
+    <footer className="w-full border-t border-border/40 mt-32 py-8">
+      <div className="max-w-6xl mx-auto px-4 sm:px-8 flex flex-col sm:flex-row items-center justify-between gap-4">
+        <div className="flex items-center gap-2">
+          <span className="font-display text-ink text-sm font-bold">Folio</span>
+          <span className="font-display text-teal text-lg font-bold">&amp;</span>
+        </div>
+        <div className="flex items-center gap-6">
+          <Link to="/privacy" className="flex items-center gap-1.5 text-xs text-muted hover:text-ink transition-colors">
+            <IconShieldLock className="h-3.5 w-3.5" />
+            Privacy Policy
+          </Link>
+          <Link to="/terms" className="flex items-center gap-1.5 text-xs text-muted hover:text-ink transition-colors">
+            <IconFileDescription className="h-3.5 w-3.5" />
+            Terms &amp; Conditions
+          </Link>
+        </div>
+        <p className="text-[10px] text-muted/40">&copy; {new Date().getFullYear()} Folio &amp;. All rights reserved.</p>
+      </div>
+    </footer>
+  </>
   )
 }

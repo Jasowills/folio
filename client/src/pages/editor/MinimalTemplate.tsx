@@ -138,9 +138,9 @@ export function MinimalTemplate({ resume, localData, redFlags, primaryColor, sho
       )}
 
       {section('links', showSections) && (localData.links && localData.links.length > 0 ? localData.links : resume.links || []).filter(l => l.title || l.url).length > 0 && (
-        <div data-section="links" className="mt-5 break-inside-avoid">
+        <div data-section="links" className="mb-5 break-inside-avoid">
           <h2 className={hClass} style={hStyle}>Links</h2>
-          <div className="space-y-1">
+          <div className="space-y-1 mt-1">
             {(localData.links && localData.links.length > 0 ? localData.links : resume.links || []).filter(l => l.title || l.url).map((link, i) => (
               <p key={i}>
                 <a href={link.url} target="_blank" rel="noopener noreferrer" style={{ color: accentColor }} className="underline decoration-from-font">{link.title || link.url}</a>
