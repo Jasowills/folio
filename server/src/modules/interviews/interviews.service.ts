@@ -1,7 +1,7 @@
 import { Injectable, NotFoundException, BadRequestException, Logger } from '@nestjs/common'
 import { InjectModel } from '@nestjs/mongoose'
 import { Model } from 'mongoose'
-import { InterviewSession, InterviewSessionDocument, InterviewerPersona } from './schemas/interview-session.schema'
+import { InterviewSession, InterviewSessionDocument, InterviewerPersona, InterviewQuestionPlan } from './schemas/interview-session.schema'
 import { InterviewTranscript, InterviewTranscriptDocument, TranscriptTurn } from './schemas/interview-transcript.schema'
 import { InterviewProctoring, InterviewProctoringDocument, ProctoringEvent } from './schemas/interview-proctoring.schema'
 import { InterviewResult, InterviewResultDocument } from './schemas/interview-result.schema'
@@ -53,14 +53,6 @@ export class InterviewsService {
       pauseSecondsRemaining: 120,
     })
 
-    if (data.company?.url) {
-      this.companyResearch.research(data.company.url).then((researchData) => {
-        this.sessionModel.findByIdAndUpdate(session._id, {
-          'company.researchData': researchData,
-        }).exec().catch((err) => this.logger.error(`Failed to save company research: ${err.message}`))
-      }).catch((err) => this.logger.warn(`Company research failed (non-blocking): ${err.message}`))
-    }
-
     this.logger.log(`createSession: created session ${session._id} for role="${data.role}" level="${data.level}"`)
     return session
   }
@@ -83,13 +75,27 @@ export class InterviewsService {
     }
 
     this.logger.log(`generatePersona: generating persona for session ${sessionId}`)
-    const persona = await this.aiService.chat(
+
+    // Await company research if a URL was provided
+    let companyContext: Record<string, unknown> | undefined
+    if (session.company?.url) {
+      this.logger.log(`generatePersona: researching company at ${session.company.url}`)
+      const data = await this.companyResearch.research(session.company.url)
+      companyContext = data as unknown as Record<string, unknown>
+      // Persist so future calls skip research
+      await this.sessionModel.findByIdAndUpdate(sessionId, {
+        'company.researchData': companyContext,
+      }).exec()
+    }
+
+    const rawPersona = await this.aiService.chat(
       PERSONA_GENERATION_SYSTEM,
       JSON.stringify({
         role: session.role,
         level: session.level,
         interviewTypes: session.interviewTypes,
         company: session.company,
+        companyContext,
         techStack: session.techStack,
         includesCoding: session.includesCoding,
         difficulty: session.difficulty,
@@ -97,17 +103,157 @@ export class InterviewsService {
       }),
     )
 
-    const personaData = persona as unknown as InterviewerPersona
-    if (!personaData.interviewerName || !personaData.questionPlan) {
+    const personaData = rawPersona as Record<string, unknown>
+    if (!personaData.interviewerName) {
+      personaData.interviewerName = this.fallbackInterviewerName(session.role)
+    }
+    if (!personaData.interviewerTitle) {
+      personaData.interviewerTitle = `${session.role} Interviewer`
+    }
+    if (!personaData.personality) {
+      personaData.personality = { tone: 'warm', followUpStyle: 'supportive', pacePreference: 'measured' }
+    }
+    if (!personaData.evaluationPriorities) {
+      personaData.evaluationPriorities = ['communication', 'problem solving', 'technical depth']
+    }
+    if (!personaData.openingStyle) {
+      personaData.openingStyle = `Warm greeting by name, thank them for joining`
+    }
+
+    // Build companyContext from research data or defaults
+    const brief = companyContext as Record<string, unknown> | undefined
+    const companyCtx = {
+      mission: String(brief?.mission ?? ''),
+      values: Array.isArray(brief?.values) ? brief.values as string[] : [],
+      recentNews: Array.isArray(brief?.recentNews) && (brief.recentNews as Array<Record<string, unknown>>).length > 0
+        ? String((brief.recentNews as Array<Record<string, unknown>>)[0]?.headline ?? '')
+        : null,
+      productFocus: String(brief?.whatTheyBuild ?? ''),
+      interviewStyleSignal: typeof brief?.interviewStyle === 'object' && brief.interviewStyle !== null
+        ? String((brief.interviewStyle as Record<string, unknown>)?.summary ?? 'conversational')
+        : 'conversational',
+    }
+
+    // Generate question plan server-side — the 1B model can't handle this complexity
+    const questionPlan = this.generateQuestionPlan(session, personaData)
+
+    const persona: InterviewerPersona = {
+      interviewerName: String(personaData.interviewerName),
+      interviewerTitle: String(personaData.interviewerTitle),
+      personality: personaData.personality as InterviewerPersona['personality'],
+      evaluationPriorities: personaData.evaluationPriorities as string[],
+      openingStyle: String(personaData.openingStyle),
+      companyContext: companyCtx,
+      questionPlan,
+    }
+
+    if (!persona.interviewerName || !persona.questionPlan || persona.questionPlan.length === 0) {
       throw new BadRequestException('Persona generation returned incomplete data')
     }
 
-    session.interviewerPersona = personaData
-    session.questionPlan = personaData.questionPlan
+    session.interviewerPersona = persona
+    session.questionPlan = persona.questionPlan
     await session.save()
 
-    this.logger.log(`generatePersona: persona "${personaData.interviewerName}" generated with ${personaData.questionPlan.length} questions`)
-    return personaData
+    this.logger.log(`generatePersona: persona "${persona.interviewerName}" generated with ${persona.questionPlan.length} questions`)
+    return persona
+  }
+
+  private generateQuestionPlan(
+    session: InterviewSessionDocument,
+    persona: Record<string, unknown>,
+  ): InterviewQuestionPlan[] {
+    const name = String(persona.interviewerName || 'your interviewer')
+    const plans: InterviewQuestionPlan[] = []
+
+    // 1. Opening / Introduction
+    plans.push({
+      order: 1,
+      phase: 'opening',
+      topic: 'Introduction',
+      basedOn: 'general',
+      resumeReference: null,
+      primaryQuestion: `Hello, I'm ${name}. Thank you for joining me today. To get started, could you please introduce yourself and walk me through your background and what led you to apply for this ${session.role} role?`,
+      followUpTriggers: [{ condition: 'candidate mentions specific experience', followUp: 'That sounds interesting. Could you tell me more about what you learned from that experience?' }],
+      estimatedMinutes: 3,
+      evaluationCriteria: ['communication', 'self_awareness'],
+    })
+
+    // 2. Behavioural / experience question
+    plans.push({
+      order: 2,
+      phase: 'behavioural',
+      topic: 'Experience & Impact',
+      basedOn: 'role',
+      resumeReference: null,
+      primaryQuestion: `That's great context. Could you tell me about a project or accomplishment from your ${session.level} engineering career that you're particularly proud of? What impact did it have, and what was your specific contribution?`,
+      followUpTriggers: [
+        { condition: 'candidate mentions team work', followUp: 'How did you collaborate with others on that project?' },
+        { condition: 'candidate mentions challenges', followUp: 'What was the toughest challenge you faced there and how did you overcome it?' },
+      ],
+      estimatedMinutes: 5,
+      evaluationCriteria: ['experience_depth', 'impact', 'leadership'],
+    })
+
+    // 3. Technical question (if tech stack available)
+    const tech = session.techStack || []
+    if (tech.length > 0) {
+      const mainTechs = tech.slice(0, 3).join(', ')
+      plans.push({
+        order: 3,
+        phase: 'technical',
+        topic: 'Technical Problem Solving',
+        basedOn: 'role',
+        resumeReference: null,
+        primaryQuestion: `I'd love to dive into the technical side for a moment. You've worked with ${mainTechs} — could you walk me through a particularly challenging technical problem you solved and how you approached it?`,
+        followUpTriggers: [
+          { condition: 'candidate describes solution', followUp: "That's a solid approach. Were there any trade-offs you had to consider?" },
+          { condition: 'candidate mentions architecture', followUp: 'How did you ensure the solution was scalable and maintainable?' },
+        ],
+        estimatedMinutes: 5,
+        evaluationCriteria: ['technical_depth', 'problem_solving', 'architectural_thinking'],
+      })
+    }
+
+    // 4. Company-specific question
+    const company = session.company?.name
+    if (company) {
+      plans.push({
+        order: plans.length + 1,
+        phase: plans.length < 3 ? 'technical' : 'behavioural',
+        topic: `Interest in ${company}`,
+        basedOn: 'company',
+        resumeReference: null,
+        primaryQuestion: `I'm curious — what drew you to ${company} and this particular role? What aspects of the work we're doing here excite you most?`,
+        followUpTriggers: [
+          { condition: 'candidate mentions company mission', followUp: 'How does your personal values align with our mission?' },
+          { condition: 'candidate mentions technology', followUp: 'What kind of impact do you hope to make in this role?' },
+        ],
+        estimatedMinutes: 4,
+        evaluationCriteria: ['cultural_fit', 'motivation', 'company_research'],
+      })
+    }
+
+    // 5. Closing
+    plans.push({
+      order: plans.length + 1,
+      phase: 'closing',
+      topic: 'Next Steps',
+      basedOn: 'general',
+      resumeReference: null,
+      primaryQuestion: `We're almost done! Is there anything else you'd like to add or any questions you have about the ${company || 'this'} role, the team, or what it's like to work here?`,
+      followUpTriggers: [],
+      estimatedMinutes: 2,
+      evaluationCriteria: ['curiosity', 'engagement', 'preparation'],
+    })
+
+    return plans
+  }
+
+  private fallbackInterviewerName(role: string): string {
+    const names = ['Alex', 'Jordan', 'Morgan', 'Casey', 'Riley', 'Sam', 'Taylor', 'Avery', 'Quinn', 'Harper']
+    const seed = role.length + role.charCodeAt(0)
+    return names[seed % names.length]
   }
 
   async startSession(sessionId: string, userId: string): Promise<InterviewSessionDocument> {
@@ -127,6 +273,21 @@ export class InterviewsService {
     if (!transcript) throw new NotFoundException('Transcript not found')
     transcript.turns.push(turn)
     await transcript.save()
+  }
+
+  async hasTranscriptTurns(sessionId: string): Promise<boolean> {
+    const transcript = await this.transcriptModel.findOne({ sessionId }).exec()
+    return transcript ? transcript.turns.length > 0 : false
+  }
+
+  buildGreeting(session: InterviewSessionDocument): string | null {
+    const persona = session.interviewerPersona as InterviewerPersona | undefined
+    if (!persona?.interviewerName) return null
+    const title = persona.interviewerTitle || ''
+    const role = session.role || ''
+    const duration = session.plannedDuration || 30
+    const name = persona.interviewerName
+    return `Hi, I'm ${name}${title ? `, ${title}` : ''}. I'll be interviewing you today for the ${role} position. We'll spend about ${duration} minutes discussing your experience and expertise. Feel free to take a moment to think before answering. Let's get started.`
   }
 
   async addProctoringEvent(sessionId: string, event: ProctoringEvent): Promise<void> {

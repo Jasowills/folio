@@ -35,6 +35,8 @@ export function useInterviewSocket(sessionId: string | undefined) {
   const [codeResult, setCodeResult] = useState<CodeResult | null>(null)
   const [isCodeRunning, setIsCodeRunning] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [isAvatarSpeaking, setIsAvatarSpeaking] = useState(false)
+  const synthRef = useRef<SpeechSynthesisUtterance | null>(null)
 
   // Connect to WebSocket
   useEffect(() => {
@@ -71,10 +73,7 @@ export function useInterviewSocket(sessionId: string | undefined) {
         { speaker: 'interviewer', text: response.text },
       ])
 
-      // Play audio if available
-      if (response.audio) {
-        playAudio(response.audio)
-      }
+      speakResponse(response.text, response.audio)
     })
 
     socket.on('code_running', () => {
@@ -100,7 +99,7 @@ export function useInterviewSocket(sessionId: string | undefined) {
     })
 
     socket.on('resumed', () => {
-      // Reconnect mic handled by startMicrophone
+      startMicrophone()
     })
 
     return () => {
@@ -110,8 +109,35 @@ export function useInterviewSocket(sessionId: string | undefined) {
     }
   }, [sessionId])
 
-  const playAudio = useCallback((base64Audio: string) => {
+  const speakWithBrowser = useCallback((text: string) => {
+    if (!window.speechSynthesis) return
+    window.speechSynthesis.cancel()
+
+    const utterance = new SpeechSynthesisUtterance(text)
+    utterance.rate = 0.95
+    utterance.pitch = 1.05
+    utterance.volume = 1
+
+    const voices = window.speechSynthesis.getVoices()
+    if (voices.length > 0) {
+      const preferred = voices.find(
+        (v) => v.name.includes('Samantha') || v.name.includes('Google UK Female') || v.name.includes('Google US Female'),
+      )
+      if (preferred) utterance.voice = preferred
+    }
+
+    utterance.onstart = () => setIsAvatarSpeaking(true)
+    utterance.onend = () => setIsAvatarSpeaking(false)
+    utterance.onerror = () => {
+      setIsAvatarSpeaking(false)
+    }
+    synthRef.current = utterance
+    window.speechSynthesis.speak(utterance)
+  }, [])
+
+  const speakWithAudio = useCallback((base64Audio: string) => {
     try {
+      setIsAvatarSpeaking(true)
       const binary = atob(base64Audio)
       const bytes = new Uint8Array(binary.length)
       for (let i = 0; i < binary.length; i++) {
@@ -120,14 +146,26 @@ export function useInterviewSocket(sessionId: string | undefined) {
       const blob = new Blob([bytes], { type: 'audio/wav' })
       const url = URL.createObjectURL(blob)
       const audio = new Audio(url)
-      audio.onended = () => URL.revokeObjectURL(url)
+      audio.onended = () => {
+        URL.revokeObjectURL(url)
+        setIsAvatarSpeaking(false)
+      }
+      audio.onerror = () => setIsAvatarSpeaking(false)
       audio.play().catch(() => {
-        // Autoplay blocked — user needs to interact first
+        setIsAvatarSpeaking(false)
       })
     } catch {
-      // Audio playback failed
+      setIsAvatarSpeaking(false)
     }
   }, [])
+
+  const speakResponse = useCallback((text: string, audio: string | null) => {
+    if (audio) {
+      speakWithAudio(audio)
+    } else {
+      speakWithBrowser(text)
+    }
+  }, [speakWithAudio, speakWithBrowser])
 
   const startMicrophone = useCallback(async () => {
     if (!socketRef.current?.connected) return
@@ -219,6 +257,12 @@ export function useInterviewSocket(sessionId: string | undefined) {
     [sessionId],
   )
 
+  const replayResponse = useCallback(() => {
+    if (interviewerResponse) {
+      speakResponse(interviewerResponse.text, interviewerResponse.audio)
+    }
+  }, [interviewerResponse, speakResponse])
+
   return {
     isConnected,
     isRecording,
@@ -228,6 +272,8 @@ export function useInterviewSocket(sessionId: string | undefined) {
     codeResult,
     isCodeRunning,
     error,
+    isAvatarSpeaking,
+    audioStream: streamRef.current,
     startMicrophone,
     stopMicrophone,
     pause,
@@ -236,5 +282,6 @@ export function useInterviewSocket(sessionId: string | undefined) {
     nextQuestion,
     submitCode,
     sendProctoringEvent,
+    replayResponse,
   }
 }

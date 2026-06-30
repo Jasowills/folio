@@ -30,38 +30,32 @@ export class InterviewsController {
       plannedDuration: number
     },
   ) {
-    const session = await this.interviewsService.createSession(user._id.toString(), body)
-    return { success: true, data: session }
+    return this.interviewsService.createSession(user._id.toString(), body)
   }
 
   @Get('sessions/:id')
   async getSession(@CurrentUser() user: UserDocument, @Param('id') id: string) {
-    const session = await this.interviewsService.getSession(id, user._id.toString())
-    return { success: true, data: session }
+    return this.interviewsService.getSession(id, user._id.toString())
   }
 
   @Post('sessions/:id/persona')
   async generatePersona(@CurrentUser() user: UserDocument, @Param('id') id: string) {
-    const persona = await this.interviewsService.generatePersona(id, user._id.toString())
-    return { success: true, data: persona }
+    return this.interviewsService.generatePersona(id, user._id.toString())
   }
 
   @Post('sessions/:id/start')
   async startSession(@CurrentUser() user: UserDocument, @Param('id') id: string) {
-    const session = await this.interviewsService.startSession(id, user._id.toString())
-    return { success: true, data: session }
+    return this.interviewsService.startSession(id, user._id.toString())
   }
 
   @Post('sessions/:id/end')
   async endSession(@CurrentUser() user: UserDocument, @Param('id') id: string) {
-    const session = await this.interviewsService.endSession(id, user._id.toString())
-    return { success: true, data: session }
+    return this.interviewsService.endSession(id, user._id.toString())
   }
 
   @Get('sessions/:id/results')
   async getResults(@CurrentUser() user: UserDocument, @Param('id') id: string) {
-    const results = await this.interviewsService.getResults(id, user._id.toString())
-    return { success: true, data: results }
+    return this.interviewsService.getResults(id, user._id.toString())
   }
 
   @Delete('sessions/:id')

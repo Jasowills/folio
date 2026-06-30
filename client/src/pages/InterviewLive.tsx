@@ -1,9 +1,8 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
-  IconMicrophone, IconMicrophoneOff, IconPlayerPause, IconPlayerPlay,
-  IconPlayerStop, IconCode, IconEye, IconEyeOff, IconAlertTriangle,
-  IconCamera, IconTerminal,
+  IconPlayerStop, IconEye, IconEyeOff, IconAlertTriangle,
+  IconCameraOff, IconTerminal,
 } from '@tabler/icons-react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useSession, useEndSession } from '../lib/queries'
@@ -13,6 +12,8 @@ import { useCameraProctoring } from '../hooks/useCameraProctoring'
 import { CodingPhase } from '../components/interview/CodingPhase'
 import { Button } from '../components/ui/button'
 import { showToast } from '../components/ui/toast'
+import InterviewerAvatar from '../components/interview/InterviewerAvatar'
+import AudioWaveform from '../components/interview/AudioWaveform'
 
 export default function InterviewLive() {
   const { sessionId } = useParams<{ sessionId: string }>()
@@ -24,19 +25,26 @@ export default function InterviewLive() {
   const {
     isConnected, isRecording, transcripts, currentInterim,
     interviewerResponse, codeResult, isCodeRunning,
-    error, startMicrophone, stopMicrophone,
-    pause, resume, endSession: wsEndSession, nextQuestion,
-    submitCode, sendProctoringEvent,
+    error, isAvatarSpeaking, audioStream, startMicrophone,
+    endSession: wsEndSession, submitCode, sendProctoringEvent,
   } = useInterviewSocket(sessionId)
 
-  const [isPaused, setIsPaused] = useState(false)
   const [elapsed, setElapsed] = useState(0)
   const [codingOpen, setCodingOpen] = useState(false)
   const [proctoringEnabled, setProctoringEnabled] = useState(false)
   const [cameraEnabled, setCameraEnabled] = useState(false)
-  const [isAvatarSpeaking, setIsAvatarSpeaking] = useState(false)
+  const hasAutoOpenedEditor = useRef(false)
+
+  const [selfViewStream, setSelfViewStream] = useState<MediaStream | null>(null)
+  const selfViewRef = useRef<HTMLVideoElement>(null)
   const timerRef = useRef<ReturnType<typeof setInterval>>()
-  const speakingTimerRef = useRef<ReturnType<typeof setTimeout>>()
+
+  const persona = session?.interviewerPersona as {
+    interviewerName?: string
+    interviewerTitle?: string
+  } | undefined
+
+  const questionPlan = session?.questionPlan as Array<{ primaryQuestion?: string; phase?: string; topic?: string }> | undefined
 
   // Page + paste proctoring
   useProctoring({
@@ -55,20 +63,50 @@ export default function InterviewLive() {
     showToast('info', 'Code submitted for execution')
   }, [submitCode])
 
-  // Avatar pulse when TTS audio plays
+  // Auto-start mic + camera when connected and session is ready
   useEffect(() => {
-    if (interviewerResponse?.audio) {
-      setIsAvatarSpeaking(true)
-      if (speakingTimerRef.current) clearTimeout(speakingTimerRef.current)
-      const estimatedDuration = interviewerResponse.text.length * 60
-      speakingTimerRef.current = setTimeout(() => setIsAvatarSpeaking(false), estimatedDuration)
-    } else if (interviewerResponse && !interviewerResponse.audio) {
-      setIsAvatarSpeaking(false)
+    if (!isConnected || !session || session.status !== 'in_progress') return
+    startMicrophone()
+    setCameraEnabled(true)
+  }, [isConnected, session, startMicrophone])
+
+  // Camera self-view (independent of proctoring)
+  useEffect(() => {
+    if (!cameraEnabled) {
+      if (selfViewStream) {
+        selfViewStream.getTracks().forEach((t) => t.stop())
+        setSelfViewStream(null)
+      }
+      return
     }
+
+    let cancelled = false
+    navigator.mediaDevices
+      .getUserMedia({ video: { facingMode: 'user', width: 320, height: 240 } })
+      .then((stream) => {
+        if (cancelled) {
+          stream.getTracks().forEach((t) => t.stop())
+          return
+        }
+        setSelfViewStream(stream)
+        if (selfViewRef.current) {
+          selfViewRef.current.srcObject = stream
+        }
+      })
+      .catch(() => {})
+
     return () => {
-      if (speakingTimerRef.current) clearTimeout(speakingTimerRef.current)
+      cancelled = true
     }
-  }, [interviewerResponse])
+  }, [cameraEnabled])
+
+  // Auto-open code editor when interview starts
+  useEffect(() => {
+    if (session?.includesCoding && isRecording && !hasAutoOpenedEditor.current) {
+      setCodingOpen(true)
+      hasAutoOpenedEditor.current = true
+    }
+  }, [isRecording, session?.includesCoding])
 
   useEffect(() => {
     if (!sessionId) navigate('/interview/new', { replace: true })
@@ -81,37 +119,17 @@ export default function InterviewLive() {
   }, [session?.status, sessionId, navigate])
 
   useEffect(() => {
-    if (isRecording && !isPaused) {
+    if (isRecording) {
       timerRef.current = setInterval(() => setElapsed((e) => e + 1), 1000)
     } else {
       clearInterval(timerRef.current)
     }
     return () => clearInterval(timerRef.current)
-  }, [isRecording, isPaused])
+  }, [isRecording])
 
   useEffect(() => {
     transcriptEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [transcripts, currentInterim, codeResult])
-
-  const handleToggleMic = async () => {
-    if (isRecording) {
-      stopMicrophone()
-    } else {
-      await startMicrophone()
-    }
-  }
-
-  const handlePause = () => {
-    setIsPaused(true)
-    pause()
-    showToast('info', 'Interview paused')
-  }
-
-  const handleResume = () => {
-    setIsPaused(false)
-    resume()
-    showToast('info', 'Interview resumed')
-  }
 
   const handleEnd = async () => {
     if (!sessionId) return
@@ -139,216 +157,242 @@ export default function InterviewLive() {
   }
 
   const totalSeconds = (session.plannedDuration || 30) * 60
+  const progressPct = Math.min(100, (elapsed / totalSeconds) * 100)
+  const questionIndex = transcripts.filter((t) => t.speaker === 'interviewer').length
+  const totalQuestions = questionPlan?.length || 0
 
   return (
-    <div className="page-container">
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        className="max-w-4xl mx-auto space-y-6"
-      >
-        {/* Top bar */}
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <div className="text-2xl font-mono font-semibold text-ink">{formatTime(elapsed)}</div>
-            <div className="h-2 w-48 bg-paper-dark rounded-full overflow-hidden">
+    <div className="h-screen flex flex-col bg-paper">
+      {/* Top bar */}
+      <div className="shrink-0 flex items-center justify-between px-6 py-3 border-b border-border">
+        <div className="flex items-center gap-4 min-w-0">
+          <span className="font-display text-teal text-lg font-bold tracking-tight shrink-0">&amp;</span>
+          <div className="h-4 w-px bg-border" />
+          <span className="text-sm font-medium text-ink truncate">{session.role}</span>
+          {totalQuestions > 0 && (
+            <span className="text-xs text-muted whitespace-nowrap">
+              {questionIndex} of {totalQuestions} questions
+            </span>
+          )}
+        </div>
+
+        <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2">
+            <div className="text-lg font-mono font-semibold text-ink tabular-nums">{formatTime(elapsed)}</div>
+            <div className="h-2 w-32 bg-paper-dark rounded-full overflow-hidden hidden sm:block">
               <div
                 className="h-full bg-teal rounded-full transition-all duration-300"
-                style={{ width: `${Math.min(100, (elapsed / totalSeconds) * 100)}%` }}
+                style={{ width: `${progressPct}%` }}
               />
             </div>
-            <div className="text-xs text-muted">{session.role}</div>
           </div>
-          <div className="flex items-center gap-2">
-            <div className={`w-2 h-2 rounded-full ${isConnected ? 'bg-green-500' : 'bg-red-400'}`} />
-            <span className="text-xs text-muted mr-2">{isConnected ? 'Connected' : 'Disconnected'}</span>
-            {isRecording && !isPaused && (
-              <Button variant="ghost" size="sm" onClick={handlePause}>
-                Pause
-                <IconPlayerPause className="w-4 h-4 ml-1" />
-              </Button>
-            )}
-            {isRecording && isPaused && (
-              <Button variant="ghost" size="sm" onClick={handleResume}>
-                Resume
-                <IconPlayerPlay className="w-4 h-4 ml-1" />
-              </Button>
-            )}
-            <Button variant="danger" size="sm" onClick={handleEnd} loading={endSession.isPending}>
-              End
-              <IconPlayerStop className="w-4 h-4 ml-1" />
-            </Button>
+          <div className="flex items-center gap-1.5">
+            <span className={`w-1.5 h-1.5 rounded-full ${isConnected ? 'bg-green-500' : 'bg-red-400'}`} />
+            <span className="text-[11px] text-muted hidden sm:inline">{isConnected ? 'Connected' : 'Disconnected'}</span>
           </div>
         </div>
+      </div>
 
-        {/* Error */}
-        {error && (
-          <div className="bg-danger/10 border border-danger/30 rounded-lg px-4 py-2 text-sm text-danger flex items-center gap-2">
-            <IconAlertTriangle className="w-4 h-4" />
-            {error}
-          </div>
-        )}
-
-        {/* Camera feed (small, picture-in-picture style) */}
-        {cameraEnabled && (
-          <div className="fixed bottom-6 left-6 z-40 w-40 rounded-lg overflow-hidden border-2 border-teal shadow-lg bg-black">
-            <video
-              ref={videoRef}
-              autoPlay
-              muted
-              playsInline
-              className="w-full h-30 object-cover scale-x-[-1]"
-            />
-            <div className="absolute top-1 right-1 flex items-center gap-1 bg-black/50 rounded px-1.5 py-0.5">
-              <span
-                className={`w-1.5 h-1.5 rounded-full ${numFaces > 0 ? 'bg-green-400' : 'bg-red-400'}`}
+      {/* Main content */}
+      <div className="flex-1 flex min-h-0">
+        {/* Left panel — Interviewer */}
+        <div className="flex-1 flex flex-col overflow-hidden border-r border-border">
+          <div className="flex-1 overflow-y-auto px-6 py-6 flex flex-col">
+            <div className="flex-1 flex flex-col items-center justify-center min-h-0">
+              <InterviewerAvatar
+                name={persona?.interviewerName || 'Interviewer'}
+                title={persona?.interviewerTitle || session.role}
+                isSpeaking={isAvatarSpeaking}
+                isListening={isRecording && !isAvatarSpeaking}
+                isPaused={false}
               />
-              <span className="text-[10px] text-white">{numFaces}</span>
             </div>
-          </div>
-        )}
 
-        {/* Avatar + Mic */}
-        <div className="flex flex-col items-center justify-center py-8 space-y-6">
-          <div className="relative">
-            <div
-              className={`w-32 h-32 rounded-full bg-gradient-to-br from-teal to-purple-500 flex items-center justify-center transition-all duration-700 ${
-                isRecording && !isPaused ? 'scale-110 shadow-lg shadow-teal/30' : ''
-              } ${isPaused ? 'opacity-60' : ''}`}
-              style={{
-                animation: isAvatarSpeaking
-                  ? 'pulse 0.8s ease-in-out infinite'
-                  : isRecording && !isPaused
-                  ? 'pulse 2s ease-in-out infinite'
-                  : 'none',
-                transform: isAvatarSpeaking ? 'scale(1.15)' : '',
-              }}
-            >
-              {isRecording && !isPaused ? (
-                <IconMicrophone className="w-12 h-12 text-white" />
-              ) : (
-                <IconMicrophoneOff className="w-12 h-12 text-white/70" />
-              )}
-            </div>
-            {isAvatarSpeaking && (
-              <div className="absolute -inset-2 rounded-full border-2 border-teal/30 animate-ping" />
-            )}
-          </div>
-
-          <div className="flex items-center gap-3">
-            <Button
-              size="lg"
-              onClick={handleToggleMic}
-              disabled={!isConnected}
-            >
-              {isRecording ? (
-                <><IconMicrophoneOff className="w-5 h-5 mr-2" /> Stop Mic</>
-              ) : (
-                <><IconMicrophone className="w-5 h-5 mr-2" /> Start Mic</>
-              )}
-            </Button>
-
-            {isRecording && (
-              <span className={`flex items-center gap-2 text-sm ${isPaused ? 'text-amber-400' : 'text-green-500'}`}>
-                <span className="w-2 h-2 rounded-full bg-current animate-pulse" />
-                {isPaused ? 'Paused' : 'Recording'}
-              </span>
-            )}
-          </div>
-        </div>
-
-        {/* Transcript area */}
-        <div className="bg-paper-dark rounded-lg p-4 max-h-72 overflow-y-auto space-y-3">
-          <AnimatePresence>
-            {transcripts.map((t, i) => (
-              <motion.div
-                key={i}
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                className={`flex ${t.speaker === 'interviewer' ? 'justify-start' : 'justify-end'}`}
-              >
-                <div className={`max-w-[75%] rounded-lg px-3 py-2 text-sm ${
-                  t.speaker === 'interviewer'
-                    ? 'bg-teal-light/10 text-ink'
-                    : 'bg-teal text-white'
-                }`}>
-                  <p className="text-xs opacity-60 mb-1">
-                    {t.speaker === 'interviewer' ? 'Interviewer' : 'You'}
-                  </p>
-                  {t.text}
-                </div>
-              </motion.div>
-            ))}
-          </AnimatePresence>
-
-          {currentInterim && (
-            <div className="flex justify-end">
-              <div className="max-w-[75%] rounded-lg px-3 py-2 text-sm bg-teal/50 text-white italic">
-                {currentInterim}
+            {/* Current question */}
+            {transcripts.filter((t) => t.speaker === 'interviewer').length > 0 && (
+              <div className="bg-paper-dark/60 rounded-xl px-5 py-3 border border-border/50">
+                <p className="text-[11px] font-semibold text-muted uppercase tracking-wider mb-1.5">
+                  Current question
+                </p>
+                <p className="text-sm text-ink leading-relaxed">
+                  {transcripts.filter((t) => t.speaker === 'interviewer').pop()?.text}
+                </p>
               </div>
+            )}
+
+            {/* Chat transcript */}
+            <div className="space-y-3">
+              <AnimatePresence initial={false}>
+                {transcripts.map((t, i) => (
+                  <motion.div
+                    key={`${t.speaker}-${i}`}
+                    initial={{ opacity: 0, y: 8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.25 }}
+                    className={`flex ${t.speaker === 'candidate' ? 'justify-end' : 'justify-start'}`}
+                  >
+                    <div className={`max-w-[80%] rounded-xl px-4 py-2.5 text-sm leading-relaxed ${
+                      t.speaker === 'interviewer'
+                        ? 'bg-paper-dark text-ink'
+                        : 'bg-teal text-white'
+                    }`}>
+                      {t.text}
+                    </div>
+                  </motion.div>
+                ))}
+              </AnimatePresence>
+
+              {currentInterim && (
+                <div className="flex justify-end">
+                  <div className="max-w-[80%] rounded-xl px-4 py-2.5 text-sm leading-relaxed bg-teal/60 text-white/90 italic">
+                    {currentInterim}
+                  </div>
+                </div>
+              )}
+
+              {codeResult && (
+                <motion.div
+                  initial={{ opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="bg-paper-dark rounded-xl p-4 text-xs font-mono space-y-1.5 border border-border/50"
+                >
+                  <p className="text-teal font-semibold flex items-center gap-1.5">
+                    <IconTerminal className="w-3 h-3" />
+                    Exit code: {codeResult.run.code}
+                  </p>
+                  {codeResult.run.stdout && (
+                    <pre className="text-green-700 whitespace-pre-wrap">{codeResult.run.stdout.slice(0, 500)}</pre>
+                  )}
+                  {codeResult.run.stderr && (
+                    <pre className="text-red-600 whitespace-pre-wrap">{codeResult.run.stderr.slice(0, 500)}</pre>
+                  )}
+                </motion.div>
+              )}
+
+              <div ref={transcriptEndRef} />
             </div>
-          )}
-
-          {codeResult && (
-            <motion.div
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="bg-black/5 rounded-lg p-3 text-xs font-mono space-y-1"
-            >
-              <p className="text-teal font-semibold flex items-center gap-1">
-                <IconTerminal className="w-3 h-3" />
-                Exit code: {codeResult.run.code}
-              </p>
-              {codeResult.run.stdout && (
-                <pre className="text-green-700 whitespace-pre-wrap">{codeResult.run.stdout.slice(0, 500)}</pre>
-              )}
-              {codeResult.run.stderr && (
-                <pre className="text-red-600 whitespace-pre-wrap">{codeResult.run.stderr.slice(0, 500)}</pre>
-              )}
-            </motion.div>
-          )}
-
-          <div ref={transcriptEndRef} />
+          </div>
         </div>
 
-        {/* Controls footer */}
-        <div className="flex justify-center gap-3 pt-2 flex-wrap">
-          <Button variant="ghost" size="sm" onClick={nextQuestion} disabled={!isRecording}>
-            Next Question
-            <IconCode className="w-4 h-4 ml-1" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => setProctoringEnabled((p) => !p)}
-            className={proctoringEnabled ? 'text-teal' : ''}
-          >
-            <IconEye className="w-4 h-4 mr-1" />
-            {proctoringEnabled ? 'Proctoring' : 'Proctoring'}
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => setCameraEnabled((p) => !p)}
-            className={cameraEnabled ? 'text-teal' : ''}
-          >
-            <IconCamera className="w-4 h-4 mr-1" />
-            {cameraEnabled ? 'Camera' : 'Camera'}
-          </Button>
-          {session.includesCoding && (
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setCodingOpen(true)}
-              loading={isCodeRunning}
-            >
-              <IconTerminal className="w-4 h-4 mr-1" />
-              Editor
-            </Button>
-          )}
-        </div>
-      </motion.div>
+        {/* Right panel — Candidate */}
+        <div className="w-72 lg:w-80 shrink-0 flex flex-col bg-paper/50">
+          <div className="flex-1 flex flex-col overflow-hidden px-4 py-6 space-y-4">
+            {/* Camera feed */}
+            <div className={`rounded-xl overflow-hidden bg-ink/5 border border-border ${cameraEnabled && selfViewStream ? '' : 'flex items-center justify-center h-44'}`}>
+              {cameraEnabled && selfViewStream ? (
+                <div className="relative">
+                  <video
+                    ref={selfViewRef}
+                    autoPlay
+                    muted
+                    playsInline
+                    className="w-full aspect-[4/3] object-cover scale-x-[-1]"
+                  />
+                  {proctoringEnabled && faceDetectorReady && (
+                    <div className="absolute top-2 right-2 flex items-center gap-1.5 bg-black/40 backdrop-blur-sm rounded-full px-2 py-1">
+                      <span className={`w-1.5 h-1.5 rounded-full ${numFaces > 0 ? 'bg-green-400' : 'bg-red-400'}`} />
+                      <span className="text-[10px] text-white font-medium">{numFaces}</span>
+                    </div>
+                  )}
+                  {isRecording && (
+                    <div className="absolute top-2 left-2 flex items-center gap-1.5 bg-red-500/80 rounded-full px-2 py-1">
+                      <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />
+                      <span className="text-[10px] text-white font-medium">REC</span>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="w-full h-44 flex flex-col items-center justify-center gap-2 text-muted">
+                  <IconCameraOff className="w-6 h-6" />
+                  <span className="text-xs">Camera unavailable</span>
+                </div>
+              )}
+            </div>
 
+            {/* Audio waveform */}
+            <div className="h-10">
+              <AudioWaveform stream={audioStream} isActive={isRecording} />
+            </div>
+
+            {/* Recording status */}
+            <div className="flex items-center justify-center gap-2 text-xs text-muted">
+              {isRecording ? (
+                <span className="flex items-center gap-1.5 text-green-600">
+                  <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
+                  Recording
+                </span>
+              ) : (
+                <span className="text-muted">Mic off</span>
+              )}
+              {faceDetectorReady && (
+                <span className="text-muted">·</span>
+              )}
+              {faceDetectorReady && (
+                <span className="text-muted">Face tracking ready</span>
+              )}
+            </div>
+
+            {/* Error */}
+            <AnimatePresence>
+              {error && (
+                <motion.div
+                  initial={{ opacity: 0, y: 4 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -4 }}
+                  className="bg-danger/10 border border-danger/30 rounded-lg px-3 py-2 text-xs text-danger flex items-center gap-1.5"
+                >
+                  <IconAlertTriangle className="w-3 h-3 shrink-0" />
+                  {error}
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
+        </div>
+      </div>
+
+      {/* Bottom toolbar */}
+      <div className="shrink-0 flex items-center justify-center gap-2 px-6 py-3 border-t border-border bg-paper/80 backdrop-blur-sm">
+        <Button
+          size="sm"
+          variant={proctoringEnabled ? 'default' : 'ghost'}
+          onClick={() => setProctoringEnabled((p) => !p)}
+          className="gap-1.5"
+        >
+          {proctoringEnabled ? (
+            <><IconEye className="w-4 h-4" /> Proctoring</>
+          ) : (
+            <><IconEyeOff className="w-4 h-4" /> Proctoring</>
+          )}
+        </Button>
+
+        <div className="w-px h-5 bg-border mx-1" />
+
+        {session.includesCoding && (
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={() => setCodingOpen(true)}
+            loading={isCodeRunning}
+            className="gap-1.5"
+          >
+            <IconTerminal className="w-4 h-4" />
+            Editor
+          </Button>
+        )}
+
+        <Button
+          size="sm"
+          variant="danger"
+          onClick={handleEnd}
+          loading={endSession.isPending}
+          className="gap-1.5"
+        >
+          <IconPlayerStop className="w-4 h-4" />
+          End
+        </Button>
+      </div>
+
+      {/* Auto-open editor when interview starts and includes coding */}
       {session.includesCoding && (
         <CodingPhase
           isOpen={codingOpen}

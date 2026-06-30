@@ -71,6 +71,7 @@ export class InterviewsGateway implements OnGatewayConnection, OnGatewayDisconne
     this.activeSessions.get(sessionId)!.add(client.id)
     client.join(sessionId)
 
+    let isNewSession = false
     if (!this.sessionStates.has(sessionId)) {
       const doc = await this.interviewsService.getSessionForAi(sessionId)
       this.sessionStates.set(sessionId, {
@@ -82,9 +83,39 @@ export class InterviewsGateway implements OnGatewayConnection, OnGatewayDisconne
         pauseStartTime: null,
         isPaused: false,
       })
+      if (doc && doc.status === 'in_progress') {
+        const hasTurns = await this.interviewsService.hasTranscriptTurns(sessionId)
+        if (!hasTurns) {
+          isNewSession = true
+        }
+      }
     }
 
     this.logger.log(`Client ${client.id} joined session ${sessionId}`)
+
+    if (isNewSession) {
+      const doc = await this.interviewsService.getSessionForAi(sessionId)
+      const greeting = this.interviewsService.buildGreeting(doc!)
+      if (greeting) {
+        const greetingTurn = {
+          speaker: 'interviewer' as const,
+          questionPlanRef: 0,
+          text: greeting,
+          timestamp: Date.now(),
+          duration: 0,
+        }
+        await this.interviewsService.addTurn(sessionId, greetingTurn)
+        let audioBase64: string | null = null
+        if (this.deepgram.isConfigured) {
+          audioBase64 = await this.deepgram.generateTtsBase64(greeting)
+        }
+        this.server.to(sessionId).emit('interviewer_response', {
+          text: greeting,
+          audio: audioBase64,
+          questionIndex: 0,
+        })
+      }
+    }
 
     if (this.deepgram.isConfigured) {
       const conn = await this.deepgram.createSttConnection(

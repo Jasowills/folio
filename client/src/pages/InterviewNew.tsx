@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { IconArrowLeft, IconArrowRight, IconDeviceLaptop, IconCode, IconClock, IconBrain } from '@tabler/icons-react'
+import { IconArrowLeft, IconArrowRight, IconDeviceLaptop, IconCode, IconClock, IconBrain, IconWorld, IconLoader, IconCircleCheck } from '@tabler/icons-react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth'
 import { useResumes } from '../lib/queries'
@@ -9,6 +9,15 @@ import { Button } from '../components/ui/button'
 import { Input } from '../components/ui/input'
 import { Select } from '../components/ui/select'
 import { showToast } from '../components/ui/toast'
+
+type ProgressStep = 'idle' | 'creating' | 'researching' | 'generating' | 'done'
+
+const progressSteps: { key: ProgressStep; label: string; icon: typeof IconBrain }[] = [
+  { key: 'creating', label: 'Creating session...', icon: IconLoader },
+  { key: 'researching', label: 'Researching company website...', icon: IconWorld },
+  { key: 'generating', label: 'Generating interviewer persona...', icon: IconBrain },
+  { key: 'done', label: 'Ready', icon: IconCircleCheck },
+]
 
 const steps = ['Role', 'Company', 'Stack', 'Duration', 'Review']
 
@@ -59,7 +68,7 @@ export default function InterviewNew() {
   const [difficulty, setDifficulty] = useState('mixed')
   const [plannedDuration, setPlannedDuration] = useState('30')
   const [resumeId, setResumeId] = useState('')
-  const [loading, setLoading] = useState(false)
+  const [progress, setProgress] = useState<ProgressStep>('idle')
 
   const toggleType = (t: string) => {
     setInterviewTypes((prev) =>
@@ -77,8 +86,10 @@ export default function InterviewNew() {
     }
   }
 
+  const isCreating = progress !== 'idle'
+
   const handleCreate = async () => {
-    setLoading(true)
+    setProgress('creating')
     try {
       const session = await createSession.mutateAsync({
         resumeId,
@@ -92,12 +103,18 @@ export default function InterviewNew() {
         plannedDuration: parseInt(plannedDuration, 10),
       })
 
+      if (companyUrl) {
+        setProgress('researching')
+      }
+
+      setProgress('generating')
       await generatePersona.mutateAsync(session._id)
-      navigate(`/interview/new/prep?sessionId=${session._id}`)
+
+      setProgress('done')
+      setTimeout(() => navigate(`/interview/new/prep?sessionId=${session._id}`), 600)
     } catch {
       showToast('error', 'Failed to create interview session')
-    } finally {
-      setLoading(false)
+      setProgress('idle')
     }
   }
 
@@ -144,9 +161,9 @@ export default function InterviewNew() {
                     <Select
                       value={resumeId}
                       onChange={setResumeId}
-                      options={(resumes || []).map((r: { _id: string; title: string }) => ({
+                      options={(resumes || []).map((r) => ({
                         value: r._id,
-                        label: r.title,
+                        label: r.name || r.title || 'Untitled',
                       }))}
                       placeholder="Select a resume"
                     />
@@ -253,7 +270,7 @@ export default function InterviewNew() {
         </AnimatePresence>
 
         <div className="flex justify-between mt-8">
-          <Button variant="ghost" onClick={() => step > 0 ? setStep((s) => s - 1) : navigate(-1)} disabled={loading}>
+          <Button variant="ghost" onClick={() => step > 0 ? setStep((s) => s - 1) : navigate(-1)} disabled={isCreating}>
             <IconArrowLeft className="w-4 h-4 mr-1" />
             {step === 0 ? 'Back' : 'Previous'}
           </Button>
@@ -263,13 +280,69 @@ export default function InterviewNew() {
               <IconArrowRight className="w-4 h-4 ml-1" />
             </Button>
           ) : (
-            <Button onClick={handleCreate} loading={loading}>
+            <Button onClick={handleCreate} loading={isCreating}>
               Generate Interview
               <IconBrain className="w-4 h-4 ml-1" />
             </Button>
           )}
         </div>
       </motion.div>
+
+      {/* Progress overlay */}
+      <AnimatePresence>
+        {isCreating && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 bg-white/80 backdrop-blur-sm flex items-center justify-center"
+          >
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="bg-ink rounded-xl p-10 max-w-sm w-full mx-4 space-y-8"
+            >
+              <div className="text-center space-y-2">
+                <span className="font-display text-teal text-4xl animate-pulse block">&amp;</span>
+                <h3 className="font-display text-h4 text-white">Preparing your interview</h3>
+              </div>
+
+              <div className="space-y-4">
+                {progressSteps
+                  .filter((s) => s.key !== 'researching' || !!companyUrl)
+                  .map((s) => {
+                    const stepOrder = progressSteps.filter((ps) => ps.key !== 'researching' || !!companyUrl)
+                    const idx = stepOrder.indexOf(s)
+                    const currentIdx = stepOrder.findIndex((ps) => ps.key === progress)
+                    const state = currentIdx === -1 ? 'waiting' : idx < currentIdx ? 'done' : idx === currentIdx ? 'active' : 'waiting'
+                    const Icon = s.icon
+                    return (
+                      <div key={s.key} className="flex items-center gap-3">
+                        {state === 'done' ? (
+                          <span className="h-6 w-6 rounded-full bg-teal flex items-center justify-center shrink-0">
+                            <IconCircleCheck className="h-3.5 w-3.5 text-white" />
+                          </span>
+                        ) : state === 'active' ? (
+                          <span className="h-6 w-6 rounded-full border-2 border-teal flex items-center justify-center shrink-0">
+                            <Icon className="h-3 w-3 text-teal animate-spin" />
+                          </span>
+                        ) : (
+                          <span className="h-6 w-6 rounded-full border-2 border-[#3A3A3A] flex items-center justify-center shrink-0">
+                            <Icon className="h-3 w-3 text-[#3A3A3A]" />
+                          </span>
+                        )}
+                        <span className={`text-sm ${
+                          state === 'done' ? 'text-white' : state === 'active' ? 'text-teal' : 'text-white/30'
+                        }`}>{s.label}</span>
+                      </div>
+                    )
+                  })}
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   )
 }

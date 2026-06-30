@@ -6,9 +6,9 @@ import { ResearchJob, ResearchJobDocument } from './schemas/research-job.schema'
 import { AiService } from '../ai/ai.service';
 import { COMPANY_RESEARCH_SYSTEM } from '../ai/prompts';
 
-const CRAWLABLE_PATHS = ['/about', '/careers', '/mission', '/values', '/about-us', '/blog', '/news', '/press'];
-const MAX_PAGES = 8;
-const PAGE_TIMEOUT = 15000;
+const MAX_PAGES = 30;
+const SOCIAL_DOMAINS = ['linkedin.com', 'twitter.com', 'x.com', 'crunchbase.com', 'glassdoor.com', 'github.io'];
+const PAGE_TIMEOUT = 30000;
 
 @Injectable()
 export class ResearchService {
@@ -81,22 +81,14 @@ export class ResearchService {
         .findByIdAndUpdate(jobId, { status: 'crawling' })
         .exec();
 
-      const pages = await this.crawl(job.companyUrl);
+      const pages = await this.crawl(job.companyUrl, jobId);
       if (pages.length > 0) {
         crawledContent = pages
           .map((p) => `--- Page: ${p.title} (${p.url}) ---\n${p.text.slice(0, 4000)}`)
           .join('\n\n');
         await this.researchJobModel
           .findByIdAndUpdate(jobId, {
-            crawlData: {
-              pagesVisited: pages.map((p) => ({
-                url: p.url,
-                title: p.title,
-                text: p.text.slice(0, 4000),
-                crawledAt: new Date(),
-              })),
-              pageCount: pages.length,
-            },
+            $set: { 'crawlData.pageCount': pages.length },
           })
           .exec();
       } else {
@@ -142,82 +134,110 @@ export class ResearchService {
     }
   }
 
-  private async crawl(baseUrl: string): Promise<Array<{ url: string; title: string; text: string }>> {
+  private async crawl(baseUrl: string, jobId?: string): Promise<Array<{ url: string; title: string; text: string }>> {
+    const pages: Array<{ url: string; title: string; text: string }> = [];
+    const visited = new Set<string>();
+    const domain = new URL(baseUrl).hostname.replace(/^www\./, '');
+    const seenSocials = new Set<string>();
+
+    this.logger.log(`Starting crawl of domain: ${domain} (base: ${baseUrl})`);
+
     let browser;
     try {
       browser = await chromium.launch({ headless: true });
       const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
+      await page.route('**/*.{png,jpg,jpeg,gif,svg,ico,woff,woff2,ttf,mp4,mp3,avi,webm}', (route) => route.abort());
 
-      const visited = new Set<string>();
-      const pages: Array<{ url: string; title: string; text: string }> = [];
+      const queue: string[] = [baseUrl];
+      let skipped = 0;
 
-      // Start with homepage
-      try {
-        await page.goto(baseUrl, { waitUntil: 'networkidle', timeout: PAGE_TIMEOUT });
-        const title = await page.title();
-        const text = await page.innerText('body');
-        pages.push({ url: page.url(), title, text });
-        visited.add(page.url());
-      } catch {
-        this.logger.warn(`Failed to load homepage: ${baseUrl}`);
-        return pages;
-      }
+      while (queue.length > 0 && pages.length < MAX_PAGES) {
+        const url = queue.shift()!;
+        const normalized = url.replace(/\/$/, '').split('#')[0];
 
-      // Try discoverable paths
-      for (const path of CRAWLABLE_PATHS) {
-        if (pages.length >= MAX_PAGES) break;
-        const fullUrl = new URL(path, baseUrl).href;
-        if (visited.has(fullUrl)) continue;
-
-        try {
-          await page.goto(fullUrl, { waitUntil: 'networkidle', timeout: PAGE_TIMEOUT });
-          visited.add(page.url());
-          if (page.url() === fullUrl || page.url().startsWith(fullUrl)) {
-            const title = await page.title();
-            const text = await page.innerText('body');
-            pages.push({ url: page.url(), title, text });
-          }
-        } catch {
-          // path may not exist — skip
+        if (visited.has(normalized)) {
+          skipped++;
+          continue;
         }
-      }
+        if (normalized.includes('mailto:') || normalized.includes('tel:')) {
+          skipped++;
+          continue;
+        }
 
-      // Try to discover product pages from nav
-      if (pages.length < MAX_PAGES) {
+        visited.add(normalized);
+
+        const isSocial = SOCIAL_DOMAINS.some((sd) => normalized.includes(sd));
+        if (!isSocial && !normalized.includes(domain)) {
+          this.logger.log(`  ↪ skipping off-domain: ${normalized}`);
+          skipped++;
+          continue;
+        }
+
+        this.logger.log(`[${pages.length + 1}/${MAX_PAGES}] Crawling: ${normalized}${isSocial ? ' (social)' : ''}`);
+
         try {
-          await page.goto(baseUrl, { waitUntil: 'networkidle', timeout: PAGE_TIMEOUT });
-          const links = await page.evaluate(() => {
-            const anchors = Array.from(document.querySelectorAll('nav a, header a, [role="navigation"] a'));
-            return anchors
-              .map((a) => ({ href: (a as HTMLAnchorElement).href, text: (a as HTMLAnchorElement).innerText.trim() }))
-              .filter((a) => a.href && a.text && a.href !== window.location.href)
-              .slice(0, 15);
-          });
+          const start = Date.now();
+          await page.goto(normalized, { waitUntil: 'domcontentloaded', timeout: PAGE_TIMEOUT });
+          await page.waitForTimeout(2000);
+          const loadTime = ((Date.now() - start) / 1000).toFixed(1);
 
-          const productLinks = links.filter(
-            (l) =>
-              /product|platform|solution|feature|what-we-build/i.test(l.text) ||
-              /product|platform|solution|feature/i.test(new URL(l.href).pathname),
-          );
+          visited.add(page.url().replace(/\/$/, '').split('#')[0]);
 
-          for (const link of productLinks) {
-            if (pages.length >= MAX_PAGES) break;
-            if (visited.has(link.href)) continue;
-            try {
-              await page.goto(link.href, { waitUntil: 'networkidle', timeout: PAGE_TIMEOUT });
-              visited.add(page.url());
-              const title = await page.title();
-              const text = await page.innerText('body');
-              pages.push({ url: page.url(), title, text });
-            } catch {
-              // skip
+          const title = await page.title();
+          const text = await page.innerText('body');
+          this.logger.log(`  ✓ ${loadTime}s — ${title} (${text.length} chars)`);
+
+          const pageData = { url: page.url(), title, text: text.slice(0, 4000) };
+          pages.push({ url: page.url(), title, text });
+
+          // Save incrementally so the client sees live progress
+          if (jobId) {
+            await this.researchJobModel
+              .findByIdAndUpdate(jobId, {
+                $push: { 'crawlData.pagesVisited': { ...pageData, crawledAt: new Date() } },
+                $inc: { 'crawlData.pageCount': 1 },
+              })
+              .exec();
+          }
+
+          if (!isSocial && pages.length < MAX_PAGES) {
+            const links: string[] = await page.evaluate(() => {
+              return Array.from(document.querySelectorAll('a[href]'))
+                .map((a) => (a as HTMLAnchorElement).href)
+                .filter((h) => h && !h.startsWith('javascript:') && !h.startsWith('mailto:'));
+            });
+
+            this.logger.log(`  → ${links.length} links found on page`);
+
+            for (const href of links) {
+              if (pages.length + queue.length >= MAX_PAGES * 2) break;
+              const clean = href.replace(/\/$/, '').split('#')[0];
+
+              if (visited.has(clean)) continue;
+              if (queue.includes(clean)) continue;
+
+              const host = new URL(href).hostname.replace(/^www\./, '');
+
+              if (host === domain) {
+                queue.push(clean);
+              }
+
+              const socialDomain = SOCIAL_DOMAINS.find((sd) => href.includes(sd));
+              if (socialDomain && !seenSocials.has(socialDomain)) {
+                seenSocials.add(socialDomain);
+                this.logger.log(`  📱 found social: ${clean}`);
+                queue.push(clean);
+              }
             }
+
+            this.logger.log(`  📊 queue: ${queue.length} remaining, ${pages.length} pages collected`);
           }
-        } catch {
-          // nav discovery failed — not critical
+        } catch (err) {
+          this.logger.warn(`  ✗ failed to load: ${normalized} — ${(err as Error).message}`);
         }
       }
 
+      this.logger.log(`Crawl complete: ${pages.length} pages from ${domain} (${skipped} skipped, ${visited.size} visited)`);
       return pages;
     } catch (err) {
       this.logger.error(`Crawl failed for ${baseUrl}:`, err);

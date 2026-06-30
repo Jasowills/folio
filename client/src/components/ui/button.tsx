@@ -62,6 +62,7 @@ const Button = forwardRef<HTMLButtonElement, ButtonProps>(
         {...props}
       >
         {loading && <Spinner />}
+        {loading && children ? <span className="w-2" /> : null}
         {children}
       </Comp>
     )

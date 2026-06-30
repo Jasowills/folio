@@ -503,6 +503,13 @@ export interface ResearchBrief {
   redFlags: Array<{ flag: string; source: string }> | null
 }
 
+export interface CrawlPage {
+  url: string
+  title: string
+  text: string
+  crawledAt: string
+}
+
 export interface ResearchJob {
   _id: string
   companyName: string
@@ -510,6 +517,10 @@ export interface ResearchJob {
   roleContext?: { roleTitle: string; resumeId?: string }
   status: 'queued' | 'crawling' | 'analysing' | 'completed' | 'failed'
   brief?: ResearchBrief
+  crawlData?: {
+    pagesVisited: CrawlPage[]
+    pageCount: number
+  }
   createdAt: string
   error?: string
   usedGeneralKnowledge?: boolean
@@ -535,7 +546,7 @@ export function useResearchStatus(analysisId: string | null) {
     refetchInterval: (query) => {
       const result = query.state.data
       if (result?.status === 'completed' || result?.status === 'failed') return false
-      return 3000
+      return result?.status === 'crawling' ? 1500 : 3000
     },
   })
 }

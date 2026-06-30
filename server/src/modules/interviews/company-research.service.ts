@@ -29,7 +29,8 @@ export class CompanyResearchService {
     try {
       browser = await chromium.launch({ headless: true, args: ['--no-sandbox'] })
       const page = await browser.newPage({ viewport: { width: 1280, height: 720 } })
-      await page.goto(url, { waitUntil: 'networkidle', timeout: 30000 })
+      await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30000 })
+      await page.waitForTimeout(2000)
 
       const title = await page.title()
       const text = await page.innerText('body')

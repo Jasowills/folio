@@ -28,6 +28,7 @@ const CACHE_TTL: Record<string, number> = {
   review: 10 * 60_000,
   bulletRewriter: 60 * 60_000,
   coverLetter: 0,
+  interview: 0,
 };
 
 const DEFAULT_CHAT_TTL = 10 * 60_000;
@@ -70,7 +71,7 @@ export class AiService {
   }
 
   private get ollamaDefaultModel(): string {
-    return process.env.OLLAMA_DEFAULT_MODEL || 'llama3.2';
+    return process.env.OLLAMA_DEFAULT_MODEL || 'llama3.2:1b';
   }
 
   private get openrouterBaseUrl(): string {
@@ -126,6 +127,7 @@ export class AiService {
     if (system.includes('resume writer')) return 'bulletRewriter';
     if (system.includes('cover letter writer')) return 'coverLetter';
     if (system.includes('senior technical recruiter') && system.includes('portfolio')) return 'portfolio';
+    if (system.includes('interview coach') || system.includes('interview evaluator')) return 'interview';
     return 'default';
   }
 
@@ -238,9 +240,13 @@ export class AiService {
     ];
 
     const category = this.promptCategory(system);
-    const maxTokens = category === 'extraction' ? this.extractionMaxTokens : this.maxTokens;
+    const maxTokens = category === 'extraction' || category === 'interview' ? this.extractionMaxTokens : this.maxTokens;
 
     const raw = await this.callWithRetry(messages, model, maxTokens);
+    if (category === 'interview') {
+      this.logger.log(`[callAi] raw response (first 500 chars): ${raw.slice(0, 500)}`);
+      this.logger.log(`[callAi] raw response (last 300 chars): ${raw.slice(-300)}`);
+    }
     return this.parseJson(raw);
   }
 
@@ -382,7 +388,7 @@ export class AiService {
   ): Promise<string> {
     const url = `${this.ollamaBaseUrl}/chat/completions`;
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 60_000);
+    const timeout = setTimeout(() => controller.abort(), 120_000);
 
     const finish = () => clearTimeout(timeout);
 
@@ -424,6 +430,31 @@ export class AiService {
 
     const cleaned = raw.replace(/```json\s*/g, '').replace(/```\s*/g, '').trim();
 
+    // Escape control characters that appear inside JSON string values
+    // The llama3.2:1b model often emits literal newlines inside strings
+    const escapeJsonStrings = (s: string): string => {
+      let out = ''
+      let inStr = false
+      let esc = false
+      for (let i = 0; i < s.length; i++) {
+        const ch = s[i]
+        if (esc) { esc = false; out += ch; continue }
+        if (ch === '\\' && inStr) { esc = true; out += ch; continue }
+        if (ch === '"') { inStr = !inStr; out += ch; continue }
+        if (inStr && (ch === '\n' || ch === '\r' || ch === '\t')) { out += ' '; continue }
+        out += ch
+      }
+      return out
+    }
+
+    // The 1B model sometimes wraps JSON in a JSON string (starts/ends with ")
+    // e.g. "{"firstName":"Kavya"}" — unwrap it before parsing
+    if (cleaned.startsWith('"') && cleaned.endsWith('"') && cleaned.indexOf('{') === 1) {
+      const inner = cleaned.slice(1, -1);
+      const parsed = tryParse(inner);
+      if (parsed) return parsed;
+    }
+
     const start = cleaned.indexOf('{');
     if (start === -1) {
       this.logger.debug(`parseJson: no '{' found in response`);
@@ -440,19 +471,26 @@ export class AiService {
       return null;
     };
 
-    let depth = 0;
-    let end = -1;
-    for (let i = start; i < cleaned.length; i++) {
-      if (cleaned[i] === '{') depth++;
-      else if (cleaned[i] === '}') {
-        depth--;
-        if (depth === 0) { end = i + 1; break; }
+    // Try every complete JSON object in the response, not just the first one
+    // The 1B model sometimes concatenates multiple objects (e.g. training artifacts)
+    let searchStart = start;
+    while (searchStart !== -1) {
+      let depth = 0;
+      let end = -1;
+      for (let i = searchStart; i < cleaned.length; i++) {
+        if (cleaned[i] === '{') depth++;
+        else if (cleaned[i] === '}') {
+          depth--;
+          if (depth === 0) { end = i + 1; break; }
+        }
       }
-    }
-
-    if (end !== -1) {
-      const parsed = tryParse(cleaned.slice(start, end));
-      if (parsed) return parsed;
+      if (end !== -1) {
+        const parsed = tryParse(escapeJsonStrings(cleaned.slice(searchStart, end)));
+        if (parsed) return parsed;
+        searchStart = cleaned.indexOf('{', end);
+      } else {
+        break;
+      }
     }
 
     // Truncation recovery — close unclosed structures from innermost to outermost
@@ -480,7 +518,7 @@ export class AiService {
     for (let i = 0; i < braceDepth; i++) closers.push('}');
     truncated += closers.join('');
 
-    const parsed = tryParse(truncated);
+    const parsed = tryParse(escapeJsonStrings(truncated));
     if (parsed) {
       this.logger.debug(`parseJson: recovered truncated JSON`);
       return parsed;
@@ -492,7 +530,7 @@ export class AiService {
     for (let i = body.length - 1; i > 0; i--) {
       const ch = body[i];
       if (ch === '}' || ch === ']' || ch === '"' || /\d/.test(ch) || (ch === 'e' && (body.substring(i - 3, i + 1) === 'true' || body.substring(i - 4, i + 1) === 'false')) || (ch === 'l' && body.substring(i - 3, i + 1) === 'null')) {
-        const parsed = tryParse(body.substring(0, i + 1));
+        const parsed = tryParse(escapeJsonStrings(body.substring(0, i + 1)));
         if (parsed) {
           this.logger.debug(`parseJson: recovered via progressive fallback (length: ${i + 1})`);
           return parsed;

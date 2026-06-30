@@ -47,7 +47,7 @@ export default function PortfolioAnalysis() {
   const [analysisId, setAnalysisId] = useState<string | null>(null)
   const [error, setError] = useState('')
 
-  const { data: result, error: statusError, isLoading: statusLoading } = usePortfolioStatus(analysisId)
+  const { data: result, error: statusError } = usePortfolioStatus(analysisId)
 
   const [animatedScore, setAnimatedScore] = useState(0)
   const animFrameRef = useRef<number>(undefined)
@@ -138,7 +138,7 @@ export default function PortfolioAnalysis() {
                   onChange={setResumeId}
                   options={[
                     { value: '', label: 'Choose a resume...' },
-                    ...(resumes?.map((r) => ({ value: r._id, label: r.title })) || []),
+                    ...(resumes?.map((r) => ({ value: r._id, label: r.name || r.title || 'Untitled' })) || []),
                   ]}
                   placeholder="Choose a resume..."
                 />

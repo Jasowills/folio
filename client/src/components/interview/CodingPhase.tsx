@@ -38,19 +38,6 @@ export function CodingPhase({ isOpen, onOpenChange, onCodeSubmit }: CodingPhaseP
 
   return (
     <>
-      {/* Floating button to open editor */}
-      {!isOpen && (
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={() => onOpenChange(true)}
-          className="fixed bottom-6 right-6 shadow-lg z-40"
-        >
-          <IconCode className="w-4 h-4 mr-1" />
-          Open Editor
-        </Button>
-      )}
-
       <AnimatePresence>
         {isOpen && (
           <motion.div

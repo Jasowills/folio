@@ -7,23 +7,8 @@ import { Select } from '../components/ui/select'
 import {
   IconTargetArrow, IconMail, IconBrandPagekit,
   IconRefresh, IconCircleCheck, IconAlertTriangle, IconExternalLink,
-  IconChevronDown, IconChevronRight, IconLoader, IconHistory,
+  IconChevronDown, IconChevronRight, IconLoader, IconHistory, IconWorld,
 } from '@tabler/icons-react'
-
-const processSteps = [
-  'Visiting company website...',
-  'Reading their mission and values...',
-  'Checking recent news and updates...',
-  'Identifying what they build...',
-  'Researching their interview style...',
-  'Putting your brief together...',
-]
-
-const statusStepMap: Record<string, number> = {
-  queued: 0,
-  crawling: 1,
-  analysing: 4,
-}
 
 function formatRelativeTime(dateStr: string): string {
   const diff = Date.now() - new Date(dateStr).getTime()
@@ -111,8 +96,10 @@ export default function Research() {
     }
   }
 
-  const statusIdx = isProcessing ? (statusStepMap[job?.status || 'queued'] ?? 0) : -1
   const recentJobs = (history?.jobs || []).slice(0, 3)
+
+  const pages = job?.crawlData?.pagesVisited || []
+  const pageCount = job?.crawlData?.pageCount || 0
 
   return (
     <div className="page-container">
@@ -207,7 +194,7 @@ export default function Research() {
                           onChange={setResumeId}
                           options={[
                             { value: '', label: 'None' },
-                            ...(resumes?.map((r) => ({ value: r._id, label: r.title })) || []),
+                            ...(resumes?.map((r) => ({ value: r._id, label: r.name || r.title || 'Untitled' })) || []),
                           ]}
                           placeholder="None"
                         />
@@ -268,40 +255,73 @@ export default function Research() {
             transition={{ duration: 0.2 }}
             className="max-w-xl mx-auto pt-12"
           >
-            <div className="bg-ink rounded-xl p-8 text-center space-y-8">
-              <span className="font-display text-teal text-4xl animate-pulse block">&amp;</span>
-
-              <h3 className="font-display text-h4 text-white">
-                {job?.status === 'crawling' ? `Crawling ${job.companyName}...` :
-                 job?.status === 'analysing' ? 'Synthesising your brief...' :
-                 `Researching ${job?.companyName || companyName}...`}
-              </h3>
-
-              <div className="max-w-xs mx-auto text-left space-y-3">
-                {processSteps.map((label, i) => {
-                  const state = statusIdx === -1 ? 'waiting' : i < statusIdx ? 'done' : i === statusIdx ? 'active' : 'waiting'
-                  return (
-                    <div key={label} className="flex items-center gap-3">
-                      {state === 'done' ? (
-                        <span className="h-3 w-3 rounded-full bg-teal flex items-center justify-center shrink-0">
-                          <svg className="h-2 w-2 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                          </svg>
-                        </span>
-                      ) : state === 'active' ? (
-                        <span className="h-3 w-3 rounded-full bg-teal animate-pulse shrink-0" />
-                      ) : (
-                        <span className="h-3 w-3 rounded-full bg-[#3A3A3A] shrink-0" />
-                      )}
-                      <span className={`text-sm ${
-                        state === 'done' ? 'text-white' : state === 'active' ? 'text-teal' : 'text-white/30'
-                      }`}>{label}</span>
-                    </div>
-                  )
-                })}
+            <div className="bg-ink rounded-xl p-8 space-y-6">
+              <div className="text-center space-y-3">
+                <IconWorld className="h-8 w-8 text-teal animate-pulse mx-auto" />
+                <h3 className="font-display text-h4 text-white">
+                  {job?.status === 'crawling' ? `Crawling ${job.companyName}...` :
+                   job?.status === 'analysing' ? 'Synthesising your brief...' :
+                   `Researching ${job?.companyName || companyName}...`}
+                </h3>
+                {job?.status === 'crawling' && (
+                  <p className="text-sm text-white/40">{pageCount} page{pageCount !== 1 ? 's' : ''} collected</p>
+                )}
               </div>
 
-              <p className="text-sm text-white/40">This usually takes 20–40 seconds.</p>
+              {job?.status === 'crawling' && (
+                <>
+                  {/* Live feed */}
+                  <div className="max-h-64 overflow-y-auto space-y-1.5 -mx-2 px-2 scrollbar-thin">
+                    {pages.length === 0 && (
+                      <div className="flex items-center gap-2 text-sm text-white/30">
+                        <span className="h-2 w-2 rounded-full bg-teal animate-pulse shrink-0" />
+                        Starting crawl...
+                      </div>
+                    )}
+                    {pages.map((p, i) => {
+                      const isLatest = i === pages.length - 1
+                      const hostname = p.url ? new URL(p.url).hostname.replace(/^www\./, '') : ''
+                      return (
+                        <motion.div
+                          key={p.url + i}
+                          initial={{ opacity: 0, x: -8 }}
+                          animate={{ opacity: 1, x: 0 }}
+                          className="flex items-start gap-2.5"
+                        >
+                          <span className={`h-2 w-2 rounded-full mt-1.5 shrink-0 ${isLatest ? 'bg-teal animate-pulse' : 'bg-teal/50'}`} />
+                          <div className="min-w-0 flex-1">
+                            <p className={`text-xs truncate ${isLatest ? 'text-white' : 'text-white/60'}`}>
+                              {p.title || hostname}
+                            </p>
+                            <p className="text-[10px] text-white/30 truncate">{hostname}</p>
+                          </div>
+                        </motion.div>
+                      )
+                    })}
+                  </div>
+
+                  {/* Stats bar */}
+                  <div className="flex items-center justify-center gap-4 text-xs text-white/40">
+                    <span>{pageCount} page{pageCount !== 1 ? 's' : ''}</span>
+                  </div>
+                </>
+              )}
+
+              {job?.status === 'analysing' && (
+                <div className="text-center space-y-4">
+                  <div className="flex items-center justify-center gap-2">
+                    {pages.length > 0 && (
+                      <span className="text-xs text-teal/70">
+                        Read {pageCount} page{pageCount !== 1 ? 's' : ''}
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex items-center justify-center gap-2 text-sm text-white/40">
+                    <span className="h-2 w-2 rounded-full bg-teal animate-pulse" />
+                    Generating your research brief...
+                  </div>
+                </div>
+              )}
             </div>
           </motion.div>
         ) : isFailed ? (

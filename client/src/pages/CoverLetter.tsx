@@ -171,7 +171,7 @@ export default function CoverLetter() {
                   onChange={setResumeId}
                   options={[
                     { value: '', label: 'Choose a resume...' },
-                    ...(resumes?.map((r) => ({ value: r._id, label: r.title })) || []),
+                    ...(resumes?.map((r) => ({ value: r._id, label: r.name || r.title || 'Untitled' })) || []),
                   ]}
                   placeholder="Choose a resume..."
                 />
