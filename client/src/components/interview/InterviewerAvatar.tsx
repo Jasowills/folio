@@ -1,134 +1,176 @@
-import { motion, AnimatePresence } from 'framer-motion'
+import { motion } from 'framer-motion'
 
 interface InterviewerAvatarProps {
   name: string
   title: string
-  isSpeaking: boolean
-  isListening: boolean
-  isPaused: boolean
-  currentQuestion?: string
+  state: 'idle' | 'speaking' | 'listening' | 'thinking'
+  size: 'large' | 'small'
 }
 
-const avatarVariants = {
-  idle: { scale: 1 },
-  listening: {
-    scale: 1.02,
-    transition: { duration: 2, ease: 'easeInOut', repeat: Infinity, repeatType: 'reverse' as const },
-  },
-  speaking: {
-    scale: [1, 1.08, 1.04, 1.1, 1.06, 1],
-    transition: { duration: 0.8, ease: 'easeInOut', repeat: Infinity, repeatType: 'mirror' as const },
-  },
-}
+const largeSize = 280
+const smallSize = 80
 
-export default function InterviewerAvatar({
-  name,
-  title,
-  isSpeaking,
-  isListening,
-  isPaused,
-}: InterviewerAvatarProps) {
-  const initials = name
-    .split(' ')
-    .map((n) => n[0])
-    .join('')
-    .toUpperCase()
-    .slice(0, 2)
+function BlobShape({ state, size }: { state: InterviewerAvatarProps['state']; size: number }) {
+  const isSmall = size === smallSize
+  const blobRadius = isSmall
+    ? '50%'
+    : [
+        '60% 40% 40% 60% / 50% 40% 60% 50%',
+        '50% 55% 45% 50% / 55% 45% 55% 45%',
+        '55% 45% 55% 45% / 45% 55% 45% 55%',
+        '45% 60% 40% 55% / 55% 45% 55% 45%',
+        '60% 40% 40% 60% / 50% 40% 60% 50%',
+      ]
 
-  const state = isPaused ? 'idle' : isSpeaking ? 'speaking' : isListening ? 'listening' : 'idle'
+  const getScale = () => {
+    if (isSmall) return 1
+    switch (state) {
+      case 'speaking':
+        return [1, 1.06, 1.03, 1.08, 1.04, 1]
+      case 'listening':
+        return [1, 1.015, 0.99, 1.02, 1]
+      case 'thinking':
+        return [1, 1.005, 1]
+      default:
+        return 1
+    }
+  }
+
+  const getGlowOpacity = () => {
+    if (isSmall) return 0
+    switch (state) {
+      case 'speaking': return [0.4, 0.7, 0.3, 0.8, 0.4]
+      case 'listening': return [0.1, 0.2, 0.1]
+      case 'thinking': return [0.05, 0.12, 0.05]
+      default: return 0
+    }
+  }
+
+  const getTransition = () => {
+    const base = { ease: 'easeInOut' as const, repeat: Infinity }
+    if (isSmall) return { ...base, duration: 4, repeatType: 'reverse' as const }
+    switch (state) {
+      case 'speaking':
+        return { ...base, duration: 0.8, repeatType: 'mirror' as const }
+      case 'listening':
+        return { ...base, duration: 4, repeatType: 'reverse' as const }
+      case 'thinking':
+        return { ...base, duration: 3, repeatType: 'reverse' as const }
+      default:
+        return { ...base, duration: 6, repeatType: 'reverse' as const }
+    }
+  }
 
   return (
-    <div className="flex flex-col items-center gap-3">
-      <div className="relative">
+    <div className="relative" style={{ width: size, height: size }}>
+      <motion.div
+        className="w-full h-full relative z-10"
+        style={{
+          background: 'radial-gradient(circle at 40% 35%, #5DCAA5, #0F6E56 70%)',
+          borderRadius: isSmall ? '50%' : undefined,
+        }}
+        animate={{
+          borderRadius: isSmall ? '50%' : blobRadius,
+          scale: getScale(),
+        }}
+        transition={getTransition()}
+      />
+
+      <motion.div
+        className="absolute inset-0 -m-4 rounded-full"
+        style={{
+          background: 'radial-gradient(circle, rgba(93,202,165,0.15) 0%, transparent 70%)',
+        }}
+        animate={{ opacity: getGlowOpacity() }}
+        transition={getTransition()}
+      />
+
+      {state === 'speaking' && !isSmall && (
         <motion.div
-          className="w-28 h-28 rounded-full bg-gradient-to-br from-teal to-emerald-600 flex items-center justify-center relative z-10 cursor-default"
-          variants={avatarVariants}
-          animate={state}
-        >
-          <span className="text-3xl font-semibold text-white/95 font-[family-name:var(--font-body)]">
-            {initials}
-          </span>
-        </motion.div>
+          className="absolute inset-0 -m-2 rounded-full border border-teal/20"
+          initial={{ opacity: 0, scale: 0.95 }}
+          animate={{ opacity: [0.3, 0.6, 0.3], scale: [1, 1.08, 1] }}
+          transition={{ duration: 0.8, repeat: Infinity, ease: 'easeInOut' }}
+        />
+      )}
+    </div>
+  )
+}
 
-        <AnimatePresence>
-          {isSpeaking && (
-            <motion.div
-              initial={{ opacity: 0, scale: 0.8 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.8 }}
-              className="absolute -inset-3 rounded-full border-2 border-teal/40"
-              style={{
-                animation: 'ping-slow 1.5s cubic-bezier(0, 0, 0.2, 1) infinite',
-              }}
-            />
-          )}
-        </AnimatePresence>
+function ThinkingDots() {
+  return (
+    <div className="flex items-center justify-center gap-2 mt-4">
+      {[0, 1, 2].map((i) => (
+        <motion.div
+          key={i}
+          className="w-2 h-2 rounded-full bg-teal/70"
+          animate={{ opacity: [0.2, 0.9, 0.2], scale: [0.8, 1.2, 0.8] }}
+          transition={{
+            duration: 1.2,
+            repeat: Infinity,
+            delay: i * 0.3,
+            ease: 'easeInOut',
+          }}
+        />
+      ))}
+    </div>
+  )
+}
 
-        <AnimatePresence>
-          {isSpeaking && (
-            <motion.div
-              initial={{ opacity: 0, scale: 0.8 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.8 }}
-              className="absolute -inset-5 rounded-full border border-teal/15"
-              style={{
-                animation: 'ping-slower 2s cubic-bezier(0, 0, 0.2, 1) infinite',
-              }}
-            />
-          )}
-        </AnimatePresence>
+function MicrophoneIndicator() {
+  return (
+    <motion.div
+      className="flex items-center justify-center gap-0.5 mt-4 h-5"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+    >
+      {[2, 4, 6, 8, 6, 4, 2].map((h, i) => (
+        <motion.div
+          key={i}
+          className="w-[2px] bg-teal/40 rounded-full"
+          animate={{ height: [2, h + 2, 2] }}
+          transition={{
+            duration: 0.6 + i * 0.06,
+            repeat: Infinity,
+            ease: 'easeInOut',
+            delay: i * 0.08,
+          }}
+        />
+      ))}
+    </motion.div>
+  )
+}
 
-        {/* Status indicator */}
-        <div className="absolute -bottom-0.5 -right-0.5 z-20">
-          {isPaused ? (
-            <div className="w-5 h-5 rounded-full bg-amber-400 border-2 border-paper flex items-center justify-center">
-              <div className="w-1.5 h-1.5 rounded-full bg-white" />
-            </div>
-          ) : isSpeaking ? (
-            <div className="w-5 h-5 rounded-full bg-teal border-2 border-paper flex items-center justify-center">
-              <motion.div
-                className="w-1.5 h-1.5 rounded-full bg-white"
-                animate={{ scale: [1, 1.5, 1] }}
-                transition={{ duration: 0.6, repeat: Infinity }}
-              />
-            </div>
-          ) : isListening ? (
-            <div className="w-5 h-5 rounded-full bg-green-500 border-2 border-paper flex items-center justify-center">
-              <div className="w-1.5 h-1.5 rounded-full bg-white" />
-            </div>
-          ) : (
-            <div className="w-5 h-5 rounded-full bg-muted border-2 border-paper flex items-center justify-center">
-              <div className="w-1.5 h-1.5 rounded-full bg-white/60" />
-            </div>
-          )}
+export default function InterviewerAvatar({ name, title, state, size }: InterviewerAvatarProps) {
+  const isSmall = size === 'small'
+  const s = isSmall ? smallSize : largeSize
+
+  return (
+    <div className={`flex flex-col items-center ${isSmall ? '' : 'gap-2'}`}>
+      <BlobShape state={state} size={s} />
+
+      {state === 'thinking' && !isSmall && <ThinkingDots />}
+      {state === 'listening' && !isSmall && <MicrophoneIndicator />}
+
+      {!isSmall && (
+        <div className="text-center mt-4">
+          <p className="text-[15px] font-semibold text-white/90" style={{ fontFamily: 'Inter, sans-serif' }}>
+            {name}
+          </p>
+          <p className="text-[12px] text-white/50 mt-0.5" style={{ fontFamily: 'Inter, sans-serif' }}>
+            {title}
+          </p>
         </div>
+      )}
 
-        {/* Audio waveform bars when speaking */}
-        {isSpeaking && (
-          <div className="absolute -bottom-8 left-1/2 -translate-x-1/2 flex items-end gap-[3px] h-4">
-            {[1, 2, 3, 4, 3, 2, 1].map((h, i) => (
-              <motion.div
-                key={i}
-                className="w-[3px] bg-teal/60 rounded-full"
-                animate={{
-                  height: [4, 4 + h * 2, 4],
-                }}
-                transition={{
-                  duration: 0.5 + i * 0.08,
-                  repeat: Infinity,
-                  ease: 'easeInOut',
-                  delay: i * 0.1,
-                }}
-              />
-            ))}
-          </div>
-        )}
-      </div>
-
-      <div className="text-center mt-2">
-        <p className="text-sm font-semibold text-ink">{name}</p>
-        <p className="text-xs text-muted">{title}</p>
-      </div>
+      {isSmall && (
+        <div className="text-center mt-2">
+          <p className="text-[11px] font-medium text-white/70" style={{ fontFamily: 'Inter, sans-serif' }}>
+            {name}
+          </p>
+        </div>
+      )}
     </div>
   )
 }

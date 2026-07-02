@@ -16,5 +16,6 @@ import { ResumesModule } from '../resumes/resumes.module';
   ],
   controllers: [AtsController],
   providers: [AtsService],
+  exports: [AtsService],
 })
 export class AtsModule {}

@@ -14,6 +14,7 @@ import ResumeReview from './pages/ResumeReview'
 import AtsScorer from './pages/AtsScorer'
 import CoverLetter from './pages/CoverLetter'
 import PortfolioAnalysis from './pages/PortfolioAnalysis'
+import Discover from './pages/Discover'
 import Research from './pages/Research'
 import Settings from './pages/Settings'
 import Legal from './pages/Legal'
@@ -46,17 +47,6 @@ class ErrorBoundary extends Component<
     }
     return this.props.children
   }
-}
-
-function PlaceholderPage({ title }: { title: string }) {
-  return (
-    <div className="flex-1 flex flex-col items-center justify-center p-8">
-      <div className="text-center max-w-md">
-        <h1 className="font-display text-h3 text-ink">{title}</h1>
-        <p className="text-sm text-muted mt-2">Coming soon.</p>
-      </div>
-    </div>
-  )
 }
 
 function LoadingFallback() {
@@ -99,6 +89,9 @@ function AppRoutes() {
         <Route path="/cover-letters" element={<ProtectedRoute><CoverLetter /></ProtectedRoute>} />
         <Route path="/cover-letter/new" element={<ProtectedRoute><CoverLetter /></ProtectedRoute>} />
         <Route path="/portfolio" element={<ProtectedRoute><PortfolioAnalysis /></ProtectedRoute>} />
+        <Route path="/discover/feed" element={<ProtectedRoute><Discover /></ProtectedRoute>} />
+        <Route path="/discover/tracker" element={<ProtectedRoute><Discover /></ProtectedRoute>} />
+        <Route path="/discover" element={<Navigate to="/discover/feed" replace />} />
         <Route path="/research" element={<ProtectedRoute><Research /></ProtectedRoute>} />
         <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
         <Route path="/interview/new" element={<ProtectedRoute><InterviewNew /></ProtectedRoute>} />

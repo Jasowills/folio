@@ -17,7 +17,7 @@ export function useCameraProctoring({ enabled, onEvent }: UseCameraProctoringOpt
   const streamRef = useRef<MediaStream | null>(null)
   const [faceDetectorReady, setFaceDetectorReady] = useState(false)
   const [numFaces, setNumFaces] = useState(0)
-  const animFrameRef = useRef<number>()
+  const animFrameRef = useRef<number>(undefined)
   const lastFaceCountRef = useRef(0)
   const faceDetectorRef = useRef<any>(null)
 
@@ -43,17 +43,35 @@ export function useCameraProctoring({ enabled, onEvent }: UseCameraProctoringOpt
         const vision = await FilesetResolver.forVisionTasks(
           'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.17/wasm',
         )
-        faceDetectorRef.current = await FaceLandmarker.createFromOptions(vision, {
-          baseOptions: {
-            modelAssetPath:
-              'https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task',
-            delegate: 'GPU',
-          },
-          runningMode: 'VIDEO',
-          numFaces: 3,
-          outputFaceBlendshapes: false,
-          outputFacialTransformationMatrixes: false,
-        })
+
+        let delegate: 'GPU' | 'CPU' = 'GPU'
+        try {
+          faceDetectorRef.current = await FaceLandmarker.createFromOptions(vision, {
+            baseOptions: {
+              modelAssetPath:
+                'https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task',
+              delegate,
+            },
+            runningMode: 'VIDEO',
+            numFaces: 3,
+            outputFaceBlendshapes: false,
+            outputFacialTransformationMatrixes: false,
+          })
+        } catch (gpuErr) {
+          console.warn('[CameraProctoring] GPU delegate failed, falling back to CPU:', gpuErr)
+          delegate = 'CPU'
+          faceDetectorRef.current = await FaceLandmarker.createFromOptions(vision, {
+            baseOptions: {
+              modelAssetPath:
+                'https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task',
+              delegate,
+            },
+            runningMode: 'VIDEO',
+            numFaces: 3,
+            outputFaceBlendshapes: false,
+            outputFacialTransformationMatrixes: false,
+          })
+        }
         setFaceDetectorReady(true)
 
         const stream = await navigator.mediaDevices.getUserMedia({
@@ -66,7 +84,6 @@ export function useCameraProctoring({ enabled, onEvent }: UseCameraProctoringOpt
           await videoRef.current.play()
         }
 
-        let startTimeMs = performance.now()
         const detector = faceDetectorRef.current
 
         function detect() {
@@ -100,7 +117,8 @@ export function useCameraProctoring({ enabled, onEvent }: UseCameraProctoringOpt
           animFrameRef.current = requestAnimationFrame(detect)
         }
         animFrameRef.current = requestAnimationFrame(detect)
-      } catch {
+      } catch (err) {
+        console.error('[CameraProctoring] Face detection init failed:', err)
         setFaceDetectorReady(false)
       }
     }

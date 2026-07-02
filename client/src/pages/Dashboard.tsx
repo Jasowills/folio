@@ -5,7 +5,7 @@ import { useAuth } from '../hooks/useAuth'
 import { useStats, useResumes, useAtsHistory, useCoverLetters, useUploadResume } from '../lib/queries'
 import { UploadZone } from '../components/UploadZone'
 import { Button } from '../components/ui/button'
-import { IconFileText, IconTargetArrow, IconMail, IconGlobe, IconArrowRight, IconClock, IconAlertTriangle, IconTrendingUp, IconBulb, IconBolt, IconUpload, IconCircleCheck, IconSparkles, IconUser, IconBriefcase, IconStar, IconBook, IconTags,  } from '@tabler/icons-react'
+import { IconFileText, IconTargetArrow, IconMail, IconGlobe, IconArrowRight, IconAlertTriangle, IconTrendingUp, IconBulb, IconBolt, IconUpload, IconSparkles, IconUser, IconStar, IconTags } from '@tabler/icons-react'
 
 const GREETINGS = [
   { start: 6, end: 12, text: 'Good morning', icon: IconSparkles, subtitle: 'Ready to tell your career story today?' },
@@ -196,25 +196,27 @@ export default function Dashboard() {
       )}
 
       <motion.div variants={containerVariants} initial="hidden" animate="visible">
-        <motion.div variants={sectionVariants} className="page-header">
-          <div>
-            <div className="flex items-center gap-2.5">
-              <GreetingIcon className="h-5 w-5 text-teal" />
-              <h1 className="page-title">
-                {greeting.text}, {user?.name?.split(' ')[0] || 'there'}
-              </h1>
+        <motion.div variants={sectionVariants} className="mb-10">
+          <div className="flex items-center justify-between">
+            <div>
+              <div className="flex items-center gap-3">
+                <GreetingIcon className="h-5 w-5 text-teal" />
+                <h1 className="font-display text-h2 text-ink">
+                  {greeting.text}, {user?.name?.split(' ')[0] || 'there'}
+                </h1>
+              </div>
+              <p className="text-body text-muted mt-1">{greeting.subtitle}</p>
             </div>
-            <p className="page-subtitle">{greeting.subtitle}</p>
+            <Link to="/resumes">
+              <Button variant="primary">
+                <IconSparkles className="h-4 w-4 mr-2" />
+                New Resume
+              </Button>
+            </Link>
           </div>
-          <Link to="/resumes">
-            <Button variant="primary">
-              <IconFileText className="h-4 w-4 mr-2" />
-              New Resume
-            </Button>
-          </Link>
         </motion.div>
 
-        <motion.div variants={sectionVariants} className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4 mb-8">
+        <motion.div variants={sectionVariants} className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-10">
           {statsLoading ? (
             <>
               {[1, 2, 3, 4].map((i) => (
@@ -275,28 +277,6 @@ export default function Dashboard() {
                   <CountUp value={stats?.portfolioAnalyses ?? 0} />
                 </span>
               </Link>
-              <div className="stat-card">
-                <div className="flex items-center gap-2.5 mb-3">
-                  <div className="p-1.5 rounded-lg bg-purple-500/10">
-                    <IconBook className="h-4 w-4 text-purple" />
-                  </div>
-                  <span className="label-uppercase text-muted">Skills</span>
-                </div>
-                <span className="font-display text-h2 text-ink leading-none">
-                  <CountUp value={skillCount} />
-                </span>
-              </div>
-              <div className="stat-card">
-                <div className="flex items-center gap-2.5 mb-3">
-                  <div className="p-1.5 rounded-lg bg-emerald/10">
-                    <IconBriefcase className="h-4 w-4 text-emerald" />
-                  </div>
-                  <span className="label-uppercase text-muted">Experience</span>
-                </div>
-                <span className="font-display text-h2 text-ink leading-none">
-                  <CountUp value={expCount} />
-                </span>
-              </div>
             </>
           )}
         </motion.div>
@@ -321,7 +301,7 @@ export default function Dashboard() {
                     ({resumes?.length ?? 0})
                   </span>
                 </div>
-                {resumes?.slice(0, 3).map((resume) => {
+                {resumes?.slice(0, 5).map((resume) => {
                   const score = resume.quality?.overallQuality ?? 0
                   const hasScore = resume.quality?.overallQuality != null
                   return (
@@ -477,79 +457,41 @@ export default function Dashboard() {
 
           <div className="space-y-6">
             <motion.div variants={sectionVariants} className="card">
-              <div className="section-title mb-3">
-                <IconArrowRight className="h-4 w-4 text-teal" />
-                Next Steps
+              <div className="section-title mb-4">
+                <IconBolt className="h-4 w-4 text-amber" />
+                Quick Actions
               </div>
-              <div className="space-y-1">
+              <div className="grid grid-cols-2 gap-2">
                 {[
-                  {
-                    show: true,
-                    to: '/ats',
-                    icon: IconTargetArrow,
-                    bg: 'bg-amber-light',
-                    color: 'text-amber',
-                    title: latestResume ? 'Check your resume against a job' : 'Upload your first resume',
-                    desc: latestResume ? 'See how well you match and what keywords you are missing.' : 'Get started by uploading a PDF or DOCX.',
-                  },
-                  {
-                    show: true,
-                    to: '/cover-letters',
-                    icon: IconMail,
-                    bg: 'bg-teal-light',
-                    color: 'text-teal',
-                    title: 'Generate a cover letter',
-                    desc: 'Tailor a letter to any role in under a minute.',
-                  },
-                  {
-                    show: hasResume,
-                    to: '/resumes',
-                    icon: IconCircleCheck,
-                    bg: 'bg-emerald/10',
-                    color: 'text-emerald',
-                    title: 'Complete your profile',
-                    desc: 'Fill in experience, skills, and education.',
-                  },
-                  {
-                    show: hasResume,
-                    to: `/resume/${latestResume?._id}/review`,
-                    icon: IconBulb,
-                    bg: 'bg-purple-500/10',
-                    color: 'text-purple',
-                    title: 'Review improvement suggestions',
-                    desc: 'Address red flags and boost your score.',
-                  },
-                  {
-                    show: !!stats?.atsScores && stats.atsScores > 0,
-                    to: '/portfolio',
-                    icon: IconGlobe,
-                    bg: 'bg-amber-light',
-                    color: 'text-amber',
-                    title: 'Analyse your portfolio',
-                    desc: 'See if your online presence matches your resume.',
-                  },
-                ]
-                  .filter((s) => s.show)
-                  .slice(0, 4)
-                  .map((step) => {
-                    const Icon = step.icon
+                  { label: 'Upload Resume', icon: IconUpload, to: '', action: handleFAB, color: 'text-teal', bg: 'bg-teal-light' },
+                  { label: 'ATS Check', icon: IconTargetArrow, to: '/ats', color: 'text-amber', bg: 'bg-amber-light' },
+                  { label: 'Cover Letter', icon: IconMail, to: '/cover-letters', color: 'text-teal', bg: 'bg-teal-light' },
+                  { label: 'Portfolio', icon: IconGlobe, to: '/portfolio', color: 'text-amber', bg: 'bg-amber-light' },
+                ].map((action) => {
+                  const Icon = action.icon
+                  const content = (
+                    <div className="flex flex-col items-center gap-1.5 p-3.5 rounded-lg border border-border hover:bg-paper transition-all group cursor-pointer">
+                      <div className={`p-2 rounded-lg ${action.bg}`}>
+                        <Icon className={`h-4 w-4 ${action.color}`} />
+                      </div>
+                      <span className="text-xs font-medium text-muted group-hover:text-ink transition-colors">
+                        {action.label}
+                      </span>
+                    </div>
+                  )
+                  if (action.action) {
                     return (
-                      <Link
-                        key={step.title}
-                        to={step.to}
-                        className="flex items-center gap-4 p-3 rounded-lg hover:bg-paper transition-colors group"
-                      >
-                        <div className={`p-2 rounded-lg ${step.bg} shrink-0`}>
-                          <Icon className={`h-4 w-4 ${step.color}`} />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium text-ink">{step.title}</p>
-                          <p className="text-xs text-muted mt-0.5">{step.desc}</p>
-                        </div>
-                        <IconArrowRight className="h-4 w-4 text-muted group-hover:text-teal transition-colors shrink-0" />
-                      </Link>
+                      <div key={action.label} onClick={action.action}>
+                        {content}
+                      </div>
                     )
-                  })}
+                  }
+                  return (
+                    <Link key={action.label} to={action.to!}>
+                      {content}
+                    </Link>
+                  )
+                })}
               </div>
             </motion.div>
 
@@ -594,6 +536,64 @@ export default function Dashboard() {
               </motion.div>
             )}
 
+            <motion.div variants={sectionVariants} className="card">
+              <div className="section-title mb-3">
+                <IconArrowRight className="h-4 w-4 text-teal" />
+                Next Steps
+              </div>
+              <div className="space-y-1">
+                {[
+                  {
+                    show: !!latestResume,
+                    to: '/ats',
+                    icon: IconTargetArrow,
+                    bg: 'bg-amber-light',
+                    color: 'text-amber',
+                    title: 'Check against a job',
+                    desc: 'Find missing keywords for your target role.',
+                  },
+                  {
+                    show: true,
+                    to: '/cover-letters',
+                    icon: IconMail,
+                    bg: 'bg-teal-light',
+                    color: 'text-teal',
+                    title: 'Generate cover letter',
+                    desc: 'Tailor a letter in under a minute.',
+                  },
+                  {
+                    show: !!latestResume,
+                    to: `/resume/${latestResume?._id}/review`,
+                    icon: IconStar,
+                    bg: 'bg-purple-500/10',
+                    color: 'text-purple',
+                    title: 'Review suggestions',
+                    desc: 'Fix red flags and boost your score.',
+                  },
+                ]
+                  .filter((s) => s.show)
+                  .map((step) => {
+                    const Icon = step.icon
+                    return (
+                      <Link
+                        key={step.title}
+                        to={step.to}
+                        className="flex items-center gap-3 p-2.5 rounded-lg hover:bg-paper transition-colors group"
+                      >
+                        <div className={`p-1.5 rounded-lg ${step.bg} shrink-0`}>
+                          <Icon className={`h-3.5 w-3.5 ${step.color}`} />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium text-ink">{step.title}</p>
+                          <p className="text-[11px] text-muted">{step.desc}</p>
+                        </div>
+                        <IconArrowRight className="h-3.5 w-3.5 text-muted group-hover:text-teal transition-colors shrink-0" />
+                      </Link>
+                    )
+                  })}
+              </div>
+            </motion.div>
+
             {topMissing.length > 0 && (
               <motion.div variants={sectionVariants} className="card">
                 <div className="section-title mb-3">
@@ -632,57 +632,15 @@ export default function Dashboard() {
 
             <motion.div variants={sectionVariants} className="card">
               <div className="section-title mb-3">
-                <IconBolt className="h-4 w-4 text-amber" />
-                Quick Actions
-              </div>
-              <div className="grid grid-cols-2 gap-2">
-                {[
-                  { label: 'Upload Resume', icon: IconUpload, to: '', action: handleFAB, color: 'text-teal', bg: 'bg-teal-light' },
-                  { label: 'ATS Check', icon: IconTargetArrow, to: '/ats', color: 'text-amber', bg: 'bg-amber-light' },
-                  { label: 'Cover Letter', icon: IconMail, to: '/cover-letters', color: 'text-teal', bg: 'bg-teal-light' },
-                  { label: 'Portfolio', icon: IconGlobe, to: '/portfolio', color: 'text-amber', bg: 'bg-amber-light' },
-                ].map((action) => {
-                  const Icon = action.icon
-                  const content = (
-                    <div className="flex flex-col items-center gap-1.5 p-3.5 rounded-lg border border-border hover:bg-paper transition-all group cursor-pointer">
-                      <div className={`p-2 rounded-lg ${action.bg}`}>
-                        <Icon className={`h-4 w-4 ${action.color}`} />
-                      </div>
-                      <span className="text-xs font-medium text-muted group-hover:text-ink transition-colors">
-                        {action.label}
-                      </span>
-                    </div>
-                  )
-                  if (action.action) {
-                    return (
-                      <div key={action.label} onClick={action.action}>
-                        {content}
-                      </div>
-                    )
-                  }
-                  return (
-                    <Link key={action.label} to={action.to!}>
-                      {content}
-                    </Link>
-                  )
-                })}
-              </div>
-            </motion.div>
-
-            <motion.div variants={sectionVariants} className="card">
-              <div className="section-title mb-3">
-                <IconClock className="h-4 w-4 text-muted" />
+                <IconTrendingUp className="h-4 w-4 text-muted" />
                 Recent Activity
               </div>
               {(() => {
-                interface Activity { icon: React.ComponentType<{ className?: string }>; bg: string; color: string; text: string; time: string; sortKey: string }
+                interface Activity { text: string; time: string; sortKey: string }
                 const activities: Activity[] = []
 
                 if (latestResume) {
                   activities.push({
-                    icon: IconFileText,
-                    bg: 'bg-teal-light',
-                    color: 'text-teal',
                     text: `Uploaded "${latestResume.title || latestResume.name || 'Untitled'}"`,
                     time: latestResume.updatedAt,
                     sortKey: `a${latestResume.updatedAt}`,
@@ -692,9 +650,6 @@ export default function Dashboard() {
                 if (atsHistory) {
                   atsHistory.slice(0, 3).forEach((check) => {
                     activities.push({
-                      icon: IconTargetArrow,
-                      bg: 'bg-amber-light',
-                      color: 'text-amber',
                       text: `ATS check: ${check.score}%${check.jobTitle ? ` for ${check.jobTitle}` : ''}`,
                       time: check.createdAt,
                       sortKey: `b${check.createdAt}`,
@@ -705,9 +660,6 @@ export default function Dashboard() {
                 if (coverLetters) {
                   coverLetters.slice(0, 3).forEach((cl) => {
                     activities.push({
-                      icon: IconMail,
-                      bg: 'bg-teal-light',
-                      color: 'text-teal',
                       text: `Cover letter for ${cl.jobTitle}${cl.company ? ` at ${cl.company}` : ''}`,
                       time: cl.createdAt,
                       sortKey: `c${cl.createdAt}`,
@@ -717,7 +669,7 @@ export default function Dashboard() {
 
                 if (activities.length === 0) {
                   return (
-                    <div className="text-center py-8">
+                    <div className="text-center py-6">
                       <div className="empty-state-icon">&amp;</div>
                       <p className="text-xs text-muted">No activity yet</p>
                     </div>
@@ -727,21 +679,15 @@ export default function Dashboard() {
                 activities.sort((a, b) => b.sortKey.localeCompare(a.sortKey))
 
                 return (
-                  <div className="space-y-1">
-                    {activities.slice(0, 6).map((a, i) => {
-                      const Icon = a.icon
-                      return (
-                        <div key={i} className="flex items-center gap-3 p-2.5 rounded-lg">
-                          <div className={`p-1.5 rounded-lg ${a.bg} shrink-0`}>
-                            <Icon className={`h-3.5 w-3.5 ${a.color}`} />
-                          </div>
-                          <p className="text-sm text-ink flex-1 min-w-0 truncate">{a.text}</p>
-                          <span className="text-[10px] text-muted shrink-0">
-                            {new Date(a.time).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                          </span>
-                        </div>
-                      )
-                    })}
+                  <div className="space-y-0.5">
+                    {activities.slice(0, 5).map((a, i) => (
+                      <div key={i} className="flex items-center justify-between gap-2 py-2 border-b border-border last:border-0">
+                        <p className="text-sm text-ink min-w-0 truncate">{a.text}</p>
+                        <span className="text-[10px] text-muted shrink-0">
+                          {new Date(a.time).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                        </span>
+                      </div>
+                    ))}
                   </div>
                 )
               })()}

@@ -1,29 +1,48 @@
 import { useState } from 'react'
-import { NavLink, useNavigate } from 'react-router-dom'
+import { NavLink, useLocation, useNavigate } from 'react-router-dom'
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu'
-import { IconLayoutDashboard, IconFileText, IconTargetArrow, IconMail, IconGlobe, IconBriefcase, IconMessage, IconFlask, IconChevronDown, IconUser, IconSettings, IconCreditCard, IconHelpCircle, IconLogout, IconMenu2, IconX } from '@tabler/icons-react'
+import { IconLayoutDashboard, IconFileText, IconTargetArrow, IconMail, IconGlobe, IconMessage, IconFlask, IconChevronDown, IconUser, IconSettings, IconCreditCard, IconHelpCircle, IconLogout, IconMenu2, IconX, IconCompass } from '@tabler/icons-react'
 import { useAuth } from '../../hooks/useAuth'
-import { useResumes } from '../../lib/queries'
+import { useResumes, useDiscoverFeedStats } from '../../lib/queries'
 import { cn } from '../../lib/utils'
 
-const mainNavItems = [
-  { to: '/dashboard', label: 'Dashboard', icon: IconLayoutDashboard },
-  { to: '/resumes', label: 'My Resumes', icon: IconFileText, badge: true },
-  { to: '/ats', label: 'ATS Scorer', icon: IconTargetArrow },
-  { to: '/cover-letter/new', label: 'Cover Letter', icon: IconMail },
-  { to: '/portfolio', label: 'Portfolio', icon: IconGlobe },
-  { to: '/research', label: 'Research', icon: IconFlask },
-  { to: '/interview/new', label: 'Interview Prep', icon: IconMessage },
-]
-
-const comingSoonItems = [
-  { label: 'Job Tracker', icon: IconBriefcase },
+const navGroups = [
+  {
+    label: 'Main',
+    items: [
+      { to: '/dashboard', label: 'Dashboard', icon: IconLayoutDashboard },
+    ],
+  },
+  {
+    label: 'Jobs',
+    items: [
+      { to: '/discover/feed', label: 'Discover', icon: IconCompass },
+      { to: '/research', label: 'Research', icon: IconFlask },
+    ],
+  },
+  {
+    label: 'Documents',
+    items: [
+      { to: '/resumes', label: 'My Resumes', icon: IconFileText, badge: true },
+      { to: '/cover-letter/new', label: 'Cover Letter', icon: IconMail },
+      { to: '/portfolio', label: 'Portfolio', icon: IconGlobe },
+    ],
+  },
+  {
+    label: 'Interviews',
+    items: [
+      { to: '/ats', label: 'ATS Scorer', icon: IconTargetArrow },
+      { to: '/interview/new', label: 'Interview Prep', icon: IconMessage },
+    ],
+  },
 ]
 
 export default function AppShell({ children }: { children: React.ReactNode }) {
   const { user, loading, logout } = useAuth()
+  const location = useLocation()
   const navigate = useNavigate()
   const { data: resumes } = useResumes()
+  const { data: feedStats } = useDiscoverFeedStats()
   const [menuOpen, setMenuOpen] = useState(false)
   const [mobileNavOpen, setMobileNavOpen] = useState(false)
 
@@ -34,6 +53,11 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     return null
   }
 
+  // Full-screen mode for live interview — no sidebar
+  if (/\/interview\/[^/]+\/live$/.test(location.pathname)) {
+    return <>{children}</>
+  }
+
   const initials = user.name
     ?.split(' ')
     .map((n) => n[0])
@@ -42,6 +66,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     .slice(0, 2)
 
   const resumeCount = resumes?.length ?? 0
+  const newJobCount = feedStats?.newSinceVisit ?? 0
 
   return (
     <div className="flex min-h-screen bg-paper w-full overflow-x-hidden">
@@ -74,51 +99,48 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
           </button>
         </div>
 
-        <nav className="flex-1 flex flex-col gap-0.5 px-3 py-3 overflow-y-auto">
+        <nav className="flex-1 flex flex-col px-3 py-3 overflow-y-auto">
 
-          {mainNavItems.map((item) => (
-            <NavLink
-              key={item.to}
-              to={item.to}
-              end={item.to === '/dashboard'}
-              onClick={() => setMobileNavOpen(false)}
-              className={({ isActive }) =>
-                cn(
-                  'flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-all duration-150 group relative',
-                  isActive
-                    ? 'bg-teal-light text-teal font-semibold'
-                    : 'text-muted hover:text-ink hover:bg-paper-dark/50',
-                )
-              }
-            >
-              {({ isActive }) => (
-                <>
-                  <item.icon className={cn('h-4 w-4 shrink-0', isActive ? 'text-teal' : 'text-muted group-hover:text-ink transition-colors')} />
-                  <span className="flex-1">{item.label}</span>
-                  {item.badge && resumeCount > 0 && (
-                    <span className="text-[10px] font-medium bg-teal/10 text-teal px-1.5 py-0.5 rounded-full leading-none">
-                      {resumeCount}
-                    </span>
-                  )}
-                </>
-              )}
-            </NavLink>
-          ))}
-
-          <span className="text-[10px] font-semibold uppercase tracking-widest text-muted/60 px-3 pb-1 pt-4">
-            Coming Soon
-          </span>
-          {comingSoonItems.map((item) => (
-            <div
-              key={item.label}
-              className="flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-muted/40 cursor-not-allowed select-none"
-              title="Coming soon"
-            >
-              <item.icon className="h-4 w-4 shrink-0" />
-              <span>{item.label}</span>
-              <span className="ml-auto text-[9px] font-medium uppercase tracking-wider text-muted/30">
-                Soon
+          {navGroups.map((group) => (
+            <div key={group.label} className="mb-4 last:mb-0">
+              <span className="block text-[10px] font-semibold uppercase tracking-widest text-muted/50 px-3 pb-1.5 select-none">
+                {group.label}
               </span>
+              <div className="flex flex-col gap-0.5">
+                {group.items.map((item) => (
+                  <NavLink
+                    key={item.to}
+                    to={item.to}
+                    end={item.to === '/dashboard'}
+                    onClick={() => setMobileNavOpen(false)}
+                    className={({ isActive }) =>
+                      cn(
+                        'flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-all duration-150 group relative',
+                        isActive
+                          ? 'bg-teal-light text-teal font-semibold'
+                          : 'text-muted hover:text-ink hover:bg-paper-dark/50',
+                      )
+                    }
+                  >
+                    {({ isActive }) => (
+                      <>
+                        <item.icon className={cn('h-4 w-4 shrink-0', isActive ? 'text-teal' : 'text-muted group-hover:text-ink transition-colors')} />
+                        <span className="flex-1">{item.label}</span>
+                        {item.to === '/resumes' && resumeCount > 0 && (
+                          <span className="text-[10px] font-medium bg-teal/10 text-teal px-1.5 py-0.5 rounded-full leading-none">
+                            {resumeCount}
+                          </span>
+                        )}
+                        {item.to === '/discover/feed' && newJobCount > 0 && (
+                          <span className="text-[10px] font-medium bg-teal text-white px-1.5 py-0.5 rounded-full leading-none">
+                            {newJobCount}
+                          </span>
+                        )}
+                      </>
+                    )}
+                  </NavLink>
+                ))}
+              </div>
             </div>
           ))}
 
@@ -137,9 +159,6 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
             >
               {({ isActive }) => (
                 <>
-                  {isActive && (
-                    <span className="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-5 bg-teal rounded-full" />
-                  )}
                   <IconSettings className={cn('h-4 w-4 shrink-0', isActive ? 'text-teal' : 'text-muted group-hover:text-ink transition-colors')} />
                   <span>Settings</span>
                 </>

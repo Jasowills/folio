@@ -22,6 +22,8 @@ interface SessionState {
   pausesUsed: number
   pauseStartTime: number | null
   isPaused: boolean
+  candidateName: string | null
+  resumeContext: Record<string, unknown> | null
 }
 
 @WebSocketGateway({
@@ -74,6 +76,31 @@ export class InterviewsGateway implements OnGatewayConnection, OnGatewayDisconne
     let isNewSession = false
     if (!this.sessionStates.has(sessionId)) {
       const doc = await this.interviewsService.getSessionForAi(sessionId)
+
+      let candidateName: string | null = null
+      let resumeContext: Record<string, unknown> | null = null
+      if (doc?.resumeId) {
+        const resume = await this.interviewsService.getResumeById(doc.resumeId.toString())
+        if (resume) {
+          candidateName = resume.name || null
+          resumeContext = {
+            name: resume.name || null,
+            summary: resume.summary || null,
+            skills: resume.skills || [],
+            experience: (resume.experience || []).map((e) => ({
+              company: e.company,
+              title: e.title,
+              bullets: e.bullets?.slice(0, 3) || [],
+            })),
+            education: (resume.education || []).map((e) => ({
+              institution: e.institution,
+              degree: e.degree,
+              field: e.field,
+            })),
+          }
+        }
+      }
+
       this.sessionStates.set(sessionId, {
         sessionId,
         questionIndex: 0,
@@ -82,6 +109,8 @@ export class InterviewsGateway implements OnGatewayConnection, OnGatewayDisconne
         pausesUsed: 0,
         pauseStartTime: null,
         isPaused: false,
+        candidateName,
+        resumeContext,
       })
       if (doc && doc.status === 'in_progress') {
         const hasTurns = await this.interviewsService.hasTranscriptTurns(sessionId)
@@ -93,9 +122,20 @@ export class InterviewsGateway implements OnGatewayConnection, OnGatewayDisconne
 
     this.logger.log(`Client ${client.id} joined session ${sessionId}`)
 
+    this.deepgram.createSttConnection(
+      client.id,
+      sessionId,
+      (event) => this.handleTranscript(client, sessionId, event),
+      (error) => this.handleSttError(client, sessionId, error),
+      () => {},
+    )
+
     if (isNewSession) {
       const doc = await this.interviewsService.getSessionForAi(sessionId)
-      const greeting = this.interviewsService.buildGreeting(doc!)
+      const state = this.sessionStates.get(sessionId)
+      const persona = doc?.interviewerPersona as { interviewerName?: string } | undefined
+      const interviewerName = persona?.interviewerName
+      const greeting = this.interviewsService.buildGreeting(doc!, state?.candidateName)
       if (greeting) {
         const greetingTurn = {
           speaker: 'interviewer' as const,
@@ -107,7 +147,7 @@ export class InterviewsGateway implements OnGatewayConnection, OnGatewayDisconne
         await this.interviewsService.addTurn(sessionId, greetingTurn)
         let audioBase64: string | null = null
         if (this.deepgram.isConfigured) {
-          audioBase64 = await this.deepgram.generateTtsBase64(greeting)
+          audioBase64 = await this.deepgram.generateTtsBase64(greeting, interviewerName)
         }
         this.server.to(sessionId).emit('interviewer_response', {
           text: greeting,
@@ -117,18 +157,7 @@ export class InterviewsGateway implements OnGatewayConnection, OnGatewayDisconne
       }
     }
 
-    if (this.deepgram.isConfigured) {
-      const conn = await this.deepgram.createSttConnection(
-        client.id,
-        sessionId,
-        (event) => this.handleTranscript(client, sessionId, event),
-        (error) => this.handleSttError(client, sessionId, error),
-        () => this.handleSttClose(client, sessionId),
-      )
-      if (conn) {
-        this.logger.log(`Deepgram STT connection opened for client ${client.id}`)
-      }
-    }
+    this.logger.log(`Groq Whisper STT started for client ${client.id} in session ${sessionId}`)
   }
 
   @SubscribeMessage('leave')
@@ -152,12 +181,22 @@ export class InterviewsGateway implements OnGatewayConnection, OnGatewayDisconne
     if (state?.isPaused) return
 
     const buffer = Buffer.from(payload.audio, 'base64')
+    if (!this.deepgram.isConfigured) {
+      this.logger.warn(`Audio chunk received from ${client.id} but Deepgram not configured`)
+      return
+    }
     this.deepgram.sendAudio(client.id, buffer)
   }
 
   @SubscribeMessage('mic_enabled')
   handleMicEnabled(client: Socket, payload: { enabled: boolean }) {
     this.micEnabled.set(client.id, payload.enabled)
+  }
+
+  @SubscribeMessage('flush_buffer')
+  handleFlushBuffer(client: Socket, sessionId: string) {
+    this.logger.debug(`[${client.id}] Flush buffer requested`)
+    this.deepgram.forceFlush(client.id)
   }
 
   private async handleTranscript(
@@ -175,6 +214,12 @@ export class InterviewsGateway implements OnGatewayConnection, OnGatewayDisconne
     if (event.isFinal) {
       const state = this.sessionStates.get(sessionId)
       if (!state || state.isAiResponding) return
+
+      const wordCount = event.transcript.trim().split(/\s+/).length
+      if (wordCount < 15) {
+        this.logger.debug(`Transcript too short (${wordCount} words), continuing to listen`)
+        return
+      }
 
       state.lastCandidateTranscript = event.transcript
       state.isAiResponding = true
@@ -195,6 +240,73 @@ export class InterviewsGateway implements OnGatewayConnection, OnGatewayDisconne
     }
   }
 
+  private buildResumeSummary(bg: Record<string, unknown> | null): string {
+    if (!bg) return 'No resume provided.'
+    const parts: string[] = []
+    if (bg.name) parts.push(`Name: ${bg.name}`)
+    if (bg.summary) parts.push(`Summary: ${bg.summary}`)
+    if (Array.isArray(bg.skills) && bg.skills.length > 0) {
+      parts.push(`Skills: ${(bg.skills as string[]).join(', ')}`)
+    }
+    if (Array.isArray(bg.experience)) {
+      for (const exp of bg.experience as Array<{ title?: string; company?: string; bullets?: string[] }>) {
+        if (exp.title || exp.company) {
+          const bullets = exp.bullets?.slice(0, 3).join('; ') || ''
+          parts.push(`- ${exp.title} at ${exp.company}${bullets ? ': ' + bullets : ''}`)
+        }
+      }
+    }
+    if (Array.isArray(bg.education)) {
+      for (const edu of bg.education as Array<{ degree?: string; field?: string; institution?: string }>) {
+        if (edu.degree || edu.institution) {
+          parts.push(`- ${edu.degree || ''} in ${edu.field || ''} from ${edu.institution || ''}`)
+        }
+      }
+    }
+    return parts.join('\n') || 'No resume provided.'
+  }
+
+  private buildTurnInstructions(
+    state: SessionState,
+    turns: Array<{ speaker: string; text: string }>,
+    questionPlan: InterviewQuestionPlan[] | undefined,
+    remainingTimeInMinutes?: number,
+    currentQuestionBudget?: number,
+  ): string {
+    if (state.questionIndex === 0 && turns.length === 0) {
+      return 'Greet the candidate warmly by name. Ask how they are. Do NOT jump straight into interview questions yet.'
+    }
+
+    if (questionPlan && state.questionIndex >= questionPlan.length - 1) {
+      return 'Thank the candidate for their time. Ask if they have any questions for you. End naturally.'
+    }
+
+    if (remainingTimeInMinutes !== undefined && remainingTimeInMinutes <= 5) {
+      return 'Time is running short. Keep your response very brief (1-2 sentences) and move to the next topic quickly.'
+    }
+
+    if (currentQuestionBudget !== undefined && remainingTimeInMinutes !== undefined && remainingTimeInMinutes > 10) {
+      const remainingQuestions = (questionPlan?.length || 1) - state.questionIndex - 1
+      const averagePerRemaining = remainingTimeInMinutes / Math.max(remainingQuestions, 1)
+      if (currentQuestionBudget > averagePerRemaining * 1.5) {
+        return 'You are spending more time on this question than budget allows. Wrap up the current discussion and transition to the next question.'
+      }
+    }
+
+    const lastCandidateTurn = turns.filter(t => t.speaker === 'candidate').pop()
+    if (lastCandidateTurn) {
+      const text = lastCandidateTurn.text || ''
+      const wordCount = text.trim().split(/\s+/).length
+      const hasFiller = /\b(basically|kind of|sort of|I guess|you know|like)\b/i.test(text)
+
+      if (wordCount < 100 || hasFiller) {
+        return 'Their last answer was vague. Ask a follow-up that pushes for a specific example or a measurable result before moving on. Do not proceed to the next question yet.'
+      }
+    }
+
+    return 'Acknowledge their answer briefly in one sentence then transition to the next question.'
+  }
+
   private async generateAiResponse(
     client: Socket,
     sessionId: string,
@@ -211,38 +323,61 @@ export class InterviewsGateway implements OnGatewayConnection, OnGatewayDisconne
       const persona = doc.interviewerPersona as InterviewerPersona | undefined
       const questionPlan = doc.questionPlan as InterviewQuestionPlan[] | undefined
       const currentQuestion = questionPlan?.[state.questionIndex]
+      const turns = await this.interviewsService.getTranscriptTurns(sessionId)
 
-      const context = {
-        personaName: persona?.interviewerName || 'Interviewer',
-        personaTitle: persona?.interviewerTitle || '',
-        tone: persona?.personality?.tone || 'neutral',
-        followUpStyle: persona?.personality?.followUpStyle || 'probing',
-        currentQuestionIndex: state.questionIndex,
-        totalQuestions: questionPlan?.length || 0,
-        currentQuestion: currentQuestion
-          ? {
-              phase: currentQuestion.phase,
-              topic: currentQuestion.topic,
-              question: currentQuestion.primaryQuestion,
-            }
-          : null,
-        lastCandidateResponse: state.lastCandidateTranscript,
-        questionPlan: questionPlan?.map((q) => ({
-          order: q.order,
-          phase: q.phase,
-          topic: q.topic,
-          question: q.primaryQuestion,
-        })) || [],
+      const personaName = persona?.interviewerName || 'Interviewer'
+      const candidateName = state.candidateName || 'the candidate'
+      const company = (doc as any)?.company || (doc as any)?.targetCompany || 'the company'
+      const role = (doc as any)?.targetRole || 'the role'
+      const level = (doc as any)?.seniority || 'mid'
+
+      const totalSeconds = (doc.plannedDuration || 30) * 60
+      const elapsedSeconds = doc.startedAt ? Math.floor((Date.now() - doc.startedAt.getTime()) / 1000) : 0
+      const remainingSeconds = Math.max(0, totalSeconds - elapsedSeconds)
+      const remainingTimeInMinutes = Math.ceil(remainingSeconds / 60)
+      const currentQuestionBudget = currentQuestion?.estimatedMinutes || 5
+
+      const historyLines: string[] = []
+      const recent = turns.slice(-8)
+      for (const turn of recent) {
+        const label = turn.speaker === 'interviewer' ? personaName : candidateName
+        historyLines.push(`${label}: ${turn.text.slice(0, 200)}`)
       }
 
-      const aiResponse = await this.aiService.chat(
-        INTERVIEW_RESPONSE_SYSTEM,
-        JSON.stringify(context),
-      )
+      const followUpText = currentQuestion?.followUpTriggers?.length
+        ? currentQuestion.followUpTriggers.map(t => `If candidate says "${t.condition}", ask: "${t.followUp}"`).join('\n')
+        : 'None specified'
 
-      const responseText = typeof aiResponse === 'string'
-        ? aiResponse
-        : (aiResponse as any)?.response || (aiResponse as any)?.text || JSON.stringify(aiResponse)
+      const turnInstructions = this.buildTurnInstructions(state, turns, questionPlan, remainingTimeInMinutes, currentQuestionBudget)
+
+      const systemPrompt = INTERVIEW_RESPONSE_SYSTEM
+        .replace(/\{interviewerName\}/g, personaName)
+        .replace(/\{interviewerTitle\}/g, persona?.interviewerTitle || 'Interviewer')
+        .replace(/\{company\}/g, company)
+        .replace(/\{role\}/g, role)
+        .replace(/\{level\}/g, level)
+        .replace(/\{candidateName\}/g, candidateName)
+        .replace(/\{tone\}/g, persona?.personality?.tone || 'professional')
+        .replace(/\{phase\}/g, currentQuestion?.phase || 'general')
+        .replace(/\{currentQuestionNumber\}/g, String(state.questionIndex + 1))
+        .replace(/\{totalQuestions\}/g, String(questionPlan?.length || 0))
+        .replace(/\{resumeSummary\}/g, this.buildResumeSummary(state.resumeContext))
+        .replace(/\{conversationHistory\}/g, historyLines.join('\n') || 'No conversation yet.')
+        .replace(/\{currentQuestion\}/g, currentQuestion?.primaryQuestion || 'Continue the conversation naturally.')
+        .replace(/\{followUpTriggers\}/g, followUpText)
+        .replace(/\{remainingTimeInMinutes\}/g, String(remainingTimeInMinutes))
+        .replace(/\{currentQuestionBudget\}/g, String(currentQuestionBudget))
+        .replace(/\{turnInstructions\}/g, turnInstructions)
+
+      // Thinking delay — simulates a real interviewer processing
+      this.server.to(sessionId).emit('interviewer_thinking')
+      const thinkMs = 800 + Math.floor(Math.random() * 1501)
+      await new Promise(r => setTimeout(r, thinkMs))
+
+      const responseText = await this.aiService.chatForInterview(
+        systemPrompt,
+        state.lastCandidateTranscript || '',
+      )
 
       await this.interviewsService.addTurn(sessionId, {
         speaker: 'interviewer',
@@ -254,7 +389,7 @@ export class InterviewsGateway implements OnGatewayConnection, OnGatewayDisconne
 
       let audioBase64: string | null = null
       if (this.deepgram.isConfigured) {
-        audioBase64 = await this.deepgram.generateTtsBase64(responseText)
+        audioBase64 = await this.deepgram.generateTtsBase64(responseText, persona?.interviewerName)
       }
 
       this.server.to(sessionId).emit('interviewer_response', {
@@ -383,6 +518,29 @@ export class InterviewsGateway implements OnGatewayConnection, OnGatewayDisconne
       result,
       questionIndex: state.questionIndex,
     })
+  }
+
+  private stripJsonFromResponse(text: string): string {
+    let cleaned = text.trim()
+
+    if (cleaned.startsWith('{') || cleaned.startsWith('[')) {
+      try {
+        const parsed = JSON.parse(cleaned)
+        const val = parsed?.response || parsed?.text || parsed?.message || parsed?.interviewerResponse
+        if (typeof val === 'string' && val.length > 0) return val.trim()
+        const values = Object.values(parsed).filter((v): v is string => typeof v === 'string' && v.length > 20)
+        if (values.length > 0) return values[0]
+      } catch {}
+    }
+
+    cleaned = cleaned.replace(/\{"[^"]+":\s*"/g, '').replace(/"\s*}\s*$/g, '').replace(/"[^"]*"\s*:/g, '').replace(/["{}[\]\\]/g, '').trim()
+    return cleaned
+  }
+
+  @SubscribeMessage('barge_in')
+  handleBargeIn(client: Socket, sessionId: string) {
+    this.logger.debug(`[${client.id}] Barge-in detected`)
+    this.server.to(sessionId).emit('barge_in_detected')
   }
 
   @SubscribeMessage('end_session')

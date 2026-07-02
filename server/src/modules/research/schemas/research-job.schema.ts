@@ -27,6 +27,7 @@ export class ResearchJob {
   crawlData?: {
     pagesVisited: Array<{ url: string; title: string; text: string; crawledAt: Date }>;
     pageCount: number;
+    currentlyCrawling?: Array<{ url: string; title: string; startedAt: Date }>;
   };
 
   @Prop({ type: Object })
@@ -49,6 +50,7 @@ export class ResearchJob {
     };
     questionsToAsk: Array<{ question: string; rationale: string }>;
     redFlags: Array<{ flag: string; source: string }> | null;
+    salaryRange: { estimate: string; confidence: 'high' | 'medium' | 'low' } | null;
   };
 
   @Prop()

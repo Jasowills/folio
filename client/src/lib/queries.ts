@@ -282,6 +282,18 @@ export function useCoverLetters() {
   })
 }
 
+export function useDeleteCoverLetter() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (id: string) => {
+      await api.delete(`/cover-letters/${id}`)
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['cover-letters'] })
+    },
+  })
+}
+
 export function useGenerateCoverLetter() {
   const qc = useQueryClient()
   return useMutation({
@@ -473,7 +485,24 @@ export function usePortfolioStatus(analysisId: string | null) {
     queryKey: ['portfolio', analysisId],
     queryFn: async () => {
       const { data } = await api.get(`/crawler/status/${analysisId}`)
-      return (data.data || data) as PortfolioResult
+      const raw = data.data || data
+      console.debug('[PortfolioStatus] raw response shape', {
+        status: raw.status,
+        hasMetadata: !!raw.metadata,
+        metadataKeys: raw.metadata ? Object.keys(raw.metadata) : [],
+        analysisKeys: raw.metadata?.analysis ? Object.keys(raw.metadata.analysis) : [],
+        raw,
+      })
+      const analysis = raw.metadata?.analysis || {}
+      return {
+        _id: raw._id,
+        status: raw.status,
+        overallScore: analysis.overallAlignment ?? 0,
+        confirmedSkills: analysis.skillsConfirmed ?? [],
+        missingSkills: analysis.skillsMissing ?? [],
+        projects: analysis.projectsFound ?? [],
+        suggestions: analysis.suggestions ?? [],
+      } as PortfolioResult
     },
     enabled: !!analysisId,
     refetchInterval: (query) => {
@@ -501,6 +530,7 @@ export interface ResearchBrief {
   interviewStyle: { summary: string; confidenceSource: 'careers_page' | 'inferred' }
   questionsToAsk: Array<{ question: string; rationale: string }>
   redFlags: Array<{ flag: string; source: string }> | null
+  salaryRange: { estimate: string; confidence: 'high' | 'medium' | 'low' } | null
 }
 
 export interface CrawlPage {
@@ -508,6 +538,12 @@ export interface CrawlPage {
   title: string
   text: string
   crawledAt: string
+}
+
+export interface CrawlingUrl {
+  url: string
+  title: string
+  startedAt: string
 }
 
 export interface ResearchJob {
@@ -520,6 +556,7 @@ export interface ResearchJob {
   crawlData?: {
     pagesVisited: CrawlPage[]
     pageCount: number
+    currentlyCrawling?: CrawlingUrl[]
   }
   createdAt: string
   error?: string
@@ -557,6 +594,239 @@ export function useResearchHistory() {
     queryFn: async () => {
       const { data } = await api.get('/research/history')
       return (data.data || data) as { jobs: ResearchJob[]; total: number }
+    },
+  })
+}
+
+// ─── Discover Feed ────────────────────────────────────────
+
+export interface DiscoverFeedJob {
+  _id: string
+  source: string
+  sourceId: string
+  companyName: string
+  companyLogoUrl?: string
+  roleTitle: string
+  location?: string
+  isRemote: boolean
+  postedAt: string
+  applicationUrl?: string
+  descriptionRaw: string
+  extractedFields?: {
+    requiredSkills?: string[]
+    niceToHaveSkills?: string[]
+    experienceLevel?: string
+    salaryMin?: number | null
+    salaryMax?: number | null
+    salaryCurrency?: string | null
+  }
+  isVerified: boolean
+  match: {
+    atsScore: number
+    matchedKeywords: string[]
+    missingKeywords: string[]
+    sectionScores: Record<string, number>
+    matchIntelligenceLine: string
+  } | null
+  isTracked: boolean
+}
+
+export interface DiscoverFeedResponse {
+  jobs: DiscoverFeedJob[]
+  cursor: string | null
+  hasMore: boolean
+}
+
+export interface FeedFilters {
+  sources?: string[]
+  postedWithin?: '24h' | '3d' | 'week'
+  minScore?: number
+  hasSalary?: boolean
+  remoteOnly?: boolean
+  excludeApplied?: boolean
+  excludeRejected?: boolean
+  sort?: 'relevance' | 'newest' | 'salary'
+}
+
+export function useDiscoverFeed(filters: FeedFilters, cursor?: string) {
+  return useQuery({
+    queryKey: ['discover-feed', filters, cursor],
+    queryFn: async () => {
+      const params = new URLSearchParams()
+      if (cursor) params.set('cursor', cursor)
+      if (filters.sources?.length) params.set('sources', filters.sources.join(','))
+      if (filters.postedWithin) params.set('postedWithin', filters.postedWithin)
+      if (filters.minScore !== undefined) params.set('minScore', String(filters.minScore))
+      if (filters.hasSalary) params.set('hasSalary', 'true')
+      if (filters.remoteOnly) params.set('remoteOnly', 'true')
+      if (filters.excludeApplied !== undefined) params.set('excludeApplied', String(filters.excludeApplied))
+      if (filters.excludeRejected) params.set('excludeRejected', 'true')
+      if (filters.sort) params.set('sort', filters.sort)
+      const { data } = await api.get(`/discover/feed?${params}`)
+      return (data.data || data) as DiscoverFeedResponse
+    },
+  })
+}
+
+export function useDiscoverFeedStats() {
+  return useQuery({
+    queryKey: ['discover-feed-stats'],
+    queryFn: async () => {
+      const { data } = await api.get('/discover/feed/stats')
+      return (data.data || data) as {
+        totalJobs: number
+        newSinceVisit: number
+        lastCrawledAt: string | null
+        sourceStatus: Record<string, any>
+      }
+    },
+  })
+}
+
+export interface DiscoverPreferences {
+  _id: string
+  userId: string
+  targetRoles: string[]
+  resumeId?: string
+  preferredLocations: string[]
+  isRemoteOnly: boolean
+  experienceLevels: string[]
+  minimumMatchScore: number
+  excludeApplied: boolean
+  excludeRejected: boolean
+  emailAlertsEnabled: boolean
+  hiddenJobIds: string[]
+  enabledSources: string[]
+  lastVisitedAt?: string
+}
+
+export function useDiscoverPreferences() {
+  return useQuery({
+    queryKey: ['discover-preferences'],
+    queryFn: async () => {
+      const { data } = await api.get('/discover/preferences')
+      return (data.data || data) as DiscoverPreferences | null
+    },
+  })
+}
+
+export function useUpdateDiscoverPreferences() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (body: Partial<DiscoverPreferences>) => {
+      const { data } = await api.post('/discover/preferences', body)
+      return data.data || data
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['discover-preferences'] })
+    },
+  })
+}
+
+export function useHideJob() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (jobId: string) => {
+      await api.post(`/discover/hide/${jobId}`)
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['discover-feed'] })
+    },
+  })
+}
+
+// ─── Discover Tracker ─────────────────────────────────────
+
+export interface TrackerJob {
+  _id: string
+  jobListingId: DiscoverFeedJob
+  stage: string
+  notes: string
+  checklistState: {
+    resumeTailored: boolean
+    coverLetterGenerated: boolean
+    companyResearched: boolean
+    interviewPracticed: boolean
+    followUpSent: boolean
+  }
+  activityLog: Array<{ action: string; timestamp: string }>
+  trackedAt: string
+  appliedAt?: string
+  lastActivityAt?: string
+  match: {
+    atsScore: number
+    matchedKeywords: string[]
+    missingKeywords: string[]
+    sectionScores: Record<string, number>
+    matchIntelligenceLine: string
+  } | null
+}
+
+export interface TrackerStats {
+  totalTracked: number
+  responseRate: number
+  averageMatchScore: number
+  ghostedCount: number
+}
+
+export function useTracker() {
+  return useQuery({
+    queryKey: ['tracker'],
+    queryFn: async () => {
+      const { data } = await api.get('/discover/tracker')
+      return (data.data || data) as TrackerJob[]
+    },
+  })
+}
+
+export function useTrackJob() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (body: { jobListingId?: string; url?: string; description?: string }) => {
+      const { data } = await api.post('/discover/tracker', body)
+      return data.data || data
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['tracker'] })
+      qc.invalidateQueries({ queryKey: ['discover-feed'] })
+      qc.invalidateQueries({ queryKey: ['discover-feed-stats'] })
+    },
+  })
+}
+
+export function useUpdateTrackerJob() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async ({ id, ...body }: { id: string; stage?: string; notes?: string; checklistState?: Record<string, boolean> }) => {
+      const { data } = await api.patch(`/discover/tracker/${id}`, body)
+      return data.data || data
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['tracker'] })
+      qc.invalidateQueries({ queryKey: ['tracker-stats'] })
+    },
+  })
+}
+
+export function useDeleteTrackerJob() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (id: string) => {
+      await api.delete(`/discover/tracker/${id}`)
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['tracker'] })
+      qc.invalidateQueries({ queryKey: ['tracker-stats'] })
+    },
+  })
+}
+
+export function useTrackerStats() {
+  return useQuery({
+    queryKey: ['tracker-stats'],
+    queryFn: async () => {
+      const { data } = await api.get('/discover/tracker/stats')
+      return (data.data || data) as TrackerStats
     },
   })
 }

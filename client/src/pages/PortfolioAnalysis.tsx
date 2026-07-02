@@ -59,6 +59,29 @@ export default function PortfolioAnalysis() {
   const hasPastAnalyses = (stats?.portfolioAnalyses ?? 0) > 0
 
   useEffect(() => {
+    if (result) {
+      if (result.status === 'failed') {
+        console.error('[PortfolioAnalysis] job failed', {
+          status: result.status,
+          error: (result as any).error || 'No error detail from server',
+          analysisId,
+        })
+      } else if (result.status === 'completed') {
+        console.debug('[PortfolioAnalysis] job completed', {
+          overallScore: result.overallScore,
+          confirmedSkills: result.confirmedSkills?.length,
+          missingSkills: result.missingSkills?.length,
+        })
+      } else {
+        console.debug('[PortfolioAnalysis] status update', {
+          status: result.status,
+          analysisId,
+        })
+      }
+    }
+  }, [result, analysisId])
+
+  useEffect(() => {
     if (isComplete && result) {
       const target = result.overallScore
       const duration = 800
@@ -78,11 +101,14 @@ export default function PortfolioAnalysis() {
 
   const handleAnalyze = async () => {
     if (!resumeId || !portfolioUrl) return
+    console.debug('[PortfolioAnalysis] starting analysis', { resumeId, portfolioUrl, tone: 'all' })
     setError('')
     try {
       const res = await analyze.mutateAsync({ resumeId, portfolioUrl })
+      console.debug('[PortfolioAnalysis] analysis created', { analysisId: res.analysisId })
       setAnalysisId(res.analysisId)
     } catch (err) {
+      console.error('[PortfolioAnalysis] failed to start analysis', err)
       setError((err as Error)?.message || 'Analysis failed to start. Please try again.')
     }
   }
@@ -191,7 +217,9 @@ export default function PortfolioAnalysis() {
                   Analysis failed
                 </h3>
                 <p className="text-sm text-muted">
-                  {statusError
+                  {(result as any)?.error
+                    ? (result as any).error
+                    : statusError
                     ? (statusError as any)?.message || 'Could not complete the portfolio analysis.'
                     : 'Could not complete the portfolio analysis. Try again.'}
                 </p>
@@ -228,10 +256,10 @@ export default function PortfolioAnalysis() {
                   {scoreInterpretation(result.overallScore)}
                 </h2>
                 <p className="text-sm text-white/60 leading-relaxed">
-                  {result.confirmedSkills.length > 0
+                  {(result.confirmedSkills?.length ?? 0) > 0
                     ? `Your portfolio confirms ${result.confirmedSkills.length} skill${result.confirmedSkills.length > 1 ? 's' : ''} from your resume.`
                     : 'Your portfolio did not confirm any skills from your resume.'}
-                  {result.missingSkills.length > 0 &&
+                  {(result.missingSkills?.length ?? 0) > 0 &&
                     ` ${result.missingSkills.length} skill${result.missingSkills.length > 1 ? 's' : ''} listed on your resume lack supporting projects.`}
                 </p>
               </div>
@@ -244,7 +272,7 @@ export default function PortfolioAnalysis() {
                   Skills confirmed
                 </div>
                 <div className="flex flex-wrap gap-1.5">
-                  {result.confirmedSkills.length > 0 ? (
+                  {(result.confirmedSkills?.length ?? 0) > 0 ? (
                     result.confirmedSkills.map((s: string) => (
                       <span key={s} className="badge badge-success">
                         {s}
@@ -262,7 +290,7 @@ export default function PortfolioAnalysis() {
                   Skills missing
                 </div>
                 <div className="flex flex-wrap gap-1.5">
-                  {result.missingSkills.length > 0 ? (
+                  {(result.missingSkills?.length ?? 0) > 0 ? (
                     result.missingSkills.map((s: string) => (
                       <span key={s} className="badge badge-danger">
                         {s}
@@ -272,7 +300,7 @@ export default function PortfolioAnalysis() {
                     <p className="text-xs text-muted">All resume skills are evidenced.</p>
                   )}
                 </div>
-                {result.missingSkills.length > 0 && (
+                {(result.missingSkills?.length ?? 0) > 0 && (
                   <p className="text-xs text-muted mt-3 leading-relaxed">
                     You list these skills on your resume but your portfolio has no projects
                     that evidence them. Add a case study for each.
@@ -281,7 +309,7 @@ export default function PortfolioAnalysis() {
               </div>
             </div>
 
-            {result.projects && result.projects.length > 0 && (
+            {(result.projects?.length ?? 0) > 0 && (
               <div className="card">
                 <div className="section-title mb-4">
                   Projects found ({result.projects.length})
@@ -321,7 +349,7 @@ export default function PortfolioAnalysis() {
               </div>
             )}
 
-            {result.suggestions && result.suggestions.length > 0 && (
+            {(result.suggestions?.length ?? 0) > 0 && (
               <div className="card">
                 <div className="section-title mb-4">
                   How to improve your portfolio
@@ -364,7 +392,7 @@ export default function PortfolioAnalysis() {
               </h3>
 
               <div className="max-w-xs mx-auto text-left space-y-3">
-                {processSteps.map((label, i) => {
+                {(processSteps || []).map((label, i) => {
                   const state = stepState(currentIdx, i)
                   return (
                     <div key={label} className="flex items-center gap-3">

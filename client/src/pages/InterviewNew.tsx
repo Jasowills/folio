@@ -1,8 +1,7 @@
 import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { IconArrowLeft, IconArrowRight, IconDeviceLaptop, IconCode, IconClock, IconBrain, IconWorld, IconLoader, IconCircleCheck } from '@tabler/icons-react'
-import { useNavigate } from 'react-router-dom'
-import { useAuth } from '../hooks/useAuth'
+import { IconArrowLeft, IconArrowRight, IconBrain, IconWorld, IconLoader, IconCircleCheck } from '@tabler/icons-react'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useResumes } from '../lib/queries'
 import { useCreateInterviewSession, useGeneratePersona } from '../lib/queries'
 import { Button } from '../components/ui/button'
@@ -52,17 +51,17 @@ const DURATIONS = [
 
 export default function InterviewNew() {
   const navigate = useNavigate()
-  const { user } = useAuth()
+  const [searchParams] = useSearchParams()
   const { data: resumes } = useResumes()
   const createSession = useCreateInterviewSession()
   const generatePersona = useGeneratePersona()
 
   const [step, setStep] = useState(0)
-  const [role, setRole] = useState('')
+  const [role, setRole] = useState(searchParams.get('role') || '')
   const [level, setLevel] = useState('mid')
   const [interviewTypes, setInterviewTypes] = useState<string[]>([])
-  const [companyName, setCompanyName] = useState('')
-  const [companyUrl, setCompanyUrl] = useState('')
+  const [companyName, setCompanyName] = useState(searchParams.get('company') || '')
+  const [companyUrl, setCompanyUrl] = useState(searchParams.get('url') || '')
   const [techStack, setTechStack] = useState('')
   const [includesCoding, setIncludesCoding] = useState(false)
   const [difficulty, setDifficulty] = useState('mixed')

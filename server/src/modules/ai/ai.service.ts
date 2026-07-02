@@ -11,6 +11,7 @@ interface OpenRouterRequest {
   max_tokens: number;
   stream: boolean;
   messages: ChatMessage[];
+  response_format?: { type: 'json_object' };
 }
 
 interface OpenRouterResponse {
@@ -95,6 +96,22 @@ export class AiService {
     return process.env.OPENROUTER_API_KEY || '';
   }
 
+  private get groqConfigured(): boolean {
+    return !!process.env.GROQ_API_KEY;
+  }
+
+  private get groqBaseUrl(): string {
+    return process.env.GROQ_BASE_URL || 'https://api.groq.com/openai/v1';
+  }
+
+  private get groqDefaultModel(): string {
+    return process.env.GROQ_DEFAULT_MODEL || 'llama-3.3-70b-versatile';
+  }
+
+  private get groqFallbackModel(): string {
+    return process.env.GROQ_FALLBACK_MODEL || 'mixtral-8x7b-32768';
+  }
+
   private todayKey(): string {
     return new Date().toISOString().slice(0, 10);
   }
@@ -145,9 +162,37 @@ export class AiService {
     system: string,
     user: string,
     model?: string,
-  ): Promise<Record<string, unknown>> {
+  ): Promise<Record<string, unknown>>;
+  async chat(
+    system: string,
+    user: string,
+    model: string | undefined,
+    format: 'text',
+  ): Promise<string>;
+  async chat(
+    system: string,
+    user: string,
+    model?: string,
+    format: 'json' | 'text' = 'json',
+  ): Promise<Record<string, unknown> | string> {
     const resolvedModel = model || (this.ollamaConfigured ? this.ollamaDefaultModel : this.openrouterDefaultModel);
     const cacheKey = this.cache.makeKey(system, user, resolvedModel);
+
+    if (format === 'text') {
+      const messages: ChatMessage[] = [
+        { role: 'system', content: system },
+        { role: 'user', content: user },
+      ];
+      const isValidText = (raw: string): boolean => {
+        const trimmed = raw.trim()
+        if (trimmed.length < 5) return false
+        if (trimmed.startsWith('{') || trimmed.startsWith('[')) return false
+        if (/"(userId|response|text|message|interviewerResponse|role|content)"\s*:/.test(trimmed)) return false
+        if (trimmed.length > 0 && trimmed[0] === '"' && trimmed.includes('":')) return false
+        return true
+      }
+      return this.callWithRetry(messages, model, 2048, isValidText);
+    }
 
     const cached = this.cache.get(cacheKey);
     if (cached) {
@@ -187,17 +232,17 @@ export class AiService {
     const selectedModel = model || (this.ollamaConfigured ? this.ollamaDefaultModel : this.openrouterDefaultModel);
 
     if (this.ollamaConfigured) {
-      return this.streamFromProvider(this.ollamaBaseUrl, selectedModel, messages, false);
+      return this.streamFromProvider('ollama', this.ollamaBaseUrl, selectedModel, messages);
     }
 
-    return this.streamFromProvider(this.openrouterBaseUrl, selectedModel, messages, true);
+    return this.streamFromProvider('openrouter', this.openrouterBaseUrl, selectedModel, messages);
   }
 
   private async streamFromProvider(
+    provider: 'ollama' | 'openrouter' | 'groq',
     baseUrl: string,
     model: string,
     messages: ChatMessage[],
-    isOpenRouter: boolean,
   ): Promise<ReadableStream<Uint8Array>> {
     const url = `${baseUrl}/chat/completions`;
 
@@ -205,10 +250,12 @@ export class AiService {
       'Content-Type': 'application/json',
     };
 
-    if (isOpenRouter) {
+    if (provider === 'openrouter') {
       headers['Authorization'] = `Bearer ${this.openrouterApiKey}`;
       headers['HTTP-Referer'] = 'https://folio.app';
       headers['X-Title'] = 'Folio &';
+    } else if (provider === 'groq') {
+      headers['Authorization'] = `Bearer ${process.env.GROQ_API_KEY}`;
     }
 
     const res = await fetch(url, {
@@ -223,7 +270,7 @@ export class AiService {
     });
 
     if (!res.ok || !res.body) {
-      throw new Error(`${isOpenRouter ? 'OpenRouter' : 'Ollama'} stream error: ${res.status}`);
+      throw new Error(`${provider} stream error: ${res.status}`);
     }
 
     return res.body;
@@ -242,7 +289,10 @@ export class AiService {
     const category = this.promptCategory(system);
     const maxTokens = category === 'extraction' || category === 'interview' ? this.extractionMaxTokens : this.maxTokens;
 
-    const raw = await this.callWithRetry(messages, model, maxTokens);
+    const raw = await this.callWithRetry(messages, model, maxTokens, (text) => {
+      const parsed = this.parseJson(text);
+      return Object.keys(parsed).length > 0;
+    });
     if (category === 'interview') {
       this.logger.log(`[callAi] raw response (first 500 chars): ${raw.slice(0, 500)}`);
       this.logger.log(`[callAi] raw response (last 300 chars): ${raw.slice(-300)}`);
@@ -255,7 +305,7 @@ export class AiService {
   }
 
   private async tryProvider(
-    provider: 'ollama' | 'openrouter',
+    provider: 'ollama' | 'openrouter' | 'groq',
     model: string,
     messages: ChatMessage[],
     maxTokens?: number,
@@ -270,6 +320,9 @@ export class AiService {
     try {
       if (provider === 'ollama') {
         return await this.callOllama(model, messages, maxTokens);
+      }
+      if (provider === 'groq') {
+        return await this.callGroq(model, messages, maxTokens);
       }
       return await this.callOpenRouter(model, messages, maxTokens);
     } catch (err) {
@@ -288,6 +341,7 @@ export class AiService {
     messages: ChatMessage[],
     model?: string,
     maxTokens?: number,
+    validate?: (raw: string) => boolean,
   ): Promise<string> {
     const usesOllama = this.ollamaConfigured;
     const tokens = maxTokens ?? this.maxTokens;
@@ -296,20 +350,31 @@ export class AiService {
     const primaryModel = model || (usesOllama ? this.ollamaDefaultModel : this.openrouterDefaultModel);
     const fallbackModel = this.openrouterFallbackModel;
 
+    const valid = (raw: string | null): raw is string =>
+      raw !== null && (!validate || validate(raw));
+
     for (let attempt = 1; attempt <= 3; attempt++) {
       // Try primary provider
       const r1 = await this.tryProvider(primaryProvider, primaryModel, messages, tokens);
-      if (r1 !== null) return r1;
+      if (valid(r1)) return r1;
 
       // If Ollama is primary, try OpenRouter as fallback
       if (usesOllama) {
         const r2 = await this.tryProvider('openrouter', this.openrouterDefaultModel, messages, tokens);
-        if (r2 !== null) return r2;
+        if (valid(r2)) return r2;
       }
 
       // Try OpenRouter fallback model
       const r3 = await this.tryProvider('openrouter', fallbackModel, messages, tokens);
-      if (r3 !== null) return r3;
+      if (valid(r3)) return r3;
+
+      // Try Groq as tertiary fallback
+      if (this.groqConfigured) {
+        const r4 = await this.tryProvider('groq', this.groqDefaultModel, messages, tokens);
+        if (valid(r4)) return r4;
+        const r5 = await this.tryProvider('groq', this.groqFallbackModel, messages, tokens);
+        if (valid(r5)) return r5;
+      }
 
       if (attempt < 3) {
         const delay = 3000 + Math.random() * 2000;
@@ -381,6 +446,117 @@ export class AiService {
     }
   }
 
+  private async callGroq(
+    model: string,
+    messages: ChatMessage[],
+    maxTokens?: number,
+  ): Promise<string> {
+    const url = `${this.groqBaseUrl}/chat/completions`;
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 120_000);
+
+    const finish = () => clearTimeout(timeout);
+
+    try {
+      this.logger.log(`Calling Groq ${model}`);
+
+      const res = await fetch(url, {
+        signal: controller.signal,
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${process.env.GROQ_API_KEY}`,
+        },
+        body: JSON.stringify({
+          model,
+          max_tokens: maxTokens ?? this.maxTokens,
+          stream: false,
+          messages,
+        }),
+      });
+
+      finish();
+
+      if (!res.ok) {
+        const body = await res.text().catch(() => '');
+        if (res.status === 429) {
+          throw new Error(`429 rate limited${body ? ` — ${body.slice(0, 100)}` : ''}`);
+        }
+        throw new Error(`Groq API error: ${res.status}${body ? ` — ${body.slice(0, 200)}` : ''}`);
+      }
+
+      const data = (await res.json()) as OpenRouterResponse;
+
+      this.logger.log(`Groq ${model} response received`);
+
+      return data.choices[0]?.message?.content || '';
+    } catch (e) {
+      finish();
+      throw e;
+    }
+  }
+
+  async chatForInterview(
+    system: string,
+    user: string,
+  ): Promise<string> {
+    const messages: ChatMessage[] = [
+      { role: 'system', content: system },
+      { role: 'user', content: user },
+    ];
+
+    const interviewProviders: Array<{ provider: 'groq' | 'openrouter'; model: string }> = [
+      { provider: 'groq', model: this.groqDefaultModel },
+      { provider: 'groq', model: this.groqFallbackModel },
+      { provider: 'openrouter', model: this.openrouterFallbackModel },
+    ];
+
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      for (const { provider, model } of interviewProviders) {
+        if (provider === 'groq' && !this.groqConfigured) continue;
+        const result = await this.tryProviderForInterview(provider, model, messages);
+        if (result !== null) return result;
+      }
+
+      if (attempt < 3) {
+        const delay = 3000 + Math.random() * 2000;
+        this.logger.debug(`[chatForInterview] Retry ${attempt + 1}/3 after ${Math.round(delay)}ms`);
+        await new Promise((r) => setTimeout(r, delay));
+      }
+    }
+
+    throw new Error('AI service is currently unavailable. All providers exhausted. Please try again later.');
+  }
+
+  private async tryProviderForInterview(
+    provider: 'groq' | 'openrouter',
+    model: string,
+    messages: ChatMessage[],
+  ): Promise<string | null> {
+    const key = this.providerKey(provider, model);
+
+    if (this.isOnCooldown(key)) {
+      this.logger.debug(`Skipping ${provider}/${model} (circuit open)`);
+      return null;
+    }
+
+    try {
+      if (provider === 'groq') {
+        return await this.callGroq(model, messages, 2048);
+      }
+      return await this.callOpenRouter(model, messages, 2048);
+    } catch (err) {
+      const msg = (err as Error)?.message || String(err);
+      const is429 = msg.includes('429');
+      if (is429) {
+        this.setCooldown(key, CIRCUIT_BREAKER_TTL);
+        this.logger.warn(`${provider}/${model} rate-limited, circuit open for 30s`);
+      }
+      if (!is429) this.logger.warn(`${provider}/${model} error: ${msg}`);
+      return null;
+    }
+  }
+
   private async callOllama(
     model: string,
     messages: ChatMessage[],
@@ -404,6 +580,7 @@ export class AiService {
           max_tokens: maxTokens ?? this.maxTokens,
           stream: false,
           messages,
+          response_format: { type: 'json_object' } as const,
         } as OpenRouterRequest),
       });
 
@@ -447,14 +624,6 @@ export class AiService {
       return out
     }
 
-    // The 1B model sometimes wraps JSON in a JSON string (starts/ends with ")
-    // e.g. "{"firstName":"Kavya"}" — unwrap it before parsing
-    if (cleaned.startsWith('"') && cleaned.endsWith('"') && cleaned.indexOf('{') === 1) {
-      const inner = cleaned.slice(1, -1);
-      const parsed = tryParse(inner);
-      if (parsed) return parsed;
-    }
-
     const start = cleaned.indexOf('{');
     if (start === -1) {
       this.logger.debug(`parseJson: no '{' found in response`);
@@ -470,6 +639,14 @@ export class AiService {
       }
       return null;
     };
+
+    // The 1B model sometimes wraps JSON in a JSON string (starts/ends with ")
+    // e.g. "{"firstName":"Kavya"}" — unwrap it before parsing
+    if (cleaned.startsWith('"') && cleaned.endsWith('"') && cleaned.indexOf('{') === 1) {
+      const inner = cleaned.slice(1, -1);
+      const parsed = tryParse(inner)
+      if (parsed) return parsed
+    }
 
     // Try every complete JSON object in the response, not just the first one
     // The 1B model sometimes concatenates multiple objects (e.g. training artifacts)

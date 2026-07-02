@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useNavigate } from 'react-router-dom'
 import { useResumes, useStartResearch, useResearchStatus, useResearchHistory } from '../lib/queries'
@@ -35,12 +35,25 @@ export default function Research() {
   const [analysisId, setAnalysisId] = useState<string | null>(null)
   const [error, setError] = useState('')
   const [upgradeUrl, setUpgradeUrl] = useState('')
+  const [processingStuck, setProcessingStuck] = useState(false)
 
   const { data: job } = useResearchStatus(analysisId)
 
   const isComplete = job?.status === 'completed'
   const isFailed = job?.status === 'failed'
   const isProcessing = !isComplete && !isFailed && !!analysisId
+
+  // Timeout: if processing takes > 5 minutes, show stuck UI
+  const processingTimeoutRef = useRef<ReturnType<typeof setTimeout>>(undefined)
+  useEffect(() => {
+    if (isProcessing) {
+      setProcessingStuck(false)
+      processingTimeoutRef.current = setTimeout(() => setProcessingStuck(true), 5 * 60 * 1000)
+    } else {
+      clearTimeout(processingTimeoutRef.current)
+    }
+    return () => clearTimeout(processingTimeoutRef.current)
+  }, [isProcessing])
 
   const handleResearch = async () => {
     if (!companyName) return
@@ -98,8 +111,17 @@ export default function Research() {
 
   const recentJobs = (history?.jobs || []).slice(0, 3)
 
+  const crawlFeedRef = useRef<HTMLDivElement>(null)
   const pages = job?.crawlData?.pagesVisited || []
   const pageCount = job?.crawlData?.pageCount || 0
+  const currentlyCrawling = job?.crawlData?.currentlyCrawling || []
+
+  // Auto-scroll crawl feed when new pages arrive
+  useEffect(() => {
+    if (crawlFeedRef.current && pages.length > 0) {
+      crawlFeedRef.current.scrollTo({ top: crawlFeedRef.current.scrollHeight, behavior: 'smooth' })
+    }
+  }, [pages.length])
 
   return (
     <div className="page-container">
@@ -259,27 +281,26 @@ export default function Research() {
               <div className="text-center space-y-3">
                 <IconWorld className="h-8 w-8 text-teal animate-pulse mx-auto" />
                 <h3 className="font-display text-h4 text-white">
-                  {job?.status === 'crawling' ? `Crawling ${job.companyName}...` :
-                   job?.status === 'analysing' ? 'Synthesising your brief...' :
+                  {job?.status === 'crawling' ? `Researching ${job.companyName}...` :
+                   job?.status === 'analysing' ? 'Building your brief...' :
                    `Researching ${job?.companyName || companyName}...`}
                 </h3>
                 {job?.status === 'crawling' && (
-                  <p className="text-sm text-white/40">{pageCount} page{pageCount !== 1 ? 's' : ''} collected</p>
+                  <p className="text-sm text-white/40">{pageCount} source{pageCount !== 1 ? 's' : ''} found</p>
                 )}
               </div>
 
               {job?.status === 'crawling' && (
                 <>
                   {/* Live feed */}
-                  <div className="max-h-64 overflow-y-auto space-y-1.5 -mx-2 px-2 scrollbar-thin">
+                  <div ref={crawlFeedRef} className="max-h-64 overflow-y-auto space-y-1.5 -mx-2 px-2 scrollbar-thin">
                     {pages.length === 0 && (
                       <div className="flex items-center gap-2 text-sm text-white/30">
                         <span className="h-2 w-2 rounded-full bg-teal animate-pulse shrink-0" />
-                        Starting crawl...
+                        Gathering information...
                       </div>
                     )}
                     {pages.map((p, i) => {
-                      const isLatest = i === pages.length - 1
                       const hostname = p.url ? new URL(p.url).hostname.replace(/^www\./, '') : ''
                       return (
                         <motion.div
@@ -288,10 +309,31 @@ export default function Research() {
                           animate={{ opacity: 1, x: 0 }}
                           className="flex items-start gap-2.5"
                         >
-                          <span className={`h-2 w-2 rounded-full mt-1.5 shrink-0 ${isLatest ? 'bg-teal animate-pulse' : 'bg-teal/50'}`} />
+                          <span className="h-2 w-2 rounded-full mt-1.5 shrink-0 bg-teal/50" />
                           <div className="min-w-0 flex-1">
-                            <p className={`text-xs truncate ${isLatest ? 'text-white' : 'text-white/60'}`}>
+                            <p className="text-xs truncate text-white/60">
                               {p.title || hostname}
+                            </p>
+                            <p className="text-[10px] text-white/30 truncate">{hostname}</p>
+                          </div>
+                        </motion.div>
+                      )
+                    })}
+
+                    {/* In-progress URLs */}
+                    {currentlyCrawling.map((c) => {
+                      const hostname = c.url ? new URL(c.url).hostname.replace(/^www\./, '') : ''
+                      return (
+                        <motion.div
+                          key={c.url}
+                          initial={{ opacity: 0, x: -8 }}
+                          animate={{ opacity: 1, x: 0 }}
+                          className="flex items-start gap-2.5"
+                        >
+                          <span className="h-2 w-2 rounded-full mt-1.5 shrink-0 bg-teal animate-pulse" />
+                          <div className="min-w-0 flex-1">
+                            <p className="text-xs truncate text-teal/80">
+                              Scanning<span className="animate-pulse">...</span>
                             </p>
                             <p className="text-[10px] text-white/30 truncate">{hostname}</p>
                           </div>
@@ -303,6 +345,9 @@ export default function Research() {
                   {/* Stats bar */}
                   <div className="flex items-center justify-center gap-4 text-xs text-white/40">
                     <span>{pageCount} page{pageCount !== 1 ? 's' : ''}</span>
+                    {currentlyCrawling.length > 0 && (
+                      <span className="text-teal/60">{currentlyCrawling.length} scanning in parallel</span>
+                    )}
                   </div>
                 </>
               )}
@@ -312,7 +357,7 @@ export default function Research() {
                   <div className="flex items-center justify-center gap-2">
                     {pages.length > 0 && (
                       <span className="text-xs text-teal/70">
-                        Read {pageCount} page{pageCount !== 1 ? 's' : ''}
+                        Scanned {pageCount} source{pageCount !== 1 ? 's' : ''}
                       </span>
                     )}
                   </div>
@@ -320,6 +365,20 @@ export default function Research() {
                     <span className="h-2 w-2 rounded-full bg-teal animate-pulse" />
                     Generating your research brief...
                   </div>
+                </div>
+              )}
+
+              {processingStuck && (
+                <div className="text-center space-y-3 pt-2 border-t border-white/10">
+                  <p className="text-xs text-amber-400/80">
+                    This is taking longer than expected. You can restart or try again.
+                  </p>
+                  <button
+                    onClick={handleReset}
+                    className="text-xs text-teal hover:text-teal-light transition-colors cursor-pointer"
+                  >
+                    Start over
+                  </button>
                 </div>
               )}
             </div>
@@ -388,6 +447,9 @@ export default function Research() {
                   )}
                   {job.brief.companySizeSignal && (
                     <span className="text-xs text-muted">{job.brief.companySizeSignal}</span>
+                  )}
+                  {job.brief.salaryRange?.estimate && (
+                    <span className="text-xs text-amber font-medium">{job.brief.salaryRange.estimate}</span>
                   )}
                   {job.companyUrl && (
                     <a

@@ -12,6 +12,7 @@ import { InterviewSession, InterviewSessionSchema } from './schemas/interview-se
 import { InterviewTranscript, InterviewTranscriptSchema } from './schemas/interview-transcript.schema'
 import { InterviewProctoring, InterviewProctoringSchema } from './schemas/interview-proctoring.schema'
 import { InterviewResult, InterviewResultSchema } from './schemas/interview-result.schema'
+import { Resume, ResumeSchema } from '../resumes/schemas/resume.schema'
 
 @Module({
   imports: [
@@ -20,6 +21,7 @@ import { InterviewResult, InterviewResultSchema } from './schemas/interview-resu
       { name: InterviewTranscript.name, schema: InterviewTranscriptSchema },
       { name: InterviewProctoring.name, schema: InterviewProctoringSchema },
       { name: InterviewResult.name, schema: InterviewResultSchema },
+      { name: Resume.name, schema: ResumeSchema },
     ]),
     AiModule,
     ResumesModule,

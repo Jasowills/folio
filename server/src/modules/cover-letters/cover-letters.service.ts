@@ -93,12 +93,19 @@ export class CoverLettersService {
   ): Promise<{ content: string }> {
     const resume = await this.resumesService.findById(resumeId, userId);
 
-    const userPrompt = `Write a ${tone} cover letter for a ${jobTitle} role at ${company}.
+    const resumeData = resume.toJSON()
+    const candidateName = resumeData.name || 'The candidate'
+    const toneLabel = tone === 'all' ? 'balanced — blend professional polish with confident directness and a warm, creative personality. Adjust formality to match the industry' : tone
+    const userPrompt = `Write a cover letter for ${candidateName} applying for a ${jobTitle} role at ${company}. Tone: ${toneLabel}.
 
-Resume:
-${JSON.stringify(resume.toJSON())}
+COMPANY (the company the candidate is applying to):
+Name: ${company}
+Role: ${jobTitle}
+${jobDescription ? `Job Description:\n${jobDescription}` : ''}
 
-${jobDescription ? `Job Description:\n${jobDescription}` : ''}`;
+CANDIDATE'S RESUME (the candidate's own experience, skills, and projects — DO NOT attribute these to ${company}):
+Name: ${candidateName}
+${JSON.stringify(resumeData)}`;
 
     const stream = await this.aiService.stream(
       COVER_LETTER_SYSTEM,

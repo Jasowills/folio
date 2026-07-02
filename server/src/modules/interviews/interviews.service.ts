@@ -5,6 +5,7 @@ import { InterviewSession, InterviewSessionDocument, InterviewerPersona, Intervi
 import { InterviewTranscript, InterviewTranscriptDocument, TranscriptTurn } from './schemas/interview-transcript.schema'
 import { InterviewProctoring, InterviewProctoringDocument, ProctoringEvent } from './schemas/interview-proctoring.schema'
 import { InterviewResult, InterviewResultDocument } from './schemas/interview-result.schema'
+import { Resume, ResumeDocument } from '../resumes/schemas/resume.schema'
 import { AiService } from '../ai/ai.service'
 import { ResumeParserService } from '../resumes/resume-parser.service'
 import { CompanyResearchService } from './company-research.service'
@@ -19,6 +20,7 @@ export class InterviewsService {
     @InjectModel(InterviewTranscript.name) private transcriptModel: Model<InterviewTranscriptDocument>,
     @InjectModel(InterviewProctoring.name) private proctoringModel: Model<InterviewProctoringDocument>,
     @InjectModel(InterviewResult.name) private resultModel: Model<InterviewResultDocument>,
+    @InjectModel(Resume.name) private resumeModel: Model<ResumeDocument>,
     private aiService: AiService,
     private resumeParser: ResumeParserService,
     private companyResearch: CompanyResearchService,
@@ -67,6 +69,15 @@ export class InterviewsService {
     return this.sessionModel.findById(sessionId).exec()
   }
 
+  async getResumeById(resumeId: string): Promise<ResumeDocument | null> {
+    return this.resumeModel.findById(resumeId).exec()
+  }
+
+  async getTranscriptTurns(sessionId: string): Promise<TranscriptTurn[]> {
+    const transcript = await this.transcriptModel.findOne({ sessionId }).exec()
+    return transcript?.turns || []
+  }
+
   async generatePersona(sessionId: string, userId: string): Promise<InterviewerPersona> {
     const session = await this.getSession(sessionId, userId)
     if (session.interviewerPersona) {
@@ -88,6 +99,24 @@ export class InterviewsService {
       }).exec()
     }
 
+    const resume = session.resumeId ? await this.getResumeById(session.resumeId.toString()) : null
+    const resumeInfo = resume ? {
+      name: resume.name || null,
+      summary: resume.summary || null,
+      skills: resume.skills || [],
+      experience: (resume.experience || []).map((e) => ({
+        company: e.company,
+        title: e.title,
+        years: e.endDate || e.current ? `${e.startDate || ''} – ${e.current ? 'Present' : e.endDate || ''}` : '',
+        bullets: e.bullets?.slice(0, 3) || [],
+      })),
+      education: (resume.education || []).map((e) => ({
+        institution: e.institution,
+        degree: e.degree,
+        field: e.field,
+      })),
+    } : null
+
     const rawPersona = await this.aiService.chat(
       PERSONA_GENERATION_SYSTEM,
       JSON.stringify({
@@ -100,6 +129,7 @@ export class InterviewsService {
         includesCoding: session.includesCoding,
         difficulty: session.difficulty,
         plannedDuration: session.plannedDuration,
+        candidate: resumeInfo,
       }),
     )
 
@@ -269,8 +299,10 @@ export class InterviewsService {
   }
 
   async addTurn(sessionId: string, turn: TranscriptTurn): Promise<void> {
-    const transcript = await this.transcriptModel.findOne({ sessionId }).exec()
-    if (!transcript) throw new NotFoundException('Transcript not found')
+    let transcript = await this.transcriptModel.findOne({ sessionId }).exec()
+    if (!transcript) {
+      transcript = await this.transcriptModel.create({ sessionId, turns: [] })
+    }
     transcript.turns.push(turn)
     await transcript.save()
   }
@@ -280,14 +312,17 @@ export class InterviewsService {
     return transcript ? transcript.turns.length > 0 : false
   }
 
-  buildGreeting(session: InterviewSessionDocument): string | null {
+  buildGreeting(session: InterviewSessionDocument, candidateName?: string | null): string | null {
     const persona = session.interviewerPersona as InterviewerPersona | undefined
     if (!persona?.interviewerName) return null
     const title = persona.interviewerTitle || ''
     const role = session.role || ''
     const duration = session.plannedDuration || 30
     const name = persona.interviewerName
-    return `Hi, I'm ${name}${title ? `, ${title}` : ''}. I'll be interviewing you today for the ${role} position. We'll spend about ${duration} minutes discussing your experience and expertise. Feel free to take a moment to think before answering. Let's get started.`
+    const greeting = candidateName
+      ? `Hi ${candidateName}, I'm ${name}${title ? `, ${title}` : ''}. Thank you for joining me today. I'll be interviewing you for the ${role} position. We'll spend about ${duration} minutes discussing your background and expertise. Feel free to take a moment to think before answering. Let's get started.`
+      : `Hi, I'm ${name}${title ? `, ${title}` : ''}. I'll be interviewing you today for the ${role} position. We'll spend about ${duration} minutes discussing your experience and expertise. Feel free to take a moment to think before answering. Let's get started.`
+    return greeting
   }
 
   async addProctoringEvent(sessionId: string, event: ProctoringEvent): Promise<void> {

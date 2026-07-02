@@ -10,9 +10,9 @@ export function validateEnv() {
     ['CLIENT_URL', 'Client application URL'],
   ];
 
-  // OPENROUTER_API_KEY is required unless Ollama is configured as the primary provider
-  if (!process.env.OLLAMA_BASE_URL && !process.env.OPENROUTER_API_KEY) {
-    required.push(['OPENROUTER_API_KEY', 'OpenRouter API key for AI calls — not needed if OLLAMA_BASE_URL is set']);
+  // OPENROUTER_API_KEY is required unless Ollama or Groq is configured
+  if (!process.env.OLLAMA_BASE_URL && !process.env.OPENROUTER_API_KEY && !process.env.GROQ_API_KEY) {
+    required.push(['OPENROUTER_API_KEY or GROQ_API_KEY', 'OpenRouter or Groq API key for AI calls — not needed if OLLAMA_BASE_URL is set']);
   }
 
   const missing: string[] = [];

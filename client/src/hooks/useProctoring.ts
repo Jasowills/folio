@@ -50,7 +50,6 @@ export function useProctoring({ enabled, onEvent }: UseProctoringOptions) {
 
     const handleFocus = () => {
       if (blurStartRef.current) {
-        const duration = Date.now() - blurStartRef.current
         blurStartRef.current = null
       }
     }

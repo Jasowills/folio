@@ -6,7 +6,7 @@ import { ScoreRing } from '../components/ScoreRing'
 import PdfViewer from '../components/PdfViewer'
 import { Button } from '../components/ui/button'
 import { cn } from '../lib/utils'
-import { IconCircleCheck, IconAlertTriangle, IconChevronDown, IconChevronRight, IconSparkles, IconFileText, IconCircleX, IconRefresh, IconAward, IconBook, IconCode, IconGlobe, IconLanguage, IconBulb, IconChartBar, IconEye, IconListCheck, IconTrendingUp, IconClock } from '@tabler/icons-react'
+import { IconCircleCheck, IconAlertTriangle, IconChevronDown, IconChevronRight, IconSparkles, IconFileText, IconCircleX, IconRefresh, IconAward, IconBook, IconCode, IconGlobe, IconLanguage, IconBulb, IconChartBar, IconEye, IconListCheck } from '@tabler/icons-react'
 
 type StreamingState = 'idle' | 'connecting' | 'streaming' | 'complete' | 'error'
 
@@ -318,21 +318,6 @@ function NextActionsBlock({ suggestions }: { suggestions: string[] }) {
   )
 }
 
-function ReviewHistoryBlock() {
-  return (
-    <div>
-      <div className="section-title mb-4">
-        <IconTrendingUp className="h-4 w-4 text-muted" />
-        Review History
-      </div>
-      <div className="card text-center py-6">
-        <IconClock className="h-8 w-8 text-muted-light mx-auto mb-2" />
-        <p className="text-sm text-muted">No previous reviews</p>
-        <p className="text-xs text-muted-light mt-0.5">Future analyses will appear here.</p>
-      </div>
-    </div>
-  )
-}
 
 function LoadingSkeleton() {
   return (

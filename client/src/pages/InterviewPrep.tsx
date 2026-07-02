@@ -1,10 +1,14 @@
 import { useEffect, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { IconBrain, IconPlayerPlay, IconAlertTriangle } from '@tabler/icons-react'
+import { IconPlayerPlay, IconAlertTriangle } from '@tabler/icons-react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
+import { io } from 'socket.io-client'
 import { useSession, useStartSession } from '../lib/queries'
+import { setPreConnectedSocket } from '../lib/socket-store'
 import { Button } from '../components/ui/button'
 import { showToast } from '../components/ui/toast'
+
+const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || 'http://localhost:8080'
 
 export default function InterviewPrep() {
   const navigate = useNavigate()
@@ -32,6 +36,19 @@ export default function InterviewPrep() {
     if (!sessionId) return
     try {
       await startSession.mutateAsync(sessionId)
+
+      const socket = io(`${SOCKET_URL}/interview`, {
+        transports: ['websocket', 'polling'],
+      })
+      socket.on('connect', () => {
+        console.log(`[Prep] Pre-connected socket ${socket.id}, joining ${sessionId}`)
+        socket.emit('join', { sessionId })
+      })
+      socket.on('connect_error', (err) => {
+        console.error(`[Prep] Pre-connect error: ${err.message}`)
+      })
+      setPreConnectedSocket(socket)
+
       setCountdown(3)
     } catch {
       showToast('error', 'Failed to start session')

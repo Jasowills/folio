@@ -14,6 +14,7 @@ import { StatsModule } from './modules/stats/stats.module';
 import { ExportModule } from './modules/export/export.module';
 import { InterviewsModule } from './modules/interviews/interviews.module';
 import { ResearchModule } from './modules/research/research.module';
+import { DiscoverModule } from './modules/discover/discover.module';
 import { PerUserThrottlerGuard } from './common/guards/per-user-throttler.guard';
 
 @Module({
@@ -46,6 +47,7 @@ import { PerUserThrottlerGuard } from './common/guards/per-user-throttler.guard'
     ExportModule,
     InterviewsModule,
     ResearchModule,
+    DiscoverModule,
   ],
   providers: [
     {
