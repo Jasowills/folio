@@ -48,7 +48,7 @@ export function ModernTemplate({ resume, localData, primaryColor, showSections, 
           <div data-section="skills" className="mt-4 break-inside-avoid">
             <h2 className="text-[9px] font-semibold uppercase tracking-wider text-white/60 mb-1.5">Skills</h2>
             <div className="flex flex-wrap gap-1">
-              {(localData.skills && localData.skills.length > 0 ? localData.skills : resume.skills || []).filter(Boolean).map((s, i) => (
+              {(localData.skills && localData.skills.length > 0 ? localData.skills.map(s => s.name) : resume.skills || []).filter(Boolean).map((s, i) => (
                 <span key={i} className="text-[8px] bg-white/10 px-1.5 py-0.5 rounded text-white/80">{s}</span>
               ))}
             </div>

@@ -1,7 +1,7 @@
 import { useLayoutEffect, useRef, useState } from 'react'
 import { A4Page } from './A4Page'
 import type { SectionName } from '../../pages/editor/types'
-import { ALL_SECTIONS } from '../../pages/editor/types'
+import { BUILTIN_SECTIONS } from '../../pages/editor/types'
 
 export interface PageInfo {
   showSections: Set<SectionName> | undefined
@@ -57,14 +57,14 @@ export function MultiPagePreview({ children, zoom, singlePage, contentKey }: Pro
     })
 
     if (heights.length === 0) {
-      setPages([ALL_SECTIONS])
+      setPages([BUILTIN_SECTIONS])
       return
     }
 
     // Check if total content (including header) fits on one page
     const scrollHeight = pageEl.scrollHeight
     if (scrollHeight <= pageHeight) {
-      setPages([ALL_SECTIONS])
+      setPages([BUILTIN_SECTIONS])
       return
     }
 
@@ -122,7 +122,7 @@ export function MultiPagePreview({ children, zoom, singlePage, contentKey }: Pro
     )
   }
 
-  const showPages = pages ?? [ALL_SECTIONS]
+  const showPages = pages ?? [BUILTIN_SECTIONS]
 
   return (
     <>

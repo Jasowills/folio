@@ -74,6 +74,7 @@ export default function InterviewLive() {
 
   const [selfViewStream, setSelfViewStream] = useState<MediaStream | null>(null)
   const selfViewRef = useRef<HTMLVideoElement>(null)
+  const selfViewStreamRef = useRef<MediaStream | null>(null)
   const [displayedChars, setDisplayedChars] = useState(0)
   const timerRef = useRef<ReturnType<typeof setInterval> | undefined>(undefined)
   const pauseTimerRef = useRef<ReturnType<typeof setInterval> | undefined>(undefined)
@@ -151,8 +152,9 @@ export default function InterviewLive() {
   // Camera self-view
   useEffect(() => {
     if (!cameraEnabled) {
-      if (selfViewStream) {
-        selfViewStream.getTracks().forEach((t) => t.stop())
+      if (selfViewStreamRef.current) {
+        selfViewStreamRef.current.getTracks().forEach((t) => t.stop())
+        selfViewStreamRef.current = null
         setSelfViewStream(null)
       }
       return
@@ -162,10 +164,17 @@ export default function InterviewLive() {
       .getUserMedia({ video: { facingMode: 'user', width: 320, height: 240 } })
       .then((stream) => {
         if (cancelled) { stream.getTracks().forEach((t) => t.stop()); return }
+        selfViewStreamRef.current = stream
         setSelfViewStream(stream)
       })
       .catch(() => {})
-    return () => { cancelled = true }
+    return () => {
+      cancelled = true
+      if (selfViewStreamRef.current) {
+        selfViewStreamRef.current.getTracks().forEach((t) => t.stop())
+        selfViewStreamRef.current = null
+      }
+    }
   }, [cameraEnabled])
 
   // Sync camera stream to video element (renders after state update)
@@ -245,6 +254,10 @@ export default function InterviewLive() {
   useEffect(() => {
     return () => {
       stopMicrophone()
+      if (selfViewStreamRef.current) {
+        selfViewStreamRef.current.getTracks().forEach((t) => t.stop())
+        setSelfViewStream(null)
+      }
     }
   }, [stopMicrophone])
 
@@ -252,6 +265,9 @@ export default function InterviewLive() {
   useEffect(() => {
     const handleBeforeUnload = () => {
       stopMicrophone()
+      if (selfViewStreamRef.current) {
+        selfViewStreamRef.current.getTracks().forEach((t) => t.stop())
+      }
     }
     window.addEventListener('beforeunload', handleBeforeUnload)
     return () => window.removeEventListener('beforeunload', handleBeforeUnload)
@@ -271,6 +287,7 @@ export default function InterviewLive() {
   const handleEnd = async () => {
     if (!sessionId || isEnding) return
     setIsEnding(true)
+    setCameraEnabled(false)
     wsEndSession()
     try {
       await endSession.mutateAsync(sessionId)

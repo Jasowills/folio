@@ -90,7 +90,7 @@ export function ExecutiveTemplate({ resume, localData, primaryColor, showSection
           <div data-section="skills" className="break-inside-avoid">
             <h2 className="font-serif text-[12px] font-bold uppercase tracking-wider mb-1.5" style={{ color: accentColor }}>Skills</h2>
             <div className="flex flex-wrap gap-1">
-              {(localData.skills && localData.skills.length > 0 ? localData.skills : resume.skills || []).filter(Boolean).map((s, i) => (
+              {(localData.skills && localData.skills.length > 0 ? localData.skills.map(s => s.name) : resume.skills || []).filter(Boolean).map((s, i) => (
                 <span key={i} className="text-[10px] bg-paper px-1.5 py-0.5 rounded text-muted">{s}</span>
               ))}
             </div>

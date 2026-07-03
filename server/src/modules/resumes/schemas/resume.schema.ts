@@ -123,6 +123,15 @@ export class Resume {
 
   @Prop({ type: [{ type: Object }] })
   versions?: ResumeVersion[];
+
+  @Prop()
+  editMode?: string;
+
+  @Prop({ type: Object })
+  design?: Record<string, unknown>;
+
+  @Prop({ type: [String] })
+  sectionOrder?: string[];
 }
 
 export const ResumeSchema = SchemaFactory.createForClass(Resume);

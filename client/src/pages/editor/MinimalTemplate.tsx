@@ -105,7 +105,7 @@ export function MinimalTemplate({ resume, localData, redFlags, primaryColor, sho
         <div data-section="skills" className="mb-5 break-inside-avoid">
           <h2 className={hClass} style={hStyle}>Skills</h2>
           <div className="flex flex-wrap gap-1">
-            {(localData.skills && localData.skills.length > 0 ? localData.skills : resume.skills || []).filter(Boolean).map((s, i) => (
+            {(localData.skills && localData.skills.length > 0 ? localData.skills.map(s => s.name) : resume.skills || []).filter(Boolean).map((s, i) => (
               <span key={i} className="text-[10px] bg-paper px-2 py-0.5 rounded text-muted">{s}</span>
             ))}
           </div>

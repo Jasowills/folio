@@ -1,5 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { AiService } from './ai.service';
+import { AiCacheService } from './ai-cache.service';
 
 const mockChatResponse = (content: string) =>
   Promise.resolve({
@@ -13,20 +14,24 @@ const mockChatResponse = (content: string) =>
 
 describe('AiService', () => {
   let service: AiService;
+  let module: TestingModule;
+  let cache: AiCacheService;
 
   beforeEach(async () => {
     process.env.OPENROUTER_API_KEY = 'sk-or-v1-test-key';
 
-    const module: TestingModule = await Test.createTestingModule({
-      providers: [AiService],
+    module = await Test.createTestingModule({
+      providers: [AiService, AiCacheService],
     }).compile();
 
     service = module.get<AiService>(AiService);
+    cache = module.get<AiCacheService>(AiCacheService);
   });
 
   afterEach(() => {
     jest.restoreAllMocks();
     delete process.env.OPENROUTER_API_KEY;
+    cache.clear();
   });
 
   describe('chat', () => {
@@ -40,14 +45,17 @@ describe('AiService', () => {
       expect(result).toEqual({ score: 85 });
     });
 
-    it('returns raw object when response is not JSON', async () => {
-      jest
-        .spyOn(globalThis, 'fetch')
-        .mockResolvedValue(mockChatResponse('plain text reply'));
+    it('uses second mock call when primary returns non-JSON', async () => {
+      const mockFn = jest
+        .fn()
+        .mockResolvedValueOnce(mockChatResponse('plain text reply'))
+        .mockResolvedValueOnce(mockChatResponse('{"ok": true}'));
+
+      jest.spyOn(globalThis, 'fetch').mockImplementation(mockFn);
 
       const result = await service.chat('system', 'user');
 
-      expect(result).toEqual({ raw: 'plain text reply' });
+      expect(result).toEqual({ ok: true });
     });
 
     it('falls back when primary model returns 429', async () => {
@@ -63,13 +71,11 @@ describe('AiService', () => {
       expect(result).toEqual({ ok: true });
     });
 
-    it('returns empty object on empty response', async () => {
+    it('throws when all providers return empty responses', async () => {
       jest.spyOn(globalThis, 'fetch').mockResolvedValue(mockChatResponse(''));
 
-      const result = await service.chat('system', 'user');
-
-      expect(result).toEqual({});
-    });
+      await expect(service.chat('system', 'user')).rejects.toThrow('AI service is currently unavailable');
+    }, 20_000);
   });
 
   describe('stream', () => {
