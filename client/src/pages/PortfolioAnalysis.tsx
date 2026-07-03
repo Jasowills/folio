@@ -51,12 +51,25 @@ export default function PortfolioAnalysis() {
 
   const [animatedScore, setAnimatedScore] = useState(0)
   const animFrameRef = useRef<number>(undefined)
+  const [elapsed, setElapsed] = useState(0)
 
   const isComplete = result?.status === 'completed'
   const isFailed = result?.status === 'failed'
   const status = (result?.status as string) || 'pending'
   const currentIdx = statusOrder.indexOf(status)
+  const estimatedIdx = currentIdx === -1
+    ? Math.min(Math.floor(elapsed / 8), processSteps.length - 1)
+    : currentIdx
   const hasPastAnalyses = (stats?.portfolioAnalyses ?? 0) > 0
+
+  useEffect(() => {
+    if (!analysisId || isComplete || isFailed) {
+      setElapsed(0)
+      return
+    }
+    const t = setInterval(() => setElapsed(p => p + 1), 1000)
+    return () => clearInterval(t)
+  }, [analysisId, isComplete, isFailed])
 
   useEffect(() => {
     if (result) {
@@ -383,19 +396,28 @@ export default function PortfolioAnalysis() {
             className="max-w-xl mx-auto pt-12"
           >
             <div className="bg-ink rounded-xl p-8 text-center space-y-8">
-              <span className="font-display text-teal text-4xl animate-pulse block">
-                &amp;
-              </span>
+              <div className="relative inline-flex items-center justify-center">
+                <div className="absolute inset-0 bg-teal rounded-full blur-3xl animate-[breathe-glow_2.4s_ease-in-out_infinite]" />
+                <span className="font-display text-teal text-5xl animate-[breathe_2.4s_ease-in-out_infinite] block relative">
+                  &amp;
+                </span>
+              </div>
 
               <h3 className="font-display text-h4 text-white">
-                {statusLabels[status] || 'Processing...'}
+                {statusLabels[status] || (status === 'running' ? 'Crawling your portfolio...' : 'Processing...')}
               </h3>
 
-              <div className="max-w-xs mx-auto text-left space-y-3">
-                {(processSteps || []).map((label, i) => {
-                  const state = stepState(currentIdx, i)
+              <div className="max-w-xs mx-auto text-left space-y-0">
+                {processSteps.map((label, i) => {
+                  const state = stepState(estimatedIdx, i)
                   return (
-                    <div key={label} className="flex items-center gap-3">
+                    <motion.div
+                      key={label}
+                      initial={{ opacity: 0, y: 4 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ duration: 0.25, delay: i * 0.08 }}
+                      className="flex items-center gap-3 py-1.5"
+                    >
                       {state === 'done' ? (
                         <span className="h-3 w-3 rounded-full bg-teal flex items-center justify-center shrink-0">
                           <svg className="h-2 w-2 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
@@ -403,12 +425,15 @@ export default function PortfolioAnalysis() {
                           </svg>
                         </span>
                       ) : state === 'active' ? (
-                        <span className="h-3 w-3 rounded-full bg-teal animate-pulse shrink-0" />
+                        <span className="h-3 w-3 rounded-full bg-teal shrink-0 relative">
+                          <span className="absolute inset-0 rounded-full bg-teal animate-ping-slow" />
+                          <span className="absolute inset-0 rounded-full bg-teal" />
+                        </span>
                       ) : (
-                        <span className="h-3 w-3 rounded-full bg-[#3A3A3A] shrink-0" />
+                        <span className="h-3 w-3 rounded-full bg-white/10 shrink-0" />
                       )}
                       <span
-                        className={`text-sm ${
+                        className={`text-sm transition-colors duration-300 ${
                           state === 'done'
                             ? 'text-white'
                             : state === 'active'
@@ -418,13 +443,26 @@ export default function PortfolioAnalysis() {
                       >
                         {label}
                       </span>
-                    </div>
+                    </motion.div>
                   )
                 })}
               </div>
 
-              <p className="text-sm text-white/40">
-                This takes 30–60 seconds. Stay on this page while we run the analysis.
+              <div className="max-w-xs mx-auto">
+                <div className="h-1 bg-white/10 rounded-full overflow-hidden">
+                  <motion.div
+                    className="h-full bg-teal rounded-full"
+                    initial={{ width: '0%' }}
+                    animate={{ width: `${Math.min((estimatedIdx + 1) / processSteps.length * 100, 95)}%` }}
+                    transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
+                  />
+                </div>
+              </div>
+
+              <p className="text-sm text-white/40 tabular-nums">
+                {elapsed < 60
+                  ? `${elapsed}s elapsed`
+                  : `${Math.floor(elapsed / 60)}m ${elapsed % 60}s elapsed`}
               </p>
             </div>
           </motion.div>

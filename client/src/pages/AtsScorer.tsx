@@ -84,6 +84,7 @@ export default function AtsScorer() {
 
   const handleSubmit = async () => {
     if (!resumeId || isPending) return
+    console.debug('[AtsScorer] submitting', { resumeId, hasJobDesc: !!jobDescription, hasJobUrl: !!jobUrl })
     setSearchParams({})
     setError('')
     try {
@@ -92,8 +93,10 @@ export default function AtsScorer() {
         jobDescription: jobDescription || undefined,
         jobUrl: jobUrl || undefined,
       })
+      console.debug('[AtsScorer] result received', { id: res._id, score: res.score })
       setSearchParams({ result: res._id })
     } catch (err) {
+      console.error('[AtsScorer] request failed', err)
       setShowProgress(false)
       setProgressStep(0)
       setError((err as Error)?.message || 'Check failed. Please try again.')

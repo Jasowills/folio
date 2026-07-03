@@ -57,6 +57,14 @@ Score this candidate against the job description. Use your role-specific knowled
       roleContext?: { detectedRole: string; confidenceLevel: string };
     };
 
+    console.log('[AtsService] AI result', {
+      score: result.score,
+      matchedCount: result.matchedKeywords?.length ?? 0,
+      missingCount: result.missingKeywords?.length ?? 0,
+      sectionScores: result.sectionScores,
+      suggestionsCount: result.suggestions?.length ?? 0,
+    });
+
     const atsScore = await this.atsModel.create({
       userId,
       resumeId,

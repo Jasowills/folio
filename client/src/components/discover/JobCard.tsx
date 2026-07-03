@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { ScoreRing } from '../ScoreRing'
 import { useTrackJob } from '../../lib/queries'
 import MiniPrepPanel from './MiniPrepPanel'
-import { cn } from '../../lib/utils'
+import { cn, decodeHtml, formatJobDescription, extractUrl } from '../../lib/utils'
 import { IconX, IconCircleCheck, IconExternalLink, IconMapPin, IconClock } from '@tabler/icons-react'
 
 const SOURCE_LABELS: Record<string, string> = {
@@ -22,6 +22,7 @@ const SOURCE_LABELS: Record<string, string> = {
   arc: 'Arc',
   wellfound: 'Wellfound',
   builtin: 'Built In',
+  techtree: 'TechTree',
 }
 
 const SOURCE_ABBREV: Record<string, string> = {
@@ -41,29 +42,7 @@ const SOURCE_ABBREV: Record<string, string> = {
   arc: 'AR',
   wellfound: 'WF',
   builtin: 'BI',
-}
-
-const ENTITY_MAP: Record<string, string> = {
-  '&#x27;': "'", '&#x2F;': '/', '&#x2f;': '/',
-  '&amp;': '&', '&quot;': '"', '&lt;': '<', '&gt;': '>', '&nbsp;': ' ',
-  '&apos;': "'",
-}
-
-function decodeHtml(text: string): string {
-  let r = text
-  for (const [e, c] of Object.entries(ENTITY_MAP)) r = r.replaceAll(e, c)
-  r = r.replace(/&#(\d+);/g, (_m, code) => String.fromCharCode(parseInt(code)))
-  r = r.replace(/&#x([0-9a-fA-F]+);/g, (_m, hex) => String.fromCharCode(parseInt(hex, 16)))
-  return r
-}
-
-const URL_REGEX = /https?:\/\/[^\s<>"'\]]+/gi
-
-function extractUrl(text: string): string | null {
-  const decoded = decodeHtml(text)
-  const urls = decoded.match(URL_REGEX)
-  if (!urls) return null
-  return urls[0].replace(/[.,;:!?)\]]+$/, '')
+  techtree: 'TT',
 }
 
 interface JobCardProps {
@@ -211,8 +190,8 @@ export default function JobCard({ job, onHide, onTracked, onSelect }: JobCardPro
               {decodeHtml(match.matchIntelligenceLine)}
             </p>
           ) : job.descriptionRaw ? (
-            <p className="text-xs text-muted mb-2 leading-relaxed line-clamp-2">
-              {decodeHtml(job.descriptionRaw.replace(/<[^>]*>/g, '')).slice(0, 250)}
+            <p className="text-xs text-muted leading-relaxed line-clamp-2">
+              {decodeHtml(formatJobDescription(job.descriptionRaw)).slice(0, 250)}
             </p>
           ) : null}
 

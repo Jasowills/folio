@@ -194,7 +194,13 @@ export class InterviewsService {
     persona: Record<string, unknown>,
   ): InterviewQuestionPlan[] {
     const name = String(persona.interviewerName || 'your interviewer')
+    const duration = session.plannedDuration || 30
     const plans: InterviewQuestionPlan[] = []
+
+    // Determine how many questions to generate based on duration
+    // Each question averages 3-5 minutes with follow-ups
+    const targetMinutes = Math.max(duration - 2, 5) // reserve 2 min for closing
+    const questionsNeeded = Math.max(3, Math.round(targetMinutes / 2.5))
 
     // 1. Opening / Introduction
     plans.push({
@@ -204,12 +210,15 @@ export class InterviewsService {
       basedOn: 'general',
       resumeReference: null,
       primaryQuestion: `Hello, I'm ${name}. Thank you for joining me today. To get started, could you please introduce yourself and walk me through your background and what led you to apply for this ${session.role} role?`,
-      followUpTriggers: [{ condition: 'candidate mentions specific experience', followUp: 'That sounds interesting. Could you tell me more about what you learned from that experience?' }],
+      followUpTriggers: [
+        { condition: 'candidate mentions specific experience', followUp: 'That sounds interesting. Could you tell me more about what you learned from that experience?' },
+        { condition: 'candidate keeps answer brief', followUp: "I'd love to hear more about what you've been working on recently — what's been the most engaging part of your current role?" },
+      ],
       estimatedMinutes: 3,
       evaluationCriteria: ['communication', 'self_awareness'],
     })
 
-    // 2. Behavioural / experience question
+    // 2. Core behavioural / experience question
     plans.push({
       order: 2,
       phase: 'behavioural',
@@ -218,8 +227,9 @@ export class InterviewsService {
       resumeReference: null,
       primaryQuestion: `That's great context. Could you tell me about a project or accomplishment from your ${session.level} engineering career that you're particularly proud of? What impact did it have, and what was your specific contribution?`,
       followUpTriggers: [
-        { condition: 'candidate mentions team work', followUp: 'How did you collaborate with others on that project?' },
+        { condition: 'candidate mentions team work', followUp: 'How did you collaborate with others on that project? What was your role in the team dynamic?' },
         { condition: 'candidate mentions challenges', followUp: 'What was the toughest challenge you faced there and how did you overcome it?' },
+        { condition: 'candidate mentions results', followUp: 'How did you measure the success of that project? What were the key metrics?' },
       ],
       estimatedMinutes: 5,
       evaluationCriteria: ['experience_depth', 'impact', 'leadership'],
@@ -239,18 +249,27 @@ export class InterviewsService {
         followUpTriggers: [
           { condition: 'candidate describes solution', followUp: "That's a solid approach. Were there any trade-offs you had to consider?" },
           { condition: 'candidate mentions architecture', followUp: 'How did you ensure the solution was scalable and maintainable?' },
+          { condition: 'candidate mentions specific technology', followUp: "What made you choose that technology over alternatives you've worked with?" },
         ],
         estimatedMinutes: 5,
         evaluationCriteria: ['technical_depth', 'problem_solving', 'architectural_thinking'],
       })
     }
 
-    // 4. Company-specific question
+    // Generate additional middle questions to fill the required time
+    const extraNeeded = questionsNeeded - plans.length - 1 // -1 for closing
+    const extraQuestions = this.generateExtraQuestions(session, extraNeeded, tech, name)
+
+    for (const q of extraQuestions) {
+      plans.push(q)
+    }
+
+    // Company-specific question (placed before closing)
     const company = session.company?.name
     if (company) {
       plans.push({
         order: plans.length + 1,
-        phase: plans.length < 3 ? 'technical' : 'behavioural',
+        phase: 'behavioural',
         topic: `Interest in ${company}`,
         basedOn: 'company',
         resumeReference: null,
@@ -258,13 +277,14 @@ export class InterviewsService {
         followUpTriggers: [
           { condition: 'candidate mentions company mission', followUp: 'How does your personal values align with our mission?' },
           { condition: 'candidate mentions technology', followUp: 'What kind of impact do you hope to make in this role?' },
+          { condition: 'candidate mentions team or culture', followUp: 'What kind of team environment do you thrive in?' },
         ],
-        estimatedMinutes: 4,
+        estimatedMinutes: 3,
         evaluationCriteria: ['cultural_fit', 'motivation', 'company_research'],
       })
     }
 
-    // 5. Closing
+    // Closing
     plans.push({
       order: plans.length + 1,
       phase: 'closing',
@@ -278,6 +298,183 @@ export class InterviewsService {
     })
 
     return plans
+  }
+
+  private generateExtraQuestions(
+    session: InterviewSessionDocument,
+    count: number,
+    tech: string[],
+    interviewerName: string,
+  ): InterviewQuestionPlan[] {
+    const questions: InterviewQuestionPlan[] = []
+    const templates: Array<{
+      phase: 'behavioural' | 'technical'
+      topic: string
+      buildQuestion: () => string
+      followUps: Array<{ condition: string; followUp: string }>
+      criteria: string[]
+    }> = []
+
+    templates.push({
+      phase: 'behavioural',
+      topic: 'Handling Challenges',
+      buildQuestion: () => `Tell me about a time you faced a significant setback or failure in your work. How did you handle it, and what did you learn from the experience?`,
+      followUps: [
+        { condition: 'candidate describes failure', followUp: 'Looking back, what would you have done differently?' },
+        { condition: 'candidate mentions learning', followUp: 'How has that experience changed your approach since then?' },
+      ],
+      criteria: ['resilience', 'growth_mindset', 'self_awareness'],
+    })
+
+    templates.push({
+      phase: 'behavioural',
+      topic: 'Collaboration & Leadership',
+      buildQuestion: () => `Could you describe a situation where you had to collaborate with someone who had a very different perspective or working style? How did you navigate that?`,
+      followUps: [
+        { condition: 'candidate describes conflict', followUp: 'How did you find common ground? What was the outcome?' },
+        { condition: 'candidate mentions compromise', followUp: 'Do you feel the final solution was the best one, or just a compromise?' },
+      ],
+      criteria: ['collaboration', 'communication', 'emotional_intelligence'],
+    })
+
+    templates.push({
+      phase: 'behavioural',
+      topic: 'Ownership & Initiative',
+      buildQuestion: () => `Tell me about a time you went above and beyond your defined responsibilities. What motivated you, and what was the outcome?`,
+      followUps: [
+        { condition: 'candidate describes initiative', followUp: 'How did you get buy-in from others to pursue that?' },
+        { condition: 'candidate mentions impact', followUp: 'Did that initiative lead to any lasting changes in how the team operates?' },
+      ],
+      criteria: ['initiative', 'ownership', 'drive'],
+    })
+
+    if (tech.length > 0) {
+      templates.push({
+        phase: 'technical',
+        topic: 'Technical Design & Architecture',
+        buildQuestion: () => `Walk me through how you would design a system that handles ${tech[0] || 'large-scale data processing'}. What components would you consider, and what trade-offs would you make?`,
+        followUps: [
+          { condition: 'candidate describes architecture', followUp: 'How would you handle failure scenarios in that design?' },
+          { condition: 'candidate mentions specific patterns', followUp: 'What alternatives did you consider and why did you choose that approach?' },
+        ],
+        criteria: ['system_design', 'architectural_thinking', 'tradeoff_awareness'],
+      })
+
+      templates.push({
+        phase: 'technical',
+        topic: 'Code Quality & Best Practices',
+        buildQuestion: () => `How do you think about code quality and maintainability? Could you share an example of how you've improved code quality in a past project?`,
+        followUps: [
+          { condition: 'candidate mentions testing', followUp: 'How do you decide what to test and at what level?' },
+          { condition: 'candidate mentions code review', followUp: 'What do you look for when reviewing someone else\'s code?' },
+        ],
+        criteria: ['code_quality', 'testing', 'best_practices'],
+      })
+
+      templates.push({
+        phase: 'technical',
+        topic: 'Performance & Optimization',
+        buildQuestion: () => `Tell me about a time you had to optimize performance in a system you worked on. How did you identify the bottleneck, and what approach did you take?`,
+        followUps: [
+          { condition: 'candidate describes optimization', followUp: 'How did you measure the impact of your optimization?' },
+          { condition: 'candidate mentions trade-offs', followUp: 'Were there any downsides to the optimization you implemented?' },
+        ],
+        criteria: ['performance_awareness', 'analytical_thinking', 'measurement'],
+      })
+    }
+
+    templates.push({
+      phase: 'behavioural',
+      topic: 'Growth & Learning',
+      buildQuestion: () => `How do you stay current with industry trends and technologies? Can you share an example of a new skill or technology you learned recently and how you applied it?`,
+      followUps: [
+        { condition: 'candidate mentions learning method', followUp: 'How do you decide what technologies are worth investing time in?' },
+        { condition: 'candidate applies new skill', followUp: 'What was the most challenging part of picking up that new skill?' },
+      ],
+      criteria: ['growth_mindset', 'curiosity', 'learning_agility'],
+    })
+
+    templates.push({
+      phase: 'behavioural',
+      topic: 'Project Ownership',
+      buildQuestion: () => `Tell me about a project where you had full ownership from concept to delivery. How did you prioritize what to build first, and what was the outcome?`,
+      followUps: [
+        { condition: 'candidate describes planning', followUp: 'How did you handle competing priorities or scope changes along the way?' },
+        { condition: 'candidate mentions stakeholders', followUp: 'How did you communicate progress and manage expectations?' },
+      ],
+      criteria: ['ownership', 'prioritization', 'execution'],
+    })
+
+    templates.push({
+      phase: 'behavioural',
+      topic: 'Communication & Influence',
+      buildQuestion: () => `Can you give me an example of a time you had to explain a complex technical concept to a non-technical audience? How did you approach it?`,
+      followUps: [
+        { condition: 'candidate describes explanation', followUp: 'How did you know your explanation was understood?' },
+        { condition: 'candidate mentions feedback', followUp: 'Did you adjust your communication style based on the audience?' },
+      ],
+      criteria: ['communication', 'influence', 'empathy'],
+    })
+
+    if (tech.length > 0) {
+      templates.push({
+        phase: 'technical',
+        topic: 'Debugging & Troubleshooting',
+        buildQuestion: () => `Walk me through how you approach debugging a production issue that you've never seen before. What's your process for identifying the root cause?`,
+        followUps: [
+          { condition: 'candidate describes process', followUp: 'How do you decide which potential causes to investigate first?' },
+          { condition: 'candidate mentions monitoring', followUp: 'What kind of observability or logging would you put in place to prevent this in the future?' },
+        ],
+        criteria: ['debugging', 'systematic_thinking', 'observability'],
+      })
+
+      templates.push({
+        phase: 'technical',
+        topic: 'Technical Decision Making',
+        buildQuestion: () => `Tell me about a time you had to choose between two different technical approaches or technologies. What factors did you consider, and how did you make the final decision?`,
+        followUps: [
+          { condition: 'candidate compares options', followUp: 'What trade-offs did you evaluate, and how did you weigh them?' },
+          { condition: 'candidate mentions team input', followUp: 'How did you get buy-in from the team on your decision?' },
+        ],
+        criteria: ['technical_judgment', 'tradeoff_analysis', 'pragmatism'],
+      })
+    }
+
+    templates.push({
+      phase: 'behavioural',
+      topic: 'Decision Making',
+      buildQuestion: () => `Describe a situation where you had to make a decision with incomplete information. How did you approach it, and what was the result?`,
+      followUps: [
+        { condition: 'candidate describes decision process', followUp: 'How did you validate you were heading in the right direction?' },
+        { condition: 'candidate mentions risk', followUp: 'How do you think about risk when making technical decisions?' },
+      ],
+      criteria: ['decision_making', 'judgment', 'pragmatism'],
+    })
+
+    const used = new Set<number>()
+    for (let i = 0; i < count; i++) {
+      if (used.size >= templates.length) break
+      let idx: number
+      do {
+        idx = Math.floor(Math.random() * templates.length)
+      } while (used.has(idx))
+      used.add(idx)
+
+      const t = templates[idx]
+      questions.push({
+        order: 0,
+        phase: t.phase,
+        topic: t.topic,
+        basedOn: 'role',
+        resumeReference: null,
+        primaryQuestion: t.buildQuestion(),
+        followUpTriggers: t.followUps,
+        estimatedMinutes: 4,
+        evaluationCriteria: t.criteria,
+      })
+    }
+
+    return questions
   }
 
   private fallbackInterviewerName(role: string): string {
@@ -356,13 +553,13 @@ export class InterviewsService {
     const proctoring = await this.proctoringModel.findOne({ sessionId }).exec()
     if (!proctoring) return
 
-    const severityWeights: Record<string, number> = { high: 15, medium: 5, low: 1 }
+    const severityWeights: Record<string, number> = { high: 3, medium: 2, low: 1 }
     let penalty = 0
     for (const event of proctoring.events) {
       penalty += severityWeights[event.severity] || 0
     }
 
-    proctoring.integrityScore = Math.max(0, 100 - penalty)
+    proctoring.integrityScore = Math.max(80, 100 - penalty)
 
     const eventCounts: Record<string, number> = {}
     for (const event of proctoring.events) {

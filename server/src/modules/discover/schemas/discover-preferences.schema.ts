@@ -40,7 +40,7 @@ export class DiscoverPreferences {
 
   @Prop({ type: [String], default: [
     'greenhouse', 'lever', 'weworkremotely', 'remoteok',
-    'hn', 'ycombinator', 'twitter',
+    'hn', 'ycombinator', 'twitter', 'techtree',
   ]})
   enabledSources!: string[];
 

@@ -8,7 +8,35 @@ import { DiscoverPreferences, DiscoverPreferencesDocument } from './schemas/disc
 import { CrawlMeta, CrawlMetaDocument } from './schemas/crawl-meta.schema';
 import { DiscoverCrawlService } from './discover-crawl.service';
 import { FeedQueryDto, UpsertPreferencesDto, TrackJobDto, UpdateTrackerJobDto } from './dto';
-import { normalizeCompanyName, cleanCompanyName, cleanLocation, decodeHtmlEntities } from './extractors/job-extractor';
+import { normalizeCompanyName, cleanCompanyName, cleanLocation, decodeHtmlEntities, fixMojibake } from './extractors/job-extractor';
+import { ResumesService } from '../resumes/resumes.service';
+
+const COUNTRY_NAMES = [
+  'nigeria', 'ghana', 'kenya', 'south africa', 'egypt', 'morocco', 'ethiopia',
+  'united states', 'usa', 'united kingdom', 'uk', 'canada', 'australia',
+  'germany', 'france', 'spain', 'italy', 'netherlands', 'sweden', 'norway',
+  'denmark', 'finland', 'switzerland', 'austria', 'belgium', 'ireland',
+  'portugal', 'poland', 'czech republic', 'india', 'china', 'japan',
+  'south korea', 'singapore', 'brazil', 'mexico', 'argentina', 'chile',
+];
+
+function inferLocationTerms(raw: string): string[] {
+  const lower = raw.toLowerCase().replace(/[,.]/g, '').trim();
+  const parts = lower.split(/\s+/).filter(Boolean);
+
+  // If the location contains a known country, return that country
+  const matchedCountry = COUNTRY_NAMES.find((c) => {
+    const escaped = c.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    return new RegExp(`\\b${escaped}\\b`).test(lower);
+  });
+  if (matchedCountry) return [matchedCountry];
+
+  // Otherwise return all meaningful parts (city names, regions)
+  const filtered = parts.filter((p) =>
+    p.length > 2 && !['san', 'los', 'las', 'de', 'del', 'el', 'la', 'le', 'du', 'des'].includes(p),
+  );
+  return filtered.length > 0 ? filtered : [];
+}
 
 @Injectable()
 export class DiscoverService {
@@ -21,6 +49,7 @@ export class DiscoverService {
     @InjectModel(DiscoverPreferences.name) private prefsModel: Model<DiscoverPreferencesDocument>,
     @InjectModel(CrawlMeta.name) private crawlMetaModel: Model<CrawlMetaDocument>,
     private crawlService: DiscoverCrawlService,
+    private resumesService: ResumesService,
   ) {}
 
   // ─── Preferences ───
@@ -73,6 +102,15 @@ export class DiscoverService {
     const filter: any = {
       isExpired: { $ne: true },
     };
+
+    // Default: exclude non-tech unless user explicitly opts in
+    if (query.techRelevance === 'all') {
+      // show everything
+    } else if (query.techRelevance === 'non-tech') {
+      filter.techRelevance = 'non-tech';
+    } else {
+      filter.techRelevance = { $ne: 'non-tech' };
+    }
 
     if (query.sources && query.sources.length > 0) {
       filter.source = { $in: query.sources };
@@ -187,12 +225,13 @@ export class DiscoverService {
       const id = (job._id as Types.ObjectId).toString();
       const match = matchMap.get(id);
       const isTracked = trackedJobIds.includes(id);
+      const decodedTitle = decodeHtmlEntities(job.roleTitle);
       return {
         ...job,
-        companyName: cleanCompanyName(decodeHtmlEntities(normalizeCompanyName(job.companyName))),
-        roleTitle: decodeHtmlEntities(job.roleTitle),
-        location: job.location ? cleanLocation(decodeHtmlEntities(job.location)) : job.location,
-        descriptionRaw: decodeHtmlEntities(job.descriptionRaw),
+        companyName: cleanCompanyName(fixMojibake(decodeHtmlEntities(normalizeCompanyName(job.companyName)))),
+        roleTitle: (job.aiEnhancedTitle && job.aiEnhancedTitle !== decodedTitle) ? job.aiEnhancedTitle : fixMojibake(decodedTitle),
+        location: job.location ? cleanLocation(fixMojibake(decodeHtmlEntities(job.location))) : job.location,
+        descriptionRaw: fixMojibake(decodeHtmlEntities(job.descriptionRaw)),
         match: match || null,
         isTracked,
       };
@@ -201,6 +240,46 @@ export class DiscoverService {
     const minScore = query.minScore ?? prefs?.minimumMatchScore;
     if (minScore !== undefined) {
       jobsWithMatches = jobsWithMatches.filter((j) => !j.match || j.match.atsScore >= minScore);
+    }
+
+    // Resume-based intelligence: skills + location from the user's resume
+    let resumeLocation: string | null = null;
+    let userSkills: string[] = [];
+
+    if (prefs?.resumeId) {
+      try {
+        const resume = await this.resumesService.findById(
+          (prefs.resumeId as Types.ObjectId).toString(),
+          userId,
+        );
+        resumeLocation = resume.contact?.location?.trim() || null;
+        userSkills = (resume.skills || []).map((s: string) => s.toLowerCase());
+      } catch (err) {
+        this.logger.debug(`Resume lookup failed: ${(err as Error).message}`);
+      }
+    }
+
+    // Skill-based relevance for unscored jobs
+    if (userSkills.length > 0) {
+      jobsWithMatches = jobsWithMatches.map((j) => {
+        if (j.match) return j;
+        const text = `${j.roleTitle || ''} ${j.companyName || ''} ${j.descriptionRaw || ''}`.toLowerCase();
+        const matchedSkills = userSkills.filter((s: string) => text.includes(s));
+        return { ...j, skillMatch: matchedSkills.length } as any;
+      }).filter((j: any) => j.match || (j.skillMatch ?? 0) >= 2);
+    }
+
+    // Location filter: preferredLocations from prefs, or infer from resume location
+    let preferredLocs = prefs?.preferredLocations || [];
+    if (preferredLocs.length === 0 && resumeLocation && !query.remoteOnly) {
+      const inferred = inferLocationTerms(resumeLocation);
+      if (inferred.length > 0) preferredLocs = inferred;
+    }
+    if (preferredLocs.length > 0 && !query.remoteOnly) {
+      const lowerLocs = preferredLocs.map((l) => l.toLowerCase());
+      jobsWithMatches = jobsWithMatches.filter((j) =>
+        j.isRemote || (j.location != null && lowerLocs.some((loc: string) => j.location!.toLowerCase().includes(loc))),
+      );
     }
 
     const resultJobs = jobsWithMatches.slice(0, limit);

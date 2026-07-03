@@ -3,7 +3,7 @@ import { useDiscoverFeed, useDiscoverFeedStats, useDiscoverPreferences, useHideJ
 import JobCard from './JobCard'
 import EmptyStates from './EmptyStates'
 import FeedJobDetailsPanel from './FeedJobDetailsPanel'
-import { cn } from '../../lib/utils'
+import { cn, decodeHtml } from '../../lib/utils'
 import { IconAdjustmentsHorizontal } from '@tabler/icons-react'
 
 const SOURCE_OPTIONS = [
@@ -21,6 +21,7 @@ const SOURCE_OPTIONS = [
   { value: 'arc', label: 'Arc' },
   { value: 'wellfound', label: 'Wellfound' },
   { value: 'builtin', label: 'Built In' },
+  { value: 'techtree', label: 'TechTree' },
 ]
 
 export default function DiscoverFeed() {
@@ -43,6 +44,8 @@ export default function DiscoverFeed() {
   const [cursor, setCursor] = useState<string | undefined>(undefined)
   const [selectedJob, setSelectedJob] = useState<any>(null)
 
+  const selectedResume = resumes?.find((r) => r._id === prefs?.resumeId) || resumes?.[0]
+  const detectedRole = selectedResume?.detectedRole?.role ? decodeHtml(selectedResume.detectedRole.role).trim() : null
   const hasNoResume = resumes?.length === 0 || (!prefs?.resumeId && resumes?.length === 0)
 
   const handleUploadResume = () => {
@@ -112,9 +115,9 @@ export default function DiscoverFeed() {
           <p className="text-sm text-muted mt-1">Upload a resume to see personalized match scores and recommendations</p>
         ) : (
           <p className="text-sm text-muted mt-1">
-            {feedStats?.totalJobs ?? 0} matched roles found
+            {feedStats?.totalJobs ?? 0} roles matched
+            {detectedRole ? <span> &middot; Search results for &ldquo;{detectedRole}&rdquo;</span> : ''}
             {timeSinceLastCrawledAt && <span> &middot; Updated {timeSinceLastCrawledAt}</span>}
-            {resumeName && <span> &middot; Based on {resumeName}</span>}
           </p>
         )}
       </div>

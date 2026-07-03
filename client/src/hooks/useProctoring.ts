@@ -14,20 +14,26 @@ interface UseProctoringOptions {
 
 export function useProctoring({ enabled, onEvent }: UseProctoringOptions) {
   const blurStartRef = useRef<number | null>(null)
+  const startupTimeRef = useRef(Date.now())
+  const lastTabSwitchRef = useRef(0)
+  const lastBlurRef = useRef(0)
+  const blurTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
 
   // Page Visibility API — detect tab switches
   useEffect(() => {
     if (!enabled) return
 
     const handleVisibilityChange = () => {
-      if (document.hidden) {
-        onEvent({
-          type: 'tab_switch',
-          severity: 'high',
-          duration: null,
-          metadata: { timestamp: Date.now() },
-        })
-      }
+      if (!document.hidden) return
+      if (Date.now() - startupTimeRef.current < 5000) return
+      if (Date.now() - lastTabSwitchRef.current < 3000) return
+      lastTabSwitchRef.current = Date.now()
+      onEvent({
+        type: 'tab_switch',
+        severity: 'low',
+        duration: null,
+        metadata: { timestamp: Date.now() },
+      })
     }
 
     document.addEventListener('visibilitychange', handleVisibilityChange)
@@ -40,15 +46,21 @@ export function useProctoring({ enabled, onEvent }: UseProctoringOptions) {
 
     const handleBlur = () => {
       blurStartRef.current = Date.now()
-      onEvent({
-        type: 'window_blur',
-        severity: 'medium',
-        duration: null,
-        metadata: { timestamp: Date.now() },
-      })
+      blurTimerRef.current = setTimeout(() => {
+        if (Date.now() - startupTimeRef.current < 5000) return
+        if (Date.now() - lastBlurRef.current < 2000) return
+        lastBlurRef.current = Date.now()
+        onEvent({
+          type: 'window_blur',
+          severity: 'low',
+          duration: null,
+          metadata: { timestamp: Date.now() },
+        })
+      }, 500)
     }
 
     const handleFocus = () => {
+      if (blurTimerRef.current) clearTimeout(blurTimerRef.current)
       if (blurStartRef.current) {
         blurStartRef.current = null
       }
@@ -59,6 +71,7 @@ export function useProctoring({ enabled, onEvent }: UseProctoringOptions) {
     return () => {
       window.removeEventListener('blur', handleBlur)
       window.removeEventListener('focus', handleFocus)
+      if (blurTimerRef.current) clearTimeout(blurTimerRef.current)
     }
   }, [enabled, onEvent])
 

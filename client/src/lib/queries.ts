@@ -256,8 +256,11 @@ export function useAtsResult(id: string | null) {
   return useQuery({
     queryKey: ['ats-result', id],
     queryFn: async () => {
+      console.debug('[AtsResult] fetching', { id })
       const { data } = await api.get(`/ats/${id}`)
-      return (data.data || data) as AtsResult
+      const result = (data.data || data) as AtsResult
+      console.debug('[AtsResult] loaded', { id, score: result.score })
+      return result
     },
     enabled: !!id,
   })
@@ -646,6 +649,7 @@ export interface FeedFilters {
   excludeApplied?: boolean
   excludeRejected?: boolean
   sort?: 'relevance' | 'newest' | 'salary'
+  techRelevance?: 'tech' | 'non-tech' | 'all'
 }
 
 export function useDiscoverFeed(filters: FeedFilters, cursor?: string) {
@@ -662,6 +666,7 @@ export function useDiscoverFeed(filters: FeedFilters, cursor?: string) {
       if (filters.excludeApplied !== undefined) params.set('excludeApplied', String(filters.excludeApplied))
       if (filters.excludeRejected) params.set('excludeRejected', 'true')
       if (filters.sort) params.set('sort', filters.sort)
+      if (filters.techRelevance) params.set('techRelevance', filters.techRelevance)
       const { data } = await api.get(`/discover/feed?${params}`)
       return (data.data || data) as DiscoverFeedResponse
     },

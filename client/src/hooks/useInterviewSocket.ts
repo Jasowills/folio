@@ -41,6 +41,7 @@ export function useInterviewSocket(sessionId: string | undefined) {
   const [isPaused, setIsPaused] = useState(false)
   const thinkingTimeoutRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
   const synthRef = useRef<SpeechSynthesisUtterance | null>(null)
+  const audioRef = useRef<HTMLAudioElement | null>(null)
   const [bargeInIndicator, setBargeInIndicator] = useState(false)
   const isAvatarSpeakingRef = useRef(false)
   const bargeInAnalyserRef = useRef<AnalyserNode | null>(null)
@@ -53,9 +54,21 @@ export function useInterviewSocket(sessionId: string | undefined) {
     isAvatarSpeakingRef.current = isAvatarSpeaking
   }, [isAvatarSpeaking])
 
+  const stopAllAudio = useCallback(() => {
+    if (window.speechSynthesis) {
+      window.speechSynthesis.cancel()
+    }
+    if (audioRef.current) {
+      audioRef.current.pause()
+      audioRef.current = null
+    }
+    synthRef.current = null
+    setIsAvatarSpeaking(false)
+  }, [])
+
   const speakWithBrowser = useCallback((text: string) => {
     if (!window.speechSynthesis) return
-    window.speechSynthesis.cancel()
+    stopAllAudio()
 
     const utterance = new SpeechSynthesisUtterance(text)
     utterance.rate = 0.95
@@ -77,10 +90,11 @@ export function useInterviewSocket(sessionId: string | undefined) {
     }
     synthRef.current = utterance
     window.speechSynthesis.speak(utterance)
-  }, [])
+  }, [stopAllAudio])
 
   const speakWithAudio = useCallback((base64Audio: string) => {
     try {
+      stopAllAudio()
       setIsAvatarSpeaking(true)
       const binary = atob(base64Audio)
       const bytes = new Uint8Array(binary.length)
@@ -90,26 +104,33 @@ export function useInterviewSocket(sessionId: string | undefined) {
       const blob = new Blob([bytes], { type: 'audio/wav' })
       const url = URL.createObjectURL(blob)
       const audio = new Audio(url)
+      audioRef.current = audio
       audio.onended = () => {
         URL.revokeObjectURL(url)
+        audioRef.current = null
         setIsAvatarSpeaking(false)
       }
-      audio.onerror = () => setIsAvatarSpeaking(false)
+      audio.onerror = () => {
+        URL.revokeObjectURL(url)
+        audioRef.current = null
+        setIsAvatarSpeaking(false)
+      }
       audio.play().catch(() => {
         setIsAvatarSpeaking(false)
       })
     } catch {
       setIsAvatarSpeaking(false)
     }
-  }, [])
+  }, [stopAllAudio])
 
   const speakResponse = useCallback((text: string, audio: string | null) => {
+    stopAllAudio()
     if (audio) {
       speakWithAudio(audio)
     } else {
       speakWithBrowser(text)
     }
-  }, [speakWithAudio, speakWithBrowser])
+  }, [speakWithAudio, speakWithBrowser, stopAllAudio])
 
   const startMicrophone = useCallback(async () => {
     if (!socketRef.current?.connected) {
@@ -126,7 +147,7 @@ export function useInterviewSocket(sessionId: string | undefined) {
       const stream = await navigator.mediaDevices.getUserMedia({
         audio: {
           channelCount: 1,
-          sampleRate: 16000,
+          sampleRate: 48000,
           sampleSize: 16,
           echoCancellation: true,
           noiseSuppression: true,
@@ -202,10 +223,10 @@ export function useInterviewSocket(sessionId: string | undefined) {
         }
       }
 
-      mediaRecorder.start(2000)
+      mediaRecorder.start(1000)
       setIsRecording(true)
       socketRef.current.emit('mic_enabled', { enabled: true })
-      console.log('[Socket] Mic enabled, MediaRecorder started at 2000ms intervals')
+      console.log('[Socket] Mic enabled, MediaRecorder started at 1000ms intervals')
     } catch (err) {
       console.error('[Socket] Microphone access denied:', err)
       setError('Microphone access denied')
@@ -252,9 +273,7 @@ export function useInterviewSocket(sessionId: string | undefined) {
         setCurrentInterim('')
         if (event.speaker === 'candidate') {
           if (thinkingTimeoutRef.current) clearTimeout(thinkingTimeoutRef.current)
-          thinkingTimeoutRef.current = setTimeout(() => {
-            setIsThinking(true)
-          }, 800)
+          setIsThinking(true)
         }
       } else {
         if (event.speaker === 'candidate') {
@@ -327,10 +346,11 @@ export function useInterviewSocket(sessionId: string | undefined) {
   const cleanup = useCallback((socket: Socket) => {
     if (thinkingTimeoutRef.current) clearTimeout(thinkingTimeoutRef.current)
     if (bargeInTimeoutRef.current) clearTimeout(bargeInTimeoutRef.current)
+    stopAllAudio()
     socket.emit('leave', sessionId)
     socket.disconnect()
     stopMicrophone()
-  }, [sessionId, stopMicrophone])
+  }, [sessionId, stopMicrophone, stopAllAudio])
 
   useEffect(() => {
     if (!sessionId) return
@@ -408,8 +428,8 @@ export function useInterviewSocket(sessionId: string | undefined) {
   }, [interviewerResponse, speakResponse])
 
   const flushBuffer = useCallback(() => {
-    socketRef.current?.emit('flush_buffer', sessionId)
-  }, [sessionId])
+    console.log('[Socket] Done answering button clicked — Flux endpointing handles turn detection automatically')
+  }, [])
 
   return {
     isConnected,

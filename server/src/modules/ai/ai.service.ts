@@ -293,11 +293,14 @@ export class AiService {
       const parsed = this.parseJson(text);
       return Object.keys(parsed).length > 0;
     });
-    if (category === 'interview') {
-      this.logger.log(`[callAi] raw response (first 500 chars): ${raw.slice(0, 500)}`);
-      this.logger.log(`[callAi] raw response (last 300 chars): ${raw.slice(-300)}`);
+    if (category === 'interview' || category === 'atsScoring') {
+      this.logger.log(`[callAi] raw response (first 800 chars): ${raw.slice(0, 800)}`);
     }
-    return this.parseJson(raw);
+    const parsed = this.parseJson(raw);
+    if (category === 'atsScoring') {
+      this.logger.log(`[callAi] parsed keys: ${Object.keys(parsed).join(', ')}`, parsed);
+    }
+    return parsed;
   }
 
   private providerKey(provider: string, model: string): string {

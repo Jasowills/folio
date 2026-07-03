@@ -127,4 +127,8 @@ export class FeedQueryDto {
   @IsString()
   @IsOptional()
   sort?: 'relevance' | 'newest' | 'salary';
+
+  @IsString()
+  @IsOptional()
+  techRelevance?: 'tech' | 'non-tech' | 'all';
 }

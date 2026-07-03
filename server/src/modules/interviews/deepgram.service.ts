@@ -24,22 +24,19 @@ export interface DeepgramTranscriptEvent {
   confidence: number
 }
 
-interface AudioBufferState {
-  chunks: Buffer[]
-  baseChunk: Buffer | null
-  checkTimer: ReturnType<typeof setInterval> | null
+interface SttConnection {
   sessionId: string
+  conn: any
   onTranscript: (event: DeepgramTranscriptEvent) => void
   onError: (error: Error) => void
-  flushInProgress: boolean
-  lastChunkTime: number
+  onClose: () => void
 }
 
 @Injectable()
 export class DeepgramService implements OnModuleDestroy {
   private readonly logger = new Logger(DeepgramService.name)
   private deepgramClient: DeepgramClient | null = null
-  private buffers = new Map<string, AudioBufferState>()
+  private connections = new Map<string, SttConnection>()
 
   constructor() {
     const apiKey = process.env.DEEPGRAM_API_KEY
@@ -50,12 +47,12 @@ export class DeepgramService implements OnModuleDestroy {
         this.logger.error(`Failed to create DeepgramClient: ${(err as Error).message}`)
       }
     } else {
-      this.logger.warn('DEEPGRAM_API_KEY not set — TTS disabled')
+      this.logger.warn('DEEPGRAM_API_KEY not set — STT and TTS disabled')
     }
   }
 
   get isConfigured(): boolean {
-    return true
+    return this.deepgramClient !== null
   }
 
   async createSttConnection(
@@ -63,164 +60,124 @@ export class DeepgramService implements OnModuleDestroy {
     sessionId: string,
     onTranscript: (event: DeepgramTranscriptEvent) => void,
     onError: (error: Error) => void,
-    _onClose: () => void,
+    onClose: () => void,
   ): Promise<boolean> {
-    if (this.buffers.has(clientId)) {
-      this.logger.warn(`Buffer already exists for client ${clientId}, cleaning up`)
+    if (!this.deepgramClient) {
+      onError(new Error('Deepgram not configured'))
+      return false
+    }
+
+    if (this.connections.has(clientId)) {
+      this.logger.warn(`Connection already exists for client ${clientId}, closing first`)
       this.closeSttConnection(clientId)
     }
 
-    const now = Date.now()
-    const state: AudioBufferState = {
-      chunks: [],
-      baseChunk: null,
-      checkTimer: null,
-      sessionId,
-      onTranscript,
-      onError,
-      flushInProgress: false,
-      lastChunkTime: now,
+    try {
+      const conn = await (this.deepgramClient as any).listen.v2.connect({
+        model: 'flux-general-en',
+        eager_eot_threshold: 0.5,
+        eot_threshold: 0.8,
+        eot_timeout_ms: 1500,
+        queryParams: {
+          smart_format: true,
+          punctuate: true,
+        },
+      })
+
+      const state: SttConnection = {
+        sessionId,
+        conn,
+        onTranscript,
+        onError,
+        onClose,
+      }
+
+      conn.on('open', () => {
+        this.logger.log(`Deepgram Flux v2 connection opened for client ${clientId}, session ${sessionId}`)
+      })
+
+      conn.on('message', (message: any) => {
+        if (message.type === 'TurnInfo') {
+          const turnInfo = message as {
+            event: string
+            transcript: string
+            words?: Array<{ word: string; confidence: number }>
+            end_of_turn_confidence: number
+          }
+
+          const isEndOfTurn = turnInfo.event === 'EndOfTurn'
+          const isEagerEndOfTurn = turnInfo.event === 'EagerEndOfTurn'
+          const isUpdate = turnInfo.event === 'Update'
+
+          if (isEndOfTurn || isEagerEndOfTurn || isUpdate) {
+            const words = turnInfo.words || []
+            const avgConfidence = words.length > 0
+              ? words.reduce((sum, w) => sum + w.confidence, 0) / words.length
+              : 0
+
+            state.onTranscript({
+              transcript: turnInfo.transcript,
+              isFinal: isEndOfTurn || isEagerEndOfTurn,
+              confidence: isEndOfTurn || isEagerEndOfTurn ? avgConfidence : avgConfidence * 0.6,
+            })
+          }
+        } else if (message.type === 'Connected') {
+          this.logger.debug(`Deepgram Flux connected for client ${clientId}: ${JSON.stringify(message)}`)
+        } else if (message.type === 'FatalError') {
+          this.logger.error(`Deepgram Flux fatal error for client ${clientId}: ${JSON.stringify(message)}`)
+          state.onError(new Error(message.description || 'Deepgram Flux fatal error'))
+        }
+      })
+
+      conn.on('close', (event: any) => {
+        this.logger.log(`Deepgram Flux connection closed for client ${clientId}: code=${event?.code || 'unknown'}`)
+        state.onClose()
+        this.connections.delete(clientId)
+      })
+
+      conn.on('error', (error: Error) => {
+        this.logger.error(`Deepgram Flux connection error for client ${clientId}: ${error.message}`)
+        state.onError(error)
+      })
+
+      this.connections.set(clientId, state)
+      this.logger.log(`Deepgram Flux v2 STT connected for client ${clientId}, session ${sessionId}`)
+      return true
+    } catch (err) {
+      this.logger.error(`Failed to create Deepgram Flux connection for ${clientId}: ${(err as Error).message}`)
+      onError(err as Error)
+      return false
     }
-
-    state.checkTimer = setInterval(() => {
-      this.checkFlush(clientId, state)
-    }, 500)
-
-    this.buffers.set(clientId, state)
-    this.logger.log(`Groq Whisper buffer initialized for client ${clientId}, session ${sessionId}`)
-    return true
   }
 
   sendAudio(clientId: string, audioBuffer: Buffer): void {
-    const state = this.buffers.get(clientId)
+    const state = this.connections.get(clientId)
     if (!state) {
-      this.logger.warn(`No buffer for client ${clientId}`)
+      this.logger.warn(`No Deepgram connection for client ${clientId}`)
       return
     }
-    this.logger.debug(`[${clientId}] audio chunk received, size=${audioBuffer.length}, firstBytes=${audioBuffer.subarray(0, 8).toString('hex')}`)
-    if (!state.baseChunk) {
-      state.baseChunk = audioBuffer
-      this.logger.debug(`[${clientId}] saved base chunk, size=${audioBuffer.length}`)
-    }
-    state.chunks.push(audioBuffer)
-    state.lastChunkTime = Date.now()
-  }
 
-  forceFlush(clientId: string): void {
-    const state = this.buffers.get(clientId)
-    if (!state || state.flushInProgress || state.chunks.length === 0) return
-    this.flushBuffer(clientId, state)
+    try {
+      // Use the underlying ReconnectingWebSocket send() which auto-queues
+      // if the socket isn't open yet. V2Socket.sendMedia() asserts open
+      // and throws — too aggressive for early audio chunks.
+      state.conn.socket.send(new Uint8Array(audioBuffer))
+    } catch (err) {
+      this.logger.error(`Failed to send audio to Deepgram for ${clientId}: ${(err as Error).message}`)
+    }
   }
 
   closeSttConnection(clientId: string): void {
-    const state = this.buffers.get(clientId)
+    const state = this.connections.get(clientId)
     if (!state) return
 
-    if (state.checkTimer) {
-      clearInterval(state.checkTimer)
-      state.checkTimer = null
-    }
-
-    if (state.chunks.length > 0 && !state.flushInProgress) {
-      this.flushBufferSync(clientId, state)
-    }
-
-    this.buffers.delete(clientId)
-    this.logger.log(`Groq Whisper buffer cleaned up for client ${clientId}`)
-  }
-
-  private checkFlush(clientId: string, state: AudioBufferState): void {
-    if (state.chunks.length === 0 || state.flushInProgress) return
-
-    const silenceDuration = Date.now() - state.lastChunkTime
-    const hasEnoughChunks = state.chunks.length >= 3
-    const isSilent = silenceDuration >= 3500
-
-    this.logger.debug(`[${clientId}] checkFlush: chunks=${state.chunks.length}, silence=${silenceDuration}ms, enough=${hasEnoughChunks}, silent=${isSilent}`)
-
-    if (hasEnoughChunks || isSilent) {
-      this.flushBuffer(clientId, state)
-    }
-  }
-
-  private async flushBuffer(clientId: string, state: AudioBufferState): Promise<void> {
-    state.flushInProgress = true
-    this.logger.debug(`[${clientId}] flushBuffer starting, chunks=${state.chunks.length}`)
-
     try {
-      const chunks = state.chunks.splice(0)
-      const validChunks = chunks.filter(c => c && c.length > 2048)
-
-      if (validChunks.length === 0) return
-
-      const needsBase = state.baseChunk && !validChunks.includes(state.baseChunk)
-      const combined = needsBase
-        ? Buffer.concat([state.baseChunk!, ...validChunks])
-        : Buffer.concat(validChunks)
-      this.logger.debug(`[${clientId}] sending combined audio to Whisper, parts=${validChunks.length}, total=${combined.length}`)
-
-      const text = await this.transcribeChunk(clientId, combined)
-      if (text) {
-        this.logger.log(`Groq Whisper transcript for ${clientId}: "${text.slice(0, 120)}"`)
-        if (text.length > 1) {
-          state.onTranscript({
-            transcript: text,
-            isFinal: true,
-            confidence: 1,
-          })
-        }
-      } else {
-        this.logger.debug(`[${clientId}] Whisper returned no text`)
-      }
-    } finally {
-      state.flushInProgress = false
-      this.logger.debug(`[${clientId}] flushBuffer done`)
-    }
-  }
-
-  private flushBufferSync(clientId: string, state: AudioBufferState): void {
-    if (state.chunks.length === 0) return
-    this.flushBuffer(clientId, state)
-  }
-
-  private async transcribeChunk(clientId: string, audio: Buffer): Promise<string | null> {
-    const groqApiKey = process.env.GROQ_API_KEY
-    if (!groqApiKey) return null
-
-    const firstBytes = audio.subarray(0, 16).toString('hex')
-    const ebmlId = audio.subarray(0, 4).toString('hex')
-
-    try {
-      const form = new FormData()
-      form.append('file', new File([new Uint8Array(audio)], 'audio.webm', { type: 'audio/webm' }))
-      form.append('model', 'whisper-large-v3-turbo')
-      form.append('response_format', 'json')
-      form.append('language', 'en')
-
-      this.logger.debug(`[${clientId}] POST to Groq Whisper: size=${audio.length}, ebml=${ebmlId}, firstBytes=${firstBytes}`)
-
-      const response = await fetch('https://api.groq.com/openai/v1/audio/transcriptions', {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${groqApiKey}`,
-        },
-        body: form,
-      })
-
-      if (!response.ok) {
-        const errText = await response.text()
-        this.logger.error(`[${clientId}] Groq Whisper ${response.status}: size=${audio.length}, ebml=${ebmlId}, body=${errText}`)
-        return null
-      }
-
-      const result = (await response.json()) as { text: string }
-      const text = result.text?.trim()
-      this.logger.debug(`[${clientId}] Groq Whisper OK: size=${audio.length}, text="${text?.slice(0, 80) || '(empty)'}"`)
-      return text || null
+      state.conn.close()
     } catch (err) {
-      this.logger.error(`[${clientId}] Groq Whisper fetch failed: ${(err as Error).message}`)
-      return null
+      this.logger.warn(`Error closing Deepgram connection for ${clientId}: ${(err as Error).message}`)
     }
+    this.connections.delete(clientId)
+    this.logger.log(`Deepgram Flux connection closed for client ${clientId}`)
   }
 
   private guessVoiceModel(name: string): string {
@@ -244,7 +201,7 @@ export class DeepgramService implements OnModuleDestroy {
         text: withPauses,
         model,
         encoding: 'linear16',
-        sample_rate: 16000,
+        sample_rate: 48000,
         container: 'wav',
         speed: 1.03,
       })
@@ -258,7 +215,7 @@ export class DeepgramService implements OnModuleDestroy {
   }
 
   onModuleDestroy() {
-    for (const clientId of this.buffers.keys()) {
+    for (const clientId of this.connections.keys()) {
       this.closeSttConnection(clientId)
     }
   }

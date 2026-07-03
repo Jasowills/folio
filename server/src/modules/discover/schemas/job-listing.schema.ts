@@ -8,7 +8,7 @@ export class JobListing {
   @Prop({ required: true, enum: [
     'greenhouse', 'lever', 'workday', 'weworkremotely', 'remoteok',
     'otta', 'hn', 'cryptojobslist', 'bitcoinerjobs', 'ycombinator',
-    'twitter', 'linkedin', 'manual',
+    'twitter', 'linkedin', 'manual', 'remotive', 'arc', 'wellfound', 'builtin', 'techtree',
   ]})
   source!: string;
 
@@ -61,6 +61,12 @@ export class JobListing {
 
   @Prop({ default: false })
   isExpired?: boolean;
+
+  @Prop({ type: String, enum: ['tech', 'non-tech', 'unknown'], default: 'unknown' })
+  techRelevance?: string;
+
+  @Prop()
+  aiEnhancedTitle?: string;
 }
 
 export const JobListingSchema = SchemaFactory.createForClass(JobListing);

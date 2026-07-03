@@ -49,7 +49,7 @@ export default function InterviewLive() {
     isConnected, isRecording, currentInterim,
     interviewerResponse, codeResult, isCodeRunning,
     error, isAvatarSpeaking, isThinking, isPaused, bargeInIndicator,
-    audioStream, startMicrophone,
+    audioStream, startMicrophone, stopMicrophone,
     pause: wsPause, resume: wsResume,
     endSession: wsEndSession, submitCode, sendProctoringEvent, flushBuffer,
   } = useInterviewSocket(sessionId)
@@ -239,10 +239,22 @@ export default function InterviewLive() {
     return () => clearInterval(pauseTimerRef.current)
   }, [isPaused, wsResume])
 
-  // Clean up confirm timer on unmount
+  // Stop all media streams on unmount
   useEffect(() => {
-    return () => clearTimeout(confirmTimerRef.current)
-  }, [])
+    return () => {
+      clearTimeout(confirmTimerRef.current)
+      stopMicrophone()
+    }
+  }, [stopMicrophone])
+
+  // Stop all media on beforeunload (refresh, closing tab, back button)
+  useEffect(() => {
+    const handleBeforeUnload = () => {
+      stopMicrophone()
+    }
+    window.addEventListener('beforeunload', handleBeforeUnload)
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload)
+  }, [stopMicrophone])
 
   // Routing
   useEffect(() => {

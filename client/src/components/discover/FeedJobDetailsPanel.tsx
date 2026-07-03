@@ -1,5 +1,6 @@
 import { ScoreRing } from '../ScoreRing'
 import { IconX, IconExternalLink, IconCalendar, IconMapPin, IconBriefcase, IconLanguage } from '@tabler/icons-react'
+import { decodeHtml, formatJobDescription, extractUrl } from '../../lib/utils'
 
 interface FeedJobDetailsPanelProps {
   job: any
@@ -11,30 +12,7 @@ const SOURCE_LABELS: Record<string, string> = {
   weworkremotely: 'WeWorkRemotely', remoteok: 'RemoteOK', otta: 'Otta',
   hn: 'Hacker News', ycombinator: 'YC', twitter: 'Twitter', linkedin: 'LinkedIn',
   cryptojobslist: 'CryptoJobsList', bitcoinerjobs: 'BitcoinerJobs',
-  remotive: 'Remotive', arc: 'Arc', wellfound: 'Wellfound', builtin: 'Built In',
-}
-
-const ENTITY_MAP: Record<string, string> = {
-  '&#x27;': "'", '&#x2F;': '/', '&#x2f;': '/',
-  '&amp;': '&', '&quot;': '"', '&lt;': '<', '&gt;': '>', '&nbsp;': ' ',
-  '&apos;': "'",
-}
-
-function decodeHtml(text: string): string {
-  let r = text
-  for (const [e, c] of Object.entries(ENTITY_MAP)) r = r.replaceAll(e, c)
-  r = r.replace(/&#(\d+);/g, (_m, code) => String.fromCharCode(parseInt(code)))
-  r = r.replace(/&#x([0-9a-fA-F]+);/g, (_m, hex) => String.fromCharCode(parseInt(hex, 16)))
-  return r
-}
-
-const URL_REGEX = /https?:\/\/[^\s<>"'\]]+/gi
-
-function extractUrl(text: string): string | null {
-  const decoded = decodeHtml(text)
-  const urls = decoded.match(URL_REGEX)
-  if (!urls) return null
-  return urls[0].replace(/[.,;:!?)\]]+$/, '')
+  remotive: 'Remotive', arc: 'Arc', wellfound: 'Wellfound', builtin: 'Built In', techtree: 'TechTree',
 }
 
 export default function FeedJobDetailsPanel({ job, onClose }: FeedJobDetailsPanelProps) {
@@ -144,8 +122,50 @@ export default function FeedJobDetailsPanel({ job, onClose }: FeedJobDetailsPane
           {job.descriptionRaw && (
             <div>
               <h3 className="text-[11px] font-semibold text-muted uppercase tracking-wider mb-2">Description</h3>
-              <div className="text-sm text-ink leading-relaxed whitespace-pre-wrap">
-                {decodeHtml(job.descriptionRaw.replace(/<[^>]*>/g, ''))}
+              <div className="text-sm text-ink leading-relaxed space-y-2">
+                {formatJobDescription(job.descriptionRaw).split('\n\n').map((block, i) => {
+                  const lines = block.split('\n')
+                  const trimmed = lines[0]?.trim() || ''
+                  const isSectionHeading = lines.length === 1 &&
+                    trimmed.length > 1 && trimmed.length < 80 &&
+                    /^[A-Z][A-Za-z\s/:',]+$/.test(trimmed) &&
+                    !trimmed.endsWith('.')
+                  if (isSectionHeading) {
+                    return (
+                      <h4 key={i} className="text-sm font-semibold text-ink mt-3 first:mt-0">
+                        {decodeHtml(lines[0].trim())}
+                      </h4>
+                    )
+                  }
+                  if (lines.length === 1) {
+                    return (
+                      <p key={i} className="text-sm text-ink leading-relaxed">
+                        {decodeHtml(lines[0])}
+                      </p>
+                    )
+                  }
+                  return (
+                    <div key={i} className="space-y-1">
+                      {lines.map((line, j) => {
+                        const trimmed = line.trim()
+                        if (!trimmed) return null
+                        const isBullet = trimmed.startsWith('•')
+                        if (isBullet) {
+                          return (
+                            <p key={j} className="text-sm text-ink leading-relaxed pl-3">
+                              {decodeHtml(trimmed)}
+                            </p>
+                          )
+                        }
+                        return (
+                          <p key={j} className="text-sm text-ink leading-relaxed">
+                            {decodeHtml(trimmed)}
+                          </p>
+                        )
+                      })}
+                    </div>
+                  )
+                })}
               </div>
             </div>
           )}

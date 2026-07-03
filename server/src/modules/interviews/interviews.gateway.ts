@@ -157,7 +157,7 @@ export class InterviewsGateway implements OnGatewayConnection, OnGatewayDisconne
       }
     }
 
-    this.logger.log(`Groq Whisper STT started for client ${client.id} in session ${sessionId}`)
+    this.logger.log(`Deepgram Flux v2 STT started for client ${client.id} in session ${sessionId}`)
   }
 
   @SubscribeMessage('leave')
@@ -193,12 +193,6 @@ export class InterviewsGateway implements OnGatewayConnection, OnGatewayDisconne
     this.micEnabled.set(client.id, payload.enabled)
   }
 
-  @SubscribeMessage('flush_buffer')
-  handleFlushBuffer(client: Socket, sessionId: string) {
-    this.logger.debug(`[${client.id}] Flush buffer requested`)
-    this.deepgram.forceFlush(client.id)
-  }
-
   private async handleTranscript(
     client: Socket,
     sessionId: string,
@@ -216,10 +210,12 @@ export class InterviewsGateway implements OnGatewayConnection, OnGatewayDisconne
       if (!state || state.isAiResponding) return
 
       const wordCount = event.transcript.trim().split(/\s+/).length
-      if (wordCount < 15) {
+      if (wordCount < 3) {
         this.logger.debug(`Transcript too short (${wordCount} words), continuing to listen`)
         return
       }
+
+      this.server.to(sessionId).emit('interviewer_thinking')
 
       state.lastCandidateTranscript = event.transcript
       state.isAiResponding = true
@@ -312,11 +308,26 @@ export class InterviewsGateway implements OnGatewayConnection, OnGatewayDisconne
     sessionId: string,
     state: SessionState,
   ) {
+    let responseSent = false
+
+    const timeout = setTimeout(() => {
+      if (!responseSent) {
+        responseSent = true
+        state.isAiResponding = false
+        this.server.to(sessionId).emit('interviewer_response', {
+          text: "Could you repeat that? I didn't quite catch it.",
+          audio: null,
+          questionIndex: state.questionIndex,
+        })
+      }
+    }, 15_000)
+
     try {
       const doc = await this.interviewsService.getSessionForAi(sessionId)
       if (!doc) {
         this.logger.warn(`Session ${sessionId} not found for AI response`)
         state.isAiResponding = false
+        clearTimeout(timeout)
         return
       }
 
@@ -369,15 +380,15 @@ export class InterviewsGateway implements OnGatewayConnection, OnGatewayDisconne
         .replace(/\{currentQuestionBudget\}/g, String(currentQuestionBudget))
         .replace(/\{turnInstructions\}/g, turnInstructions)
 
-      // Thinking delay — simulates a real interviewer processing
-      this.server.to(sessionId).emit('interviewer_thinking')
-      const thinkMs = 800 + Math.floor(Math.random() * 1501)
+      const thinkMs = 200 + Math.floor(Math.random() * 301)
       await new Promise(r => setTimeout(r, thinkMs))
+      if (responseSent) return
 
       const responseText = await this.aiService.chatForInterview(
         systemPrompt,
         state.lastCandidateTranscript || '',
       )
+      if (responseSent) return
 
       await this.interviewsService.addTurn(sessionId, {
         speaker: 'interviewer',
@@ -392,6 +403,8 @@ export class InterviewsGateway implements OnGatewayConnection, OnGatewayDisconne
         audioBase64 = await this.deepgram.generateTtsBase64(responseText, persona?.interviewerName)
       }
 
+      clearTimeout(timeout)
+      responseSent = true
       this.server.to(sessionId).emit('interviewer_response', {
         text: responseText,
         audio: audioBase64,
@@ -400,13 +413,17 @@ export class InterviewsGateway implements OnGatewayConnection, OnGatewayDisconne
 
       state.isAiResponding = false
     } catch (err) {
-      this.logger.error(`AI response generation failed: ${(err as Error).message}`)
-      state.isAiResponding = false
-      this.server.to(sessionId).emit('interviewer_response', {
-        text: "Could you repeat that? I didn't quite catch it.",
-        audio: null,
-        questionIndex: state.questionIndex,
-      })
+      if (!responseSent) {
+        responseSent = true
+        this.logger.error(`AI response generation failed: ${(err as Error).message}`)
+        state.isAiResponding = false
+        this.server.to(sessionId).emit('interviewer_response', {
+          text: "Could you repeat that? I didn't quite catch it.",
+          audio: null,
+          questionIndex: state.questionIndex,
+        })
+      }
+      clearTimeout(timeout)
     }
   }
 

@@ -22,8 +22,18 @@ import { RemotiveCrawler } from './crawlers/remotive.crawler';
 import { ArcCrawler } from './crawlers/arc.crawler';
 import { WellfoundCrawler } from './crawlers/wellfound.crawler';
 import { BuiltInCrawler } from './crawlers/builtin.crawler';
+import { TechTreeCrawler } from './crawlers/techtree.crawler';
 import { AtsService } from '../ats/ats.service';
-import { normalizeCompanyName, cleanCompanyName, cleanLocation, decodeHtmlEntities, normalizePostedDate, parseSalary, detectExperienceLevel, extractLocation, extractLanguages } from './extractors/job-extractor';
+import { AiService } from '../ai/ai.service';
+import { normalizeCompanyName, cleanCompanyName, cleanLocation, decodeHtmlEntities, normalizePostedDate, parseSalary, detectExperienceLevel, extractLocation, extractLanguages, fixMojibake, classifyTechRelevance } from './extractors/job-extractor';
+
+const JOB_CLASSIFICATION_SYSTEM = `You are a job listing analyst. Given a raw job title and description, determine:
+1. isTechRole: Is this role in software engineering, technology, or a closely related technical field? Security and IT roles count as tech.
+2. cleanedTitle: If the title is clearly wrong or generic (e.g. "P0005148", "Heading", "Creative", "Spontaneous application", "12 jobs that pay well without a degree"), extract the actual role title from the description. Return null if the original title looks correct.
+3. techCategory: Categorize the role.
+4. confidence: How confident are you? 0.0 to 1.0.
+
+Be inclusive of adjacent technical roles (devops, SRE, data engineering, security, IT engineering). Exclude non-technical roles (sales, marketing, customer service, healthcare admin, facilities, maintenance, teaching non-CS, driving, delivery, retail, accounting non-fin-tech). Return JSON only.`;
 
 @Injectable()
 export class DiscoverCrawlService {
@@ -53,7 +63,9 @@ export class DiscoverCrawlService {
     private arcCrawler: ArcCrawler,
     private wellfoundCrawler: WellfoundCrawler,
     private builtInCrawler: BuiltInCrawler,
+    private techTreeCrawler: TechTreeCrawler,
     private atsService: AtsService,
+    private aiService: AiService,
   ) {}
 
   startScheduledCrawl(): void {
@@ -61,6 +73,10 @@ export class DiscoverCrawlService {
     this.logger.log('Starting scheduled crawl (every 6 hours)');
     this.runCrawlCycle();
     this.crawlTimer = setInterval(() => this.runCrawlCycle(), 6 * 60 * 60 * 1000);
+    // Backfill classification on startup so existing jobs get classified
+    this.backfillClassification().catch((err) =>
+      this.logger.error('Startup backfill failed:', err),
+    );
   }
 
   stopScheduledCrawl(): void {
@@ -95,19 +111,35 @@ export class DiscoverCrawlService {
       this.arcCrawler,
       this.wellfoundCrawler,
       this.builtInCrawler,
+      this.techTreeCrawler,
     ];
 
     const sourceStatus: Record<string, any> = {};
 
-    for (const crawler of crawlers) {
+    const results = await Promise.allSettled(crawlers.map(async (crawler) => {
       try {
         const rawJobs = await crawler.crawl();
-        sourceStatus[crawler.source] = { status: 'ok', jobsFound: rawJobs.length };
-        this.logger.log(`${crawler.source}: ${rawJobs.length} jobs found`);
-        await this.processRawJobs(rawJobs, crawler.source);
+        return { source: crawler.source, rawJobs };
       } catch (err) {
-        this.logger.error(`${crawler.source} crawl failed:`, err);
-        sourceStatus[crawler.source] = { status: 'error', error: (err as Error).message };
+        throw { source: crawler.source, message: (err as Error).message };
+      }
+    }));
+
+    for (const result of results) {
+      if (result.status === 'fulfilled') {
+        const { source, rawJobs } = result.value;
+        sourceStatus[source] = { status: 'ok', jobsFound: rawJobs.length };
+        this.logger.log(`${source}: ${rawJobs.length} jobs found`);
+        try {
+          await this.processRawJobs(rawJobs, source);
+        } catch (err) {
+          this.logger.error(`${source} processing failed:`, err);
+          sourceStatus[source] = { status: 'error', error: (err as Error).message };
+        }
+      } else {
+        const source = (result.reason as any)?.source || 'unknown';
+        sourceStatus[source] = { status: 'error', error: result.reason?.message || String(result.reason) };
+        this.logger.error(`${source} crawl failed:`, result.reason);
       }
     }
 
@@ -120,6 +152,14 @@ export class DiscoverCrawlService {
 
     this.crawling = false;
     this.logger.log('Crawl cycle complete');
+
+    await this.backfillClassification().catch((err) =>
+      this.logger.error('Backfill classification failed:', err),
+    );
+
+    await this.runJobEnrichment().catch((err) =>
+      this.logger.error('AI enrichment batch failed:', err),
+    );
 
     await this.runScoringBatch().catch((err) =>
       this.logger.error('Scoring batch failed:', err),
@@ -171,7 +211,7 @@ export class DiscoverCrawlService {
   private async insertJob(raw: RawJob): Promise<JobListingDocument> {
     const companyName = cleanCompanyName(decodeHtmlEntities(normalizeCompanyName(raw.companyName)));
     const roleTitle = decodeHtmlEntities(raw.roleTitle);
-    const rawDescription = decodeHtmlEntities(raw.descriptionRaw);
+    const rawDescription = fixMojibake(decodeHtmlEntities(raw.descriptionRaw));
     const locationRaw = cleanLocation(decodeHtmlEntities(raw.location || ''));
 
     const postedAt = raw.postedAt || new Date();
@@ -179,6 +219,8 @@ export class DiscoverCrawlService {
     const { location: extractedLocation, isRemote } = extractLocation(locationRaw);
     const salary = parseSalary(rawDescription);
     const experienceLevel = detectExperienceLevel(roleTitle, rawDescription) ?? undefined;
+
+    const { relevance, confidence } = classifyTechRelevance(roleTitle, rawDescription);
 
     return this.jobListingModel.create({
       source: raw.source,
@@ -191,6 +233,7 @@ export class DiscoverCrawlService {
       expiresAt,
       applicationUrl: raw.applicationUrl ?? undefined,
       descriptionRaw: rawDescription,
+      techRelevance: relevance,
       extractedFields: {
         experienceLevel,
         salaryMin: salary.min ?? undefined,
@@ -245,6 +288,76 @@ export class DiscoverCrawlService {
       } catch (err) {
         this.logger.error(`Scoring failed for job ${job._id}:`, err);
       }
+    }
+  }
+
+  async backfillClassification(): Promise<void> {
+    const unclassified = await this.jobListingModel.find({
+      techRelevance: { $exists: false },
+      isExpired: { $ne: true },
+    }).exec();
+
+    if (unclassified.length === 0) {
+      this.logger.log('Backfill: all jobs already classified');
+      return;
+    }
+
+    this.logger.log(`Backfill: classifying ${unclassified.length} existing jobs with keyword classifier`);
+    const bulk = this.jobListingModel.collection.initializeUnorderedBulkOp();
+    let count = 0;
+
+    for (const job of unclassified) {
+      const { relevance } = classifyTechRelevance(job.roleTitle, job.descriptionRaw || '');
+      if (relevance) {
+        bulk.find({ _id: job._id }).updateOne({ $set: { techRelevance: relevance } });
+        count++;
+      }
+    }
+
+    if (count > 0) {
+      await bulk.execute();
+    }
+    this.logger.log(`Backfill: classified ${count} jobs`);
+  }
+
+  private async runJobEnrichment(): Promise<void> {
+    const candidates = await this.jobListingModel.find({
+      $or: [
+        { techRelevance: 'unknown' },
+        { techRelevance: { $exists: false } },
+      ],
+      isExpired: { $ne: true },
+    }).sort({ postedAt: -1 }).limit(100).exec();
+
+    if (candidates.length === 0) return;
+    this.logger.log(`Enriching ${candidates.length} jobs with AI classification`);
+
+    let enriched = 0;
+    for (const job of candidates) {
+      try {
+        const result = await this.aiService.chat(
+          JOB_CLASSIFICATION_SYSTEM,
+          `Title: ${job.roleTitle}\n\nDescription:\n${(job.descriptionRaw || '').slice(0, 1500)}`,
+        ) as { isTechRole?: boolean; cleanedTitle?: string | null; techCategory?: string; confidence?: number };
+
+        const isTech = result.isTechRole === true;
+        const confidence = result.confidence ?? 0;
+
+        job.techRelevance = isTech ? 'tech' : 'non-tech';
+
+        if (result.cleanedTitle && result.cleanedTitle !== job.roleTitle) {
+          job.aiEnhancedTitle = result.cleanedTitle;
+        }
+
+        await job.save();
+        enriched++;
+      } catch (err) {
+        this.logger.debug(`AI enrichment failed for job ${job._id}: ${(err as Error).message}`);
+      }
+    }
+
+    if (enriched > 0) {
+      this.logger.log(`AI enrichment: classified ${enriched} jobs`);
     }
   }
 

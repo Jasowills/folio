@@ -23,7 +23,10 @@ import { RemotiveCrawler } from './crawlers/remotive.crawler';
 import { ArcCrawler } from './crawlers/arc.crawler';
 import { WellfoundCrawler } from './crawlers/wellfound.crawler';
 import { BuiltInCrawler } from './crawlers/builtin.crawler';
+import { TechTreeCrawler } from './crawlers/techtree.crawler';
 import { AtsModule } from '../ats/ats.module';
+import { AiModule } from '../ai/ai.module';
+import { ResumesModule } from '../resumes/resumes.module';
 
 @Module({
   imports: [
@@ -35,6 +38,8 @@ import { AtsModule } from '../ats/ats.module';
       { name: CrawlMeta.name, schema: CrawlMetaSchema },
     ]),
     AtsModule,
+    AiModule,
+    ResumesModule,
   ],
   controllers: [DiscoverController],
   providers: [
@@ -56,6 +61,7 @@ import { AtsModule } from '../ats/ats.module';
     ArcCrawler,
     WellfoundCrawler,
     BuiltInCrawler,
+    TechTreeCrawler,
   ],
 })
 export class DiscoverModule implements OnModuleInit {

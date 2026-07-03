@@ -243,6 +243,231 @@ export function extractLanguages(text: string): string[] {
   return Array.from(found);
 }
 
+const TECH_TITLE_PATTERNS: RegExp[] = [
+  /software\s*(?:engineer|developer|architect)/i,
+  /front[- ]?end/i,
+  /back[- ]?end/i,
+  /full[- ]?stack/i,
+  /devops/i,
+  /\bsite\s+reliability\s*(?:engineer)?/i,
+  /\bsre\b/i,
+  /data\s*(?:engineer|scientist|analytics)/i,
+  /machine\s*learning/i,
+  /\bai\s*(?:engineer|architect|developer|scientist)/i,
+  /\bml\s*(?:engineer|ops)/i,
+  /infrastructure\s*(?:engineer)?/i,
+  /platform\s*(?:engineer|developer)/i,
+  /cloud\s*(?:engineer|architect)/i,
+  /security\s*(?:engineer|analyst|architect)/i,
+  /\bqa\s*(?:engineer|automation)/i,
+  /test\s*(?:engineer|automation)/i,
+  /\bios\s*(?:engineer|developer)/i,
+  /android\s*(?:engineer|developer)/i,
+  /mobile\s*(?:engineer|developer)/i,
+  /\bdeveloper/i,
+  /\bprogrammer/i,
+  /\bsoftware\s*architect/i,
+  /tech\s*lead/i,
+  /engineering\s*manager/i,
+  /staff\s*engineer/i,
+  /principal\s*engineer/i,
+  /\bgolang\b/i,
+  /\brust\b/i,
+  /\bpython\b.*(?:engineer|developer)/i,
+  /typescript\s*(?:engineer|developer)/i,
+  /kubernetes/i,
+  /\bdocker\b/i,
+  /\baws\b.*(?:engineer|architect)/i,
+  /microservices/i,
+  /\bapi\s*(?:engineer|developer|design)/i,
+  /blockchain/i,
+  /smart\s*contract/i,
+  /solidity/i,
+  /\bnlp\b/i,
+  /computer\s*vision/i,
+  /deep\s*learning/i,
+  /etl\s*(?:engineer|developer)/i,
+  /data\s*pipeline/i,
+  /system\s*design/i,
+  /distributed\s*systems/i,
+  /web\s*(?:engineer|developer)/i,
+  /backend\s*(?:engineer|developer)/i,
+  /technical\s*(?:co-founder|lead|manager)/i,
+  /scala\s*(?:engineer|developer)/i,
+  /kotlin\s*(?:engineer|developer)/i,
+  /swift\s*(?:engineer|developer)/i,
+  /\bc\+\+/i,
+  /embedded\s*(?:engineer|software|systems)/i,
+  /\bqa\s*(?:engineer|lead)/i,
+  /solution\s*architect/i,
+  /systems\s*(?:engineer|architect)/i,
+  /\bllm\b/i,
+  /gen[- ]?ai/i,
+  /prompt\s*engineer/i,
+  /database\s*(?:engineer|administrator|architect)/i,
+  /site\s*reliability/i,
+  /\bci\s*\/\s*cd/i,
+  /haskell/i,
+  /\berlang\b/i,
+  /\belixir\b/i,
+  /servicenow\s*(?:engineer|developer)/i,
+  /salesforce\s*(?:engineer|developer)/i,
+  /sap\s*(?:engineer|developer|consultant)/i,
+  /it\s*(?:engineer|support|specialist|analyst)/i,
+];
+
+const NON_TECH_TITLE_PATTERNS: RegExp[] = [
+  /nurse/i, /doctor/i, /medical\s*(?:assistant|receptionist|scribe|records)/i,
+  /clinical/i, /patient/i, /healthcare\s*(?:assistant|aide)/i,
+  /social\s*media/i,
+  /accountant/i, /accounting/i, /financial\s*analyst/i,
+  /\bhr\b/i, /human\s*resources/i, /recruiter/i, /talent\s*acquis/i,
+  /administrative\s*(?:assistant|coordinator)/i, /office\s*manager/i,
+  /customer\s*(?:service|support|success\s*manager|care)/i,
+  /call\s*center/i,
+  /driver/i, /delivery/i, /warehouse/i, /logistics/i,
+  /maintenance/i, /facility/i, /janitor/i, /housekeeping/i,
+  /cook/i, /chef/i, /restaurant/i, /server\b(?!.*engineer)/i, /bartender/i,
+  /retail/i, /cashier/i, /store\s*manager/i,
+  /teacher/i, /professor/i, /instructor(?!.*(?:tech|code|coding|software))/i,
+  /legal/i, /paralegal/i, /attorney/i, /lawyer/i,
+  /esthetician/i, /barber/i, /hairdresser/i, /nail\s*tech/i,
+  /police/i, /security\s*guard/i, /firefighter/i,
+  /construction/i, /electrician/i, /plumber/i, /carpenter/i, /hvac/i,
+  /receptionist/i, /front\s*desk/i,
+  /phlebotomist/i, /pharmacy/i, /dental/i, /veterinary/i,
+  /concierge/i, /valet/i, /parking/i,
+  /pastor/i, /minister/i, /priest/i,
+];
+
+export function fixMojibake(text: string): string {
+  // Detect UTF-8 bytes misread as Latin-1 (common in scraped text)
+  if (/[\u00C0-\u00FF][\u0080-\u00BF]/.test(text)) {
+    try {
+      const buf = Buffer.from(text, 'latin1');
+      const fixed = buf.toString('utf-8');
+      if (fixed !== text) return fixed;
+    } catch {}
+  }
+  return text;
+}
+
+const NON_ENGLISH_TERMS = [
+  'docente', 'universidad', 'facultad', 'búsqueda', 'remoto', 'tiempo parcial',
+  'orientador', 'mentores', 'clases', 'tutores', 'refuerzo escolar',
+  'profesor', 'apoyo escolar', 'todos los niveles', 'matemáticas', 'física',
+  'química', 'filosofía', 'bachiller', 'vocación',
+  'advogado', 'trabalhista', 'prazos', 'vagas', 'contratação',
+  'freelancer', 'kundenservice', 'möchtest', 'engagement',
+  'información', 'experiencia', 'habilidades', 'requisitos',
+  'asistente', 'administrativa', 'reportes', 'seguimiento',
+  'derecho', 'remuneración', 'postulación', 'contratación',
+  'inscripción', 'estudiantes', 'aprender', 'enseñar',
+  'jurídico', 'trabalhista', 'efetivo', 'remota',
+  'pré-requisitos', 'jornada', 'período', 'integral',
+  'entreprise', 'temps plein', 'temps partiel', 'cdi', 'cdd', 'stage',
+  'alternance', 'salaire', 'expérience', 'compétences', 'poste',
+  'recrutons', 'rejoignez', 'nous cherchons', 'missions',
+  'lavoro', 'tempo pieno', 'assunzione', 'stipendio', 'esperienza',
+  'ufficio', 'azienda', 'requisiti',
+  '中方', '合作', '经验', '工作', '职位', '招聘',
+];
+
+const ACCENT_THRESHOLD = 0.04; // if >4% of chars are accented, likely not English
+
+const ACCENTED_CHARS = /[àáâãäåæçèéêëìíîïðñòóôõöøùúûüýþāăąćĉċčďđēĕėęěĝğġģĥħĩīĭįıĳĵķĸĺļľŀłńņňŉŋōŏőœŕŗřśŝşšţťŧũūŭůűųŵŷźżž]/i;
+
+export function isLikelyEnglish(text: string): boolean {
+  if (!text || text.length < 50) return true;
+
+  let t = text.toLowerCase();
+
+  // Check for non-English stop words / phrases
+  const nonEnglishHits = NON_ENGLISH_TERMS.filter(term => t.includes(term)).length;
+  if (nonEnglishHits >= 2) return false;
+  if (nonEnglishHits === 1 && t.length < 500) return false;
+
+  // Check accented character ratio
+  const total = t.length;
+  const accented = (t.match(ACCENTED_CHARS) || []).length;
+  if (accented / total > ACCENT_THRESHOLD) return false;
+
+  return true;
+}
+
+export interface TechClassification {
+  relevance: 'tech' | 'non-tech' | 'unknown';
+  confidence: number;
+}
+
+export function classifyTechRelevance(title: string, description: string): TechClassification {
+  const text = `${title} ${description}`.toLowerCase();
+
+  let techScore = 0;
+  let nonTechScore = 0;
+
+  for (const pattern of TECH_TITLE_PATTERNS) {
+    if (pattern.test(text)) techScore += 3;
+  }
+
+  for (const pattern of NON_TECH_TITLE_PATTERNS) {
+    if (pattern.test(text)) nonTechScore += 3;
+  }
+
+  const techWords = ['engineer', 'developer', 'software', 'code', 'programming', 'deploy',
+    'algorithm', 'api', 'database', 'server', 'frontend', 'backend', 'fullstack',
+    'devops', 'infrastructure', 'kubernetes', 'docker', 'aws', 'cloud', 'microservice',
+    'typescript', 'javascript', 'python', 'react', 'node', 'git', 'agile', 'sprint',
+    'technical', 'architecture', 'system design', 'ci/cd', 'automation',
+    'unit test', 'integration test', 'code review', 'pull request',
+  ];
+
+  const nonTechWords = ['sales', 'marketing', 'accounting', 'finance', 'hr', 'recruit',
+    'customer', 'patient', 'medical', 'clinical', 'warehouse', 'driver', 'delivery',
+    'maintenance', 'retail', 'restaurant', 'hospital', 'nurse', 'doctor',
+    'administrative', 'reception', 'call center',
+  ];
+
+  for (const word of techWords) {
+    const count = (text.match(new RegExp(`\\b${word.replace(/[\/\- ]/g, '[- ]')}\\b`, 'gi')) || []).length;
+    techScore += Math.min(count, 3);
+  }
+
+  for (const word of nonTechWords) {
+    const count = (text.match(new RegExp(`\\b${word.replace(/[\/\- ]/g, '[- ]')}\\b`, 'gi')) || []).length;
+    nonTechScore += Math.min(count, 3);
+  }
+
+  // Heavily penalize non-tech when title clearly indicates non-tech
+  const titleLower = title.toLowerCase();
+  for (const pattern of NON_TECH_TITLE_PATTERNS) {
+    if (pattern.test(titleLower)) nonTechScore += 5;
+  }
+  for (const pattern of TECH_TITLE_PATTERNS) {
+    if (pattern.test(titleLower)) techScore += 5;
+  }
+
+  // Check for encoding garbage (garbage titles)
+  if (/^[A-Za-z]?\d{6,}$/.test(title.trim()) || title.trim().length < 2) {
+    nonTechScore += 10;
+  }
+
+  // Penalize non-English descriptions
+  if (!isLikelyEnglish(text)) {
+    nonTechScore += 8;
+  }
+
+  const total = techScore + nonTechScore;
+  if (total === 0) return { relevance: 'unknown', confidence: 0 };
+
+  const techRatio = techScore / total;
+
+  if (techRatio >= 0.55) return { relevance: 'tech', confidence: Math.round(techRatio * 100) };
+  if (nonTechScore > techScore * 2) return { relevance: 'non-tech', confidence: Math.round((1 - techRatio) * 100) };
+
+  return { relevance: 'unknown', confidence: Math.round(Math.min(techRatio, 1 - techRatio) * 50) };
+}
+
 export function extractField(text: string, fieldName: string): string | null {
   const patterns: Record<string, RegExp[]> = {
     roleTitle: [
