@@ -27,6 +27,8 @@ export interface DeepgramTranscriptEvent {
 interface SttConnection {
   sessionId: string
   conn: any
+  audioQueue: Buffer[]
+  isSocketOpen: boolean
   onTranscript: (event: DeepgramTranscriptEvent) => void
   onError: (error: Error) => void
   onClose: () => void
@@ -73,27 +75,35 @@ export class DeepgramService implements OnModuleDestroy {
     }
 
     try {
-      const conn = await (this.deepgramClient as any).listen.v2.connect({
+      const conn = await (this.deepgramClient as any).listen.v2.createConnection({
         model: 'flux-general-en',
         eager_eot_threshold: 0.5,
         eot_threshold: 0.8,
         eot_timeout_ms: 1500,
-        queryParams: {
-          smart_format: true,
-          punctuate: true,
-        },
       })
 
       const state: SttConnection = {
         sessionId,
         conn,
+        audioQueue: [],
+        isSocketOpen: false,
         onTranscript,
         onError,
         onClose,
       }
 
+      this.connections.set(clientId, state)
+
       conn.on('open', () => {
-        this.logger.log(`Deepgram Flux v2 connection opened for client ${clientId}, session ${sessionId}`)
+        this.logger.log(`Deepgram Flux v2 WebSocket opened for client ${clientId}, session ${sessionId}`)
+        state.isSocketOpen = true
+        const queue = state.audioQueue
+        state.audioQueue = []
+        for (const chunk of queue) {
+          try {
+            conn.sendMedia(chunk)
+          } catch { /* socket is now open, sendMedia should work */ }
+        }
       })
 
       conn.on('message', (message: any) => {
@@ -130,9 +140,8 @@ export class DeepgramService implements OnModuleDestroy {
       })
 
       conn.on('close', (event: any) => {
-        this.logger.log(`Deepgram Flux connection closed for client ${clientId}: code=${event?.code || 'unknown'}`)
-        state.onClose()
-        this.connections.delete(clientId)
+        this.logger.log(`Deepgram Flux connection closed for client ${clientId}: code=${event?.code || 'unknown'}, will auto-reconnect`)
+        state.isSocketOpen = false
       })
 
       conn.on('error', (error: Error) => {
@@ -140,8 +149,10 @@ export class DeepgramService implements OnModuleDestroy {
         state.onError(error)
       })
 
-      this.connections.set(clientId, state)
-      this.logger.log(`Deepgram Flux v2 STT connected for client ${clientId}, session ${sessionId}`)
+      await conn.connect()
+      await conn.waitForOpen()
+
+      this.logger.log(`Deepgram Flux v2 STT ready for client ${clientId}, session ${sessionId}`)
       return true
     } catch (err) {
       this.logger.error(`Failed to create Deepgram Flux connection for ${clientId}: ${(err as Error).message}`)
@@ -152,18 +163,14 @@ export class DeepgramService implements OnModuleDestroy {
 
   sendAudio(clientId: string, audioBuffer: Buffer): void {
     const state = this.connections.get(clientId)
-    if (!state) {
-      this.logger.warn(`No Deepgram connection for client ${clientId}`)
-      return
-    }
+    if (!state) return
 
-    try {
-      // Use the underlying ReconnectingWebSocket send() which auto-queues
-      // if the socket isn't open yet. V2Socket.sendMedia() asserts open
-      // and throws — too aggressive for early audio chunks.
-      state.conn.socket.send(new Uint8Array(audioBuffer))
-    } catch (err) {
-      this.logger.error(`Failed to send audio to Deepgram for ${clientId}: ${(err as Error).message}`)
+    if (state.isSocketOpen) {
+      try {
+        state.conn.sendMedia(audioBuffer)
+      } catch { /* socket is open, sendMedia should work */ }
+    } else {
+      state.audioQueue = [...state.audioQueue, audioBuffer]
     }
   }
 

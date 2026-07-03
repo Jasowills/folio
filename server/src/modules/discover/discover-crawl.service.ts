@@ -343,13 +343,15 @@ export class DiscoverCrawlService {
         const isTech = result.isTechRole === true;
         const confidence = result.confidence ?? 0;
 
-        job.techRelevance = isTech ? 'tech' : 'non-tech';
-
-        if (result.cleanedTitle && result.cleanedTitle !== job.roleTitle) {
-          job.aiEnhancedTitle = result.cleanedTitle;
+        const update: Record<string, unknown> = {
+          techRelevance: isTech ? 'tech' : 'non-tech',
         }
 
-        await job.save();
+        if (result.cleanedTitle && result.cleanedTitle !== job.roleTitle) {
+          update.aiEnhancedTitle = result.cleanedTitle
+        }
+
+        await this.jobListingModel.updateOne({ _id: job._id }, { $set: update }).exec()
         enriched++;
       } catch (err) {
         this.logger.debug(`AI enrichment failed for job ${job._id}: ${(err as Error).message}`);

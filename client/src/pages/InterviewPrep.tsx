@@ -41,8 +41,7 @@ export default function InterviewPrep() {
         transports: ['websocket', 'polling'],
       })
       socket.on('connect', () => {
-        console.log(`[Prep] Pre-connected socket ${socket.id}, joining ${sessionId}`)
-        socket.emit('join', { sessionId })
+        console.log(`[Prep] Pre-connected socket ${socket.id} connected`)
       })
       socket.on('connect_error', (err) => {
         console.error(`[Prep] Pre-connect error: ${err.message}`)

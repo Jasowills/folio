@@ -24,6 +24,9 @@ interface SessionState {
   isPaused: boolean
   candidateName: string | null
   resumeContext: Record<string, unknown> | null
+  greetingSent: boolean
+  lastAiResponseAt: number | null
+  lastAiResponseText: string
 }
 
 @WebSocketGateway({
@@ -41,6 +44,7 @@ export class InterviewsGateway implements OnGatewayConnection, OnGatewayDisconne
 
   private readonly MAX_PAUSES = 2
   private readonly MAX_PAUSE_SECONDS = 120
+  private readonly ECHO_COOLDOWN_MS = 3000
 
   constructor(
     private interviewsService: InterviewsService,
@@ -60,6 +64,7 @@ export class InterviewsGateway implements OnGatewayConnection, OnGatewayDisconne
       clients.delete(client.id)
       if (clients.size === 0) {
         this.activeSessions.delete(sessionId)
+        this.sessionStates.delete(sessionId)
       }
     }
   }
@@ -73,7 +78,6 @@ export class InterviewsGateway implements OnGatewayConnection, OnGatewayDisconne
     this.activeSessions.get(sessionId)!.add(client.id)
     client.join(sessionId)
 
-    let isNewSession = false
     if (!this.sessionStates.has(sessionId)) {
       const doc = await this.interviewsService.getSessionForAi(sessionId)
 
@@ -111,18 +115,59 @@ export class InterviewsGateway implements OnGatewayConnection, OnGatewayDisconne
         isPaused: false,
         candidateName,
         resumeContext,
+        greetingSent: false,
+        lastAiResponseAt: null,
+        lastAiResponseText: '',
       })
-      if (doc && doc.status === 'in_progress') {
-        const hasTurns = await this.interviewsService.hasTranscriptTurns(sessionId)
-        if (!hasTurns) {
-          isNewSession = true
+    }
+
+    const state = this.sessionStates.get(sessionId)!
+
+    // Send greeting if session is in_progress and we haven't sent one yet
+    // (handles StrictMode remount, reconnect, and first join)
+    if (!state.greetingSent) {
+      try {
+        const doc = await this.interviewsService.getSessionForAi(sessionId)
+        if (doc && doc.status === 'in_progress') {
+          const hasTurns = await this.interviewsService.hasTranscriptTurns(sessionId)
+          const isNewSession = !hasTurns
+          const persona = doc?.interviewerPersona as { interviewerName?: string } | undefined
+          const interviewerName = persona?.interviewerName
+          const greeting = this.interviewsService.buildGreeting(doc, state.candidateName)
+          if (greeting) {
+            state.greetingSent = true
+            const greetingTurn = {
+              speaker: 'interviewer' as const,
+              questionPlanRef: 0,
+              text: greeting,
+              timestamp: Date.now(),
+              duration: 0,
+            }
+            if (isNewSession) {
+              await this.interviewsService.addTurn(sessionId, greetingTurn)
+            }
+            let audioBase64: string | null = null
+            if (this.deepgram.isConfigured) {
+              audioBase64 = await this.deepgram.generateTtsBase64(greeting, interviewerName)
+            }
+            this.server.to(sessionId).emit('interviewer_response', {
+              text: greeting,
+              audio: audioBase64,
+              questionIndex: 0,
+            })
+            this.logger.log(`Greeting sent for session ${sessionId} (newSession=${isNewSession})`)
+          }
         }
+      } catch (err) {
+        this.logger.error(`Failed to send greeting for session ${sessionId}: ${err}`)
       }
     }
 
     this.logger.log(`Client ${client.id} joined session ${sessionId}`)
 
-    this.deepgram.createSttConnection(
+    // Start Deepgram Flux BEFORE the greeting TTS (which is slow)
+    // so the connection is ready when the mic starts streaming audio
+    const sttConnected = await this.deepgram.createSttConnection(
       client.id,
       sessionId,
       (event) => this.handleTranscript(client, sessionId, event),
@@ -130,34 +175,11 @@ export class InterviewsGateway implements OnGatewayConnection, OnGatewayDisconne
       () => {},
     )
 
-    if (isNewSession) {
-      const doc = await this.interviewsService.getSessionForAi(sessionId)
-      const state = this.sessionStates.get(sessionId)
-      const persona = doc?.interviewerPersona as { interviewerName?: string } | undefined
-      const interviewerName = persona?.interviewerName
-      const greeting = this.interviewsService.buildGreeting(doc!, state?.candidateName)
-      if (greeting) {
-        const greetingTurn = {
-          speaker: 'interviewer' as const,
-          questionPlanRef: 0,
-          text: greeting,
-          timestamp: Date.now(),
-          duration: 0,
-        }
-        await this.interviewsService.addTurn(sessionId, greetingTurn)
-        let audioBase64: string | null = null
-        if (this.deepgram.isConfigured) {
-          audioBase64 = await this.deepgram.generateTtsBase64(greeting, interviewerName)
-        }
-        this.server.to(sessionId).emit('interviewer_response', {
-          text: greeting,
-          audio: audioBase64,
-          questionIndex: 0,
-        })
-      }
+    if (sttConnected) {
+      this.logger.log(`Deepgram Flux v2 STT ready for client ${client.id} in session ${sessionId}`)
+    } else {
+      this.logger.warn(`Deepgram Flux v2 STT failed for client ${client.id} — audio will not be processed`)
     }
-
-    this.logger.log(`Deepgram Flux v2 STT started for client ${client.id} in session ${sessionId}`)
   }
 
   @SubscribeMessage('leave')
@@ -193,6 +215,16 @@ export class InterviewsGateway implements OnGatewayConnection, OnGatewayDisconne
     this.micEnabled.set(client.id, payload.enabled)
   }
 
+  private isEcho(transcript: string, lastAiResponse: string): boolean {
+    if (!lastAiResponse || transcript.length < 10) return false
+    const tWords = transcript.toLowerCase().split(/\s+/).filter(Boolean)
+    if (tWords.length < 3) return false
+    const rWords = new Set(lastAiResponse.toLowerCase().split(/\s+/).filter(Boolean))
+    if (rWords.size === 0) return false
+    const matchCount = tWords.filter(w => rWords.has(w)).length
+    return matchCount / tWords.length > 0.45
+  }
+
   private async handleTranscript(
     client: Socket,
     sessionId: string,
@@ -208,6 +240,14 @@ export class InterviewsGateway implements OnGatewayConnection, OnGatewayDisconne
     if (event.isFinal) {
       const state = this.sessionStates.get(sessionId)
       if (!state || state.isAiResponding) return
+
+      if (state.lastAiResponseAt && Date.now() - state.lastAiResponseAt < this.ECHO_COOLDOWN_MS) {
+        return
+      }
+
+      if (this.isEcho(event.transcript, state.lastAiResponseText)) {
+        return
+      }
 
       const wordCount = event.transcript.trim().split(/\s+/).length
       if (wordCount < 3) {
@@ -268,24 +308,27 @@ export class InterviewsGateway implements OnGatewayConnection, OnGatewayDisconne
     questionPlan: InterviewQuestionPlan[] | undefined,
     remainingTimeInMinutes?: number,
     currentQuestionBudget?: number,
+    company?: string,
   ): string {
+    const companyRef = company && company !== 'the company' ? `at ${company}` : ''
+
     if (state.questionIndex === 0 && turns.length === 0) {
-      return 'Greet the candidate warmly by name. Ask how they are. Do NOT jump straight into interview questions yet.'
+      return `Greet the candidate warmly by name. Introduce yourself as the interviewer ${companyRef} and mention the role they are interviewing for. Ask how they are. Do NOT jump straight into interview questions yet.`
     }
 
     if (questionPlan && state.questionIndex >= questionPlan.length - 1) {
-      return 'Thank the candidate for their time. Ask if they have any questions for you. End naturally.'
+      return `Thank the candidate for their time. Ask if they have any questions for you about the role ${companyRef}. End naturally.`
     }
 
     if (remainingTimeInMinutes !== undefined && remainingTimeInMinutes <= 5) {
-      return 'Time is running short. Keep your response very brief (1-2 sentences) and move to the next topic quickly.'
+      return `Time is running short. Keep your response very brief (1-2 sentences) and move to the next topic quickly. Naturally reference the role ${companyRef} where appropriate.`
     }
 
     if (currentQuestionBudget !== undefined && remainingTimeInMinutes !== undefined && remainingTimeInMinutes > 10) {
       const remainingQuestions = (questionPlan?.length || 1) - state.questionIndex - 1
       const averagePerRemaining = remainingTimeInMinutes / Math.max(remainingQuestions, 1)
       if (currentQuestionBudget > averagePerRemaining * 1.5) {
-        return 'You are spending more time on this question than budget allows. Wrap up the current discussion and transition to the next question.'
+        return `You are spending more time on this question than budget allows. Wrap up the current discussion and transition to the next question. Naturally reference the role ${companyRef} where appropriate.`
       }
     }
 
@@ -296,11 +339,11 @@ export class InterviewsGateway implements OnGatewayConnection, OnGatewayDisconne
       const hasFiller = /\b(basically|kind of|sort of|I guess|you know|like)\b/i.test(text)
 
       if (wordCount < 100 || hasFiller) {
-        return 'Their last answer was vague. Ask a follow-up that pushes for a specific example or a measurable result before moving on. Do not proceed to the next question yet.'
+        return `Their last answer was vague. Ask a follow-up that pushes for a specific example or a measurable result before moving on. Do not proceed to the next question yet. Naturally reference the role ${companyRef} where appropriate.`
       }
     }
 
-    return 'Acknowledge their answer briefly in one sentence then transition to the next question.'
+    return `Acknowledge their answer briefly in one sentence then transition to the next question. Naturally reference the role ${companyRef} where appropriate.`
   }
 
   private async generateAiResponse(
@@ -314,19 +357,22 @@ export class InterviewsGateway implements OnGatewayConnection, OnGatewayDisconne
       if (!responseSent) {
         responseSent = true
         state.isAiResponding = false
+        state.lastAiResponseAt = Date.now()
+        state.lastAiResponseText = "Could you repeat that? I didn't quite catch it."
         this.server.to(sessionId).emit('interviewer_response', {
-          text: "Could you repeat that? I didn't quite catch it.",
+          text: state.lastAiResponseText,
           audio: null,
           questionIndex: state.questionIndex,
         })
       }
-    }, 15_000)
+    }, 20_000)
 
     try {
       const doc = await this.interviewsService.getSessionForAi(sessionId)
       if (!doc) {
         this.logger.warn(`Session ${sessionId} not found for AI response`)
         state.isAiResponding = false
+        state.lastAiResponseAt = Date.now()
         clearTimeout(timeout)
         return
       }
@@ -338,9 +384,10 @@ export class InterviewsGateway implements OnGatewayConnection, OnGatewayDisconne
 
       const personaName = persona?.interviewerName || 'Interviewer'
       const candidateName = state.candidateName || 'the candidate'
-      const company = (doc as any)?.company || (doc as any)?.targetCompany || 'the company'
-      const role = (doc as any)?.targetRole || 'the role'
-      const level = (doc as any)?.seniority || 'mid'
+      const companyData = (doc as any)?.company
+      const company = typeof companyData === 'object' && companyData?.name ? companyData.name : companyData || 'the company'
+      const role = doc.role || (doc as any)?.targetRole || 'the role'
+      const level = doc.level || (doc as any)?.seniority || 'mid'
 
       const totalSeconds = (doc.plannedDuration || 30) * 60
       const elapsedSeconds = doc.startedAt ? Math.floor((Date.now() - doc.startedAt.getTime()) / 1000) : 0
@@ -359,7 +406,7 @@ export class InterviewsGateway implements OnGatewayConnection, OnGatewayDisconne
         ? currentQuestion.followUpTriggers.map(t => `If candidate says "${t.condition}", ask: "${t.followUp}"`).join('\n')
         : 'None specified'
 
-      const turnInstructions = this.buildTurnInstructions(state, turns, questionPlan, remainingTimeInMinutes, currentQuestionBudget)
+      const turnInstructions = this.buildTurnInstructions(state, turns, questionPlan, remainingTimeInMinutes, currentQuestionBudget, company)
 
       const systemPrompt = INTERVIEW_RESPONSE_SYSTEM
         .replace(/\{interviewerName\}/g, personaName)
@@ -403,8 +450,12 @@ export class InterviewsGateway implements OnGatewayConnection, OnGatewayDisconne
         audioBase64 = await this.deepgram.generateTtsBase64(responseText, persona?.interviewerName)
       }
 
+      if (responseSent) return
+
       clearTimeout(timeout)
       responseSent = true
+      state.lastAiResponseAt = Date.now()
+      state.lastAiResponseText = responseText
       this.server.to(sessionId).emit('interviewer_response', {
         text: responseText,
         audio: audioBase64,
@@ -417,8 +468,10 @@ export class InterviewsGateway implements OnGatewayConnection, OnGatewayDisconne
         responseSent = true
         this.logger.error(`AI response generation failed: ${(err as Error).message}`)
         state.isAiResponding = false
+        state.lastAiResponseAt = Date.now()
+        state.lastAiResponseText = "Could you repeat that? I didn't quite catch it."
         this.server.to(sessionId).emit('interviewer_response', {
-          text: "Could you repeat that? I didn't quite catch it.",
+          text: state.lastAiResponseText,
           audio: null,
           questionIndex: state.questionIndex,
         })

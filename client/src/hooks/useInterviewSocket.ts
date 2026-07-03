@@ -49,10 +49,23 @@ export function useInterviewSocket(sessionId: string | undefined) {
   const bargeInHighCountRef = useRef(0)
   const bargeInPollRef = useRef<ReturnType<typeof setInterval> | undefined>(undefined)
   const bargeInTimeoutRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
+  const [greetingDone, setGreetingDone] = useState(false)
+  const greetingSpokenRef = useRef(false)
+  const [aiResponseTime, setAiResponseTime] = useState<number | null>(null)
+  const thinkingStartTimeRef = useRef(0)
 
   useEffect(() => {
     isAvatarSpeakingRef.current = isAvatarSpeaking
   }, [isAvatarSpeaking])
+
+  useEffect(() => {
+    if (isAvatarSpeaking) {
+      greetingSpokenRef.current = true
+    }
+    if (!isAvatarSpeaking && greetingSpokenRef.current && !greetingDone) {
+      setGreetingDone(true)
+    }
+  }, [isAvatarSpeaking, greetingDone])
 
   const stopAllAudio = useCallback(() => {
     if (window.speechSynthesis) {
@@ -273,10 +286,13 @@ export function useInterviewSocket(sessionId: string | undefined) {
         setCurrentInterim('')
         if (event.speaker === 'candidate') {
           if (thinkingTimeoutRef.current) clearTimeout(thinkingTimeoutRef.current)
+          if (thinkingStartTimeRef.current === 0) {
+            thinkingStartTimeRef.current = performance.now()
+          }
           setIsThinking(true)
         }
       } else {
-        if (event.speaker === 'candidate') {
+        if (event.speaker === 'candidate' && event.text.trim().length > 0) {
           if (thinkingTimeoutRef.current) clearTimeout(thinkingTimeoutRef.current)
           setIsThinking(false)
         }
@@ -286,12 +302,17 @@ export function useInterviewSocket(sessionId: string | undefined) {
 
     socket.on('interviewer_thinking', () => {
       if (thinkingTimeoutRef.current) clearTimeout(thinkingTimeoutRef.current)
+      thinkingStartTimeRef.current = performance.now()
       setIsThinking(true)
     })
 
     socket.on('interviewer_response', (response: InterviewerResponse) => {
       console.log(`[Socket] Interviewer response: text="${response.text.slice(0, 60)}", audio=${response.audio ? 'present' : 'null'}, questionIndex=${response.questionIndex}`)
       if (thinkingTimeoutRef.current) clearTimeout(thinkingTimeoutRef.current)
+      if (thinkingStartTimeRef.current > 0) {
+        setAiResponseTime(Math.round(performance.now() - thinkingStartTimeRef.current))
+        thinkingStartTimeRef.current = 0
+      }
       setIsThinking(false)
       setInterviewerResponse(response)
       setTranscripts((prev) => [
@@ -348,7 +369,12 @@ export function useInterviewSocket(sessionId: string | undefined) {
     if (bargeInTimeoutRef.current) clearTimeout(bargeInTimeoutRef.current)
     stopAllAudio()
     socket.emit('leave', sessionId)
-    socket.disconnect()
+    if (socket.connected) {
+      socket.disconnect()
+    } else {
+      socket.removeAllListeners()
+      socket.close()
+    }
     stopMicrophone()
   }, [sessionId, stopMicrophone, stopAllAudio])
 
@@ -359,15 +385,10 @@ export function useInterviewSocket(sessionId: string | undefined) {
     if (existing) {
       console.log(`[Socket] Reusing pre-connected socket ${existing.id} for session ${sessionId}`)
       socketRef.current = existing
-      setIsConnected(existing.connected)
-      if (!existing.connected) {
-        existing.on('connect', () => {
-          console.log(`[Socket] Pre-connected socket now connected with id ${existing.id}`)
-          setIsConnected(true)
-        })
-      }
+      setIsConnected(true)
       setPreConnectedSocket(null)
       setupSocketHandlers(existing)
+      existing.emit('join', { sessionId })
       return () => cleanup(existing)
     }
 
@@ -427,10 +448,6 @@ export function useInterviewSocket(sessionId: string | undefined) {
     }
   }, [interviewerResponse, speakResponse])
 
-  const flushBuffer = useCallback(() => {
-    console.log('[Socket] Done answering button clicked — Flux endpointing handles turn detection automatically')
-  }, [])
-
   return {
     isConnected,
     isRecording,
@@ -443,7 +460,9 @@ export function useInterviewSocket(sessionId: string | undefined) {
     isAvatarSpeaking,
     isThinking,
     isPaused,
+    greetingDone,
     bargeInIndicator,
+    aiResponseTime,
     audioStream: streamRef.current,
     startMicrophone,
     stopMicrophone,
@@ -454,6 +473,5 @@ export function useInterviewSocket(sessionId: string | undefined) {
     submitCode,
     sendProctoringEvent,
     replayResponse,
-    flushBuffer,
   }
 }

@@ -434,10 +434,14 @@ export function useGeneratePersona() {
 }
 
 export function useStartSession() {
+  const qc = useQueryClient()
   return useMutation({
     mutationFn: async (sessionId: string) => {
       const res = await api.post(`/interviews/sessions/${sessionId}/start`)
       return (res.data.data || res.data) as InterviewSessionData
+    },
+    onSuccess: (_data, sessionId) => {
+      qc.invalidateQueries({ queryKey: ['interview-session', sessionId] })
     },
   })
 }

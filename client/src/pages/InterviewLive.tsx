@@ -13,6 +13,7 @@ import { useCameraProctoring } from '../hooks/useCameraProctoring'
 import { showToast } from '../components/ui/toast'
 import InterviewerAvatar from '../components/interview/InterviewerAvatar'
 import AudioWaveform from '../components/interview/AudioWaveform'
+import DebugPanel from '../components/interview/DebugPanel'
 
 const LANGUAGES = [
   { id: 'javascript', label: 'JavaScript' },
@@ -46,18 +47,19 @@ export default function InterviewLive() {
   const endSession = useEndSession()
 
   const {
-    isConnected, isRecording, currentInterim,
+    isConnected, isRecording, transcripts, currentInterim,
     interviewerResponse, codeResult, isCodeRunning,
-    error, isAvatarSpeaking, isThinking, isPaused, bargeInIndicator,
+    error, isAvatarSpeaking, isThinking, isPaused, greetingDone, bargeInIndicator,
+    aiResponseTime,
     audioStream, startMicrophone, stopMicrophone,
     pause: wsPause, resume: wsResume,
-    endSession: wsEndSession, submitCode, sendProctoringEvent, flushBuffer,
+    endSession: wsEndSession, submitCode, sendProctoringEvent,
   } = useInterviewSocket(sessionId)
 
   const [opening, setOpening] = useState(true)
   const [closing, setClosing] = useState(false)
   const [elapsed, setElapsed] = useState(0)
-  const [confirmEnd, setConfirmEnd] = useState(false)
+  const [isEnding, setIsEnding] = useState(false)
   const [showSettings, setShowSettings] = useState(false)
   const [settingsTab, setSettingsTab] = useState<'audio' | 'video'>('audio')
   const [pausesUsed, setPausesUsed] = useState(0)
@@ -74,7 +76,6 @@ export default function InterviewLive() {
   const selfViewRef = useRef<HTMLVideoElement>(null)
   const [displayedChars, setDisplayedChars] = useState(0)
   const timerRef = useRef<ReturnType<typeof setInterval> | undefined>(undefined)
-  const confirmTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
   const pauseTimerRef = useRef<ReturnType<typeof setInterval> | undefined>(undefined)
   const hasAutoResumedRef = useRef(false)
   const hasAutoOpenedRef = useRef(false)
@@ -139,12 +140,13 @@ export default function InterviewLive() {
     return () => clearInterval(timer)
   }, [interviewerResponse?.text, isAvatarSpeaking])
 
-  // Auto-start mic + camera
+  // Start mic + camera after AI greeting finishes
   useEffect(() => {
     if (!isConnected || !session || session.status !== 'in_progress') return
+    if (!greetingDone) return
     startMicrophone()
     setCameraEnabled(true)
-  }, [isConnected, session, startMicrophone])
+  }, [isConnected, session, greetingDone, startMicrophone])
 
   // Camera self-view
   useEffect(() => {
@@ -242,7 +244,6 @@ export default function InterviewLive() {
   // Stop all media streams on unmount
   useEffect(() => {
     return () => {
-      clearTimeout(confirmTimerRef.current)
       stopMicrophone()
     }
   }, [stopMicrophone])
@@ -268,13 +269,15 @@ export default function InterviewLive() {
   }, [submitCode, codeLanguage, code])
 
   const handleEnd = async () => {
-    if (!sessionId) return
+    if (!sessionId || isEnding) return
+    setIsEnding(true)
     wsEndSession()
     try {
       await endSession.mutateAsync(sessionId)
-      navigate(`/interview/${sessionId}/results`)
+      navigate(`/interview/${sessionId}/results`, { replace: true })
     } catch {
       showToast('error', 'Failed to end session')
+      setIsEnding(false)
     }
   }
 
@@ -292,12 +295,7 @@ export default function InterviewLive() {
   }
 
   const handleEndClick = () => {
-    if (confirmEnd) {
-      handleEnd()
-    } else {
-      setConfirmEnd(true)
-      confirmTimerRef.current = setTimeout(() => setConfirmEnd(false), 3000)
-    }
+    handleEnd()
   }
 
   // Turn state determination
@@ -402,8 +400,24 @@ export default function InterviewLive() {
         )}
       </AnimatePresence>
 
-      {/* ── Phase transition overlay ── */}
-      {/* Will be triggered by question phase changes */}
+      {/* ── Ending overlay ── */}
+      <AnimatePresence>
+        {isEnding && !closing && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 0.3 }}
+            className="fixed inset-0 z-50 bg-[#1C1C1A] flex items-center justify-center"
+          >
+            <div className="flex flex-col items-center gap-4">
+              <p className="text-sm text-white/40" style={{ fontFamily: 'Inter, sans-serif' }}>
+                Ending interview...
+              </p>
+              <span className="text-teal text-2xl font-display animate-pulse">&amp;</span>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* ── Pause overlay ── */}
       <AnimatePresence>
@@ -530,12 +544,17 @@ export default function InterviewLive() {
             </button>
             <button
               onClick={handleEndClick}
-              className={`p-1.5 rounded transition-colors cursor-pointer ${
-                confirmEnd ? 'bg-danger text-white' : 'text-danger/60 hover:text-danger hover:bg-danger/10'
+              disabled={isEnding}
+              className={`p-1.5 rounded transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-wait ${
+                isEnding ? 'bg-danger/20' : 'text-danger/60 hover:text-danger hover:bg-danger/10'
               }`}
-              title={confirmEnd ? 'Tap again to confirm' : 'End session'}
+              title="End session"
             >
-              <IconPlayerStop className="w-3.5 h-3.5" />
+              {isEnding ? (
+                <span className="w-3.5 h-3.5 rounded-full border border-danger border-t-transparent animate-spin block" />
+              ) : (
+                <IconPlayerStop className="w-3.5 h-3.5" />
+              )}
             </button>
           </div>
         </div>
@@ -821,35 +840,42 @@ export default function InterviewLive() {
         )}
       </AnimatePresence>
 
+      {/* ── Debug Panel (Ctrl+Shift+D) ── */}
+      <DebugPanel
+        isConnected={isConnected}
+        isRecording={isRecording}
+        transcripts={transcripts}
+        currentInterim={currentInterim}
+        interviewerResponse={interviewerResponse}
+        codeResult={codeResult}
+        isCodeRunning={isCodeRunning}
+        error={error}
+        isAvatarSpeaking={isAvatarSpeaking}
+        isThinking={isThinking}
+        isPaused={isPaused}
+        greetingDone={greetingDone}
+        bargeInIndicator={bargeInIndicator}
+        turnState={turnState}
+        aiResponseTime={aiResponseTime}
+        elapsed={elapsed}
+        pausesUsed={pausesUsed}
+        pauseTimer={pauseTimer}
+        cameraEnabled={cameraEnabled}
+        sessionId={sessionId}
+        session={session}
+      />
+
       {/* ── Bottom Bar (56px) ── */}
       <div className="shrink-0 h-14 bg-[#252522] flex items-center px-5 gap-4 border-t border-white/5 relative z-10">
-        {/* Left: Mic status + Done button */}
+        {/* Left: Mic status */}
         <div className="w-fit shrink-0 flex items-center gap-3">
-          {turnState === 'candidate' ? (
-            <>
-              <div className="flex items-center gap-2">
-                {audioStream && <AudioWaveform stream={audioStream} isActive={isRecording} />}
-                {!audioStream && (
-                  <span className="text-[11px] text-white/30 flex items-center gap-1.5">
-                    <IconMicrophone className="w-3 h-3" />
-                    Mic active
-                  </span>
-                )}
-              </div>
-              <button
-                onClick={flushBuffer}
-                className="flex items-center gap-1.5 text-[11px] px-3 py-1.5 rounded-lg bg-teal/20 text-teal hover:bg-teal/30 transition-colors cursor-pointer font-medium"
-              >
-                Done answering
-                <span className="text-teal/70">→</span>
-              </button>
-            </>
-          ) : (
+          <div className="flex items-center gap-2">
+            {audioStream && <AudioWaveform stream={audioStream} isActive={isRecording} />}
             <span className="text-[11px] text-white/30 flex items-center gap-1.5">
-              <IconMicrophoneOff className="w-3 h-3" />
-              Listening...
+              <IconMicrophone className={`w-3 h-3 ${isRecording ? 'text-teal' : ''}`} />
+              {isRecording ? 'Listening' : 'Mic off'}
             </span>
-          )}
+          </div>
         </div>
 
         {/* Center: Turn state pill */}
