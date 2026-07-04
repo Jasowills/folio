@@ -83,6 +83,7 @@ export interface Resume {
   languages?: string[]
   links?: Array<{ title: string; url: string }>
   score?: number
+  pdfRegions?: string
   updatedAt: string
   createdAt: string
 }

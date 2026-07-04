@@ -1,16 +1,10 @@
 import { cn } from '../../../lib/utils'
-import { IconChevronLeft, IconLayout, IconLayoutGrid, IconWand, IconDownload, IconPencil, IconEye, IconZoomIn, IconZoomOut } from '@tabler/icons-react'
+import { IconChevronLeft, IconLayout, IconLayoutGrid, IconWand, IconDownload, IconZoomIn, IconZoomOut } from '@tabler/icons-react'
 
 interface EditorToolbarProps {
   resumeTitle: string
   saved: boolean
   onSave: () => void
-  onUndo: () => void
-  onRedo: () => void
-  canUndo: boolean
-  canRedo: boolean
-  editMode: boolean
-  onEditModeToggle: () => void
   zoom: number
   onZoomIn: () => void
   onZoomOut: () => void
@@ -25,8 +19,6 @@ export default function EditorToolbar({
   resumeTitle,
   saved,
   onBack,
-  editMode,
-  onEditModeToggle,
   zoom,
   onZoomIn,
   onZoomOut,
@@ -64,13 +56,13 @@ export default function EditorToolbar({
       <div className="flex items-center gap-0.5">
         <ToolbarButton
           icon={IconLayout}
-          label="Sections"
+          label="Data"
           active={activePanel === 'sections'}
           onClick={() => onOpenPanel('sections')}
         />
         <ToolbarButton
           icon={IconLayoutGrid}
-          label="Styles"
+          label="Fonts"
           active={activePanel === 'styles'}
           onClick={() => onOpenPanel('styles')}
         />
@@ -79,15 +71,6 @@ export default function EditorToolbar({
           label="AI"
           active={activePanel === 'ai'}
           onClick={() => onOpenPanel('ai')}
-        />
-
-        <div className="w-px h-5 bg-border mx-1" />
-
-        <ToolbarButton
-          icon={editMode ? IconPencil : IconEye}
-          label={editMode ? 'Edit' : 'Preview'}
-          active={editMode}
-          onClick={onEditModeToggle}
         />
 
         <div className="w-px h-5 bg-border mx-1" />

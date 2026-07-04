@@ -1,60 +1,29 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { AnimatePresence } from 'framer-motion'
 import { useResume, useUpdateResume } from '../../lib/queries'
-import { useFontLoader } from '../../pages/editor/DesignPreviewWrapper'
+import { AiService } from '../../lib/ai'
 import EditorToolbar from './components/EditorToolbar'
 import EditorCanvas from './components/EditorCanvas'
-import ResumePaper from './components/ResumePaper'
 import FloatingPanel from './components/FloatingPanel'
-import EditableResumeView from './components/EditableResumeView'
-import StylesPanel from './components/StylesPanel'
-import SectionsPanel from './components/SectionsPanel'
-import type { LocalData, SkillEntry } from '../../pages/editor/types'
-import { DEFAULT_DESIGN, BUILTIN_SECTIONS } from '../../pages/editor/types'
-import { TEMPLATE_DEFS, getTemplateLayout, getTemplateStyle } from './templates'
-import type { TemplateId } from './templates'
+import SelectionToolbar from './components/SelectionToolbar'
+import AiDrawer from './components/AiDrawer'
+import CommandPalette from './components/CommandPalette'
+import ExportPopover from './components/ExportPopover'
+import ExtractionNotification from './components/ExtractionNotification'
+import AiPanel from './components/AiPanel'
+import SuggestionTray from './components/SuggestionTray'
+import PdfEditor from './components/PdfEditor'
+import FontsPanel from './components/FontsPanel'
+import DataPanel from './components/DataPanel'
+import useEditorKeyboard from './hooks/useEditorKeyboard'
+import type { DocumentFontDefaults, PdfDocumentData } from './types/pdf'
 
-function makeLocalData(resume: any): LocalData {
-  const name = resume?.name || resume?.rawText?.split('\n').find((l: string) => l.trim().length > 0)?.trim().slice(0, 64) || ''
-  const skills: SkillEntry[] = (resume?.skills || []).map((s: any) => typeof s === 'string' ? { name: s } : s)
-  return {
-    title: resume?.title || '',
-    name,
-    summary: resume?.summary || '',
-    contact: {
-      email: resume?.contact?.email || '',
-      phone: resume?.contact?.phone || '',
-      location: resume?.contact?.location || '',
-      linkedin: resume?.contact?.linkedin || '',
-      website: resume?.contact?.website || '',
-      github: resume?.contact?.github || '',
-    },
-    experience: (resume?.experience || []).map((e: any) => ({
-      company: e.company || '',
-      title: e.title || '',
-      startDate: e.startDate || '',
-      endDate: e.endDate || '',
-      current: e.current || false,
-      bullets: e.bullets || [''],
-    })),
-    education: (resume?.education || []).map((e: any) => ({
-      institution: e.institution || '',
-      degree: e.degree || '',
-      field: e.field || '',
-      startDate: e.startDate || '',
-      endDate: e.endDate || '',
-      gpa: e.gpa || '',
-    })),
-    skills,
-    certifications: (resume?.certifications || []).map((c: any) => ({ name: c.name || '', issuer: c.issuer || '', date: c.date || '' })),
-    languages: resume?.languages || [],
-    links: (resume?.links || []).map((l: any) => ({ title: l.title || '', url: l.url || '' })),
-    customSections: [],
-    sectionOrder: BUILTIN_SECTIONS,
-    design: { ...DEFAULT_DESIGN, ...(resume as any)?.design },
-    editMode: 'direct' as const,
-  }
+const DEFAULT_FONTS: DocumentFontDefaults = {
+  fontName: 'Helvetica',
+  fontSize: 11,
+  fontColor: '#000000',
+  lineSpacing: 1.2,
 }
 
 function LoadingState() {
@@ -83,54 +52,64 @@ export default function EditorPage() {
   const navigate = useNavigate()
   const { data: resume, isLoading } = useResume(id!)
   const updateResume = useUpdateResume()
-  const [localData, setLocalData] = useState<LocalData>(makeLocalData())
   const [saved, setSaved] = useState(true)
-  const [templateId, setTemplateId] = useState<TemplateId>('minimal')
   const [zoom, setZoom] = useState(0.75)
-  const [editMode, setEditMode] = useState(true)
   const [panelOpen, setPanelOpen] = useState(false)
   const [panelTab, setPanelTab] = useState<'styles' | 'sections' | 'ai'>('styles')
-  const [undoStack, setUndoStack] = useState<LocalData[]>([])
-  const [redoStack, setRedoStack] = useState<LocalData[]>([])
+  const [commandPaletteOpen, setCommandPaletteOpen] = useState(false)
+  const [exportPopoverOpen, setExportPopoverOpen] = useState(false)
+  const [aiDrawerOpen, setAiDrawerOpen] = useState(false)
+  const [aiLoading, setAiLoading] = useState(false)
+  const [aiVariations, setAiVariations] = useState<string[]>([])
+  const [showExtractionNote, setShowExtractionNote] = useState(true)
+  const [fontDefaults, setFontDefaults] = useState<DocumentFontDefaults>(DEFAULT_FONTS)
+  const [regionData, setRegionData] = useState<PdfDocumentData | null>(null)
   const saveAttemptRef = useRef(0)
 
-  useFontLoader(localData.design.headingFont, localData.design.bodyFont)
+  useEditorKeyboard({
+    onSave: forceSave,
+    onUndo: () => {},
+    onRedo: () => {},
+    onToggleCommandPalette: () => setCommandPaletteOpen(o => !o),
+    onToggleEditMode: () => {},
+    onToggleStyles: () => openPanel('styles'),
+    onToggleSections: () => openPanel('sections'),
+    onToggleAi: () => openPanel('ai'),
+    onClosePanels: () => { setPanelOpen(false); setExportPopoverOpen(false); setCommandPaletteOpen(false) },
+    onZoomIn: () => setZoom(z => Math.min(2, z + 0.1)),
+    onZoomOut: () => setZoom(z => Math.max(0.3, z - 0.1)),
+    onZoomReset: () => setZoom(0.75),
+  })
+
+  const hasEdits = regionData?.pages.some(p => p.regions.some(r => r.edited))
 
   useEffect(() => {
-    if (resume) {
-      setLocalData(makeLocalData(resume))
-    }
-  }, [resume])
-
-  useEffect(() => {
-    if (!saved && id) {
+    if (!saved && id && hasEdits && regionData) {
       const attempt = ++saveAttemptRef.current
       const timer = setTimeout(async () => {
-        const data: Record<string, unknown> = {
-          title: localData.title,
-          name: localData.name,
-          summary: localData.summary,
-          contact: localData.contact,
-          experience: localData.experience,
-          education: localData.education,
-          skills: localData.skills.map(s => s.name),
-          certifications: localData.certifications,
-          languages: localData.languages,
-          links: localData.links,
-          editMode: localData.editMode,
-          design: localData.design,
-          sectionOrder: localData.sectionOrder,
-        }
         try {
-          await updateResume.mutateAsync({ id, data })
+          await updateResume.mutateAsync({
+            id,
+            data: { pdfRegions: JSON.stringify(regionData) },
+          })
           if (saveAttemptRef.current === attempt) setSaved(true)
         } catch {
           if (saveAttemptRef.current === attempt) setSaved(false)
         }
-      }, 1000)
+      }, 1500)
       return () => clearTimeout(timer)
     }
-  }, [localData, saved, id, updateResume])
+  }, [saved, id, regionData, hasEdits, updateResume])
+
+  useEffect(() => {
+    if (resume && (resume as any).pdfRegions) {
+      try {
+        const parsed = JSON.parse((resume as any).pdfRegions)
+        setRegionData(parsed)
+        if (parsed.fontDefaults) setFontDefaults(parsed.fontDefaults)
+      } catch { /* ignore parse errors */ }
+    }
+  }, [resume])
 
   useEffect(() => {
     function handleBeforeUnload(e: BeforeUnloadEvent) {
@@ -140,68 +119,101 @@ export default function EditorPage() {
     return () => window.removeEventListener('beforeunload', handleBeforeUnload)
   }, [saved])
 
-  function pushUndo(data: LocalData) {
-    setUndoStack(prev => [...prev.slice(-20), data])
-    setRedoStack([])
-  }
-
-  function updateLocal<K extends keyof LocalData>(key: K, value: LocalData[K]) {
-    pushUndo(localData)
-    setLocalData(prev => ({ ...prev, [key]: value }))
-    setSaved(false)
-  }
-
-  function updateLocalFull(data: LocalData) {
-    pushUndo(localData)
-    setLocalData(data)
-    setSaved(false)
-  }
-
-  function handleUndo() {
-    if (undoStack.length === 0) return
-    setRedoStack(prev => [...prev, localData])
-    setLocalData(undoStack[undoStack.length - 1])
-    setUndoStack(prev => prev.slice(0, -1))
-  }
-
-  function handleRedo() {
-    if (redoStack.length === 0) return
-    setUndoStack(prev => [...prev, localData])
-    setLocalData(redoStack[redoStack.length - 1])
-    setRedoStack(prev => prev.slice(0, -1))
-  }
-
   function forceSave() {
     if (!id) return
-    const data: Record<string, unknown> = {
-      title: localData.title, name: localData.name, summary: localData.summary,
-      contact: localData.contact, experience: localData.experience, education: localData.education,
-      skills: localData.skills.map(s => s.name), certifications: localData.certifications,
-      languages: localData.languages, links: localData.links,
-      editMode: localData.editMode, design: localData.design, sectionOrder: localData.sectionOrder,
-    }
+    const data: Record<string, unknown> = {}
+    if (regionData) data.pdfRegions = JSON.stringify(regionData)
     updateResume.mutate({ id, data })
     setSaved(true)
   }
 
   function openPanel(tab: 'styles' | 'sections' | 'ai') {
-    setPanelTab(tab)
-    setPanelOpen(true)
+    if (panelOpen && panelTab === tab) {
+      setPanelOpen(false)
+    } else {
+      setPanelTab(tab)
+      setPanelOpen(true)
+    }
   }
+
+  async function handleAiRewrite(text: string) {
+    setAiLoading(true)
+    setAiVariations([])
+    setAiDrawerOpen(true)
+    try {
+      const variations = await AiService.rewrite(text)
+      setAiVariations(variations)
+    } catch {
+      setAiVariations(['An error occurred. Please try again.'])
+    } finally {
+      setAiLoading(false)
+    }
+  }
+
+  async function handleAiImprove(text: string) {
+    setAiLoading(true)
+    setAiVariations([])
+    setAiDrawerOpen(true)
+    try {
+      const variations = await AiService.improve(text)
+      setAiVariations(variations)
+    } catch {
+      setAiVariations(['An error occurred.'])
+    } finally {
+      setAiLoading(false)
+    }
+  }
+
+  async function handleQuickAction(action: string) {
+    const prompts: Record<string, string> = {
+      'improve-summary': `Improve this resume summary: "${resume?.summary || ''}"`,
+      'rewrite-weak': 'List 3 improvements for weak bullet points.',
+      'suggest-skills': 'Suggest 5 relevant skills to add.',
+      'ats-score': 'List 3 ATS optimization tips.',
+    }
+    const prompt = prompts[action]
+    if (!prompt) return
+    setAiDrawerOpen(true)
+    setAiLoading(true)
+    setAiVariations([])
+    try {
+      const result = await AiService.chat([
+        { role: 'system', content: 'You are a resume expert. Provide concise, actionable advice.' },
+        { role: 'user', content: prompt },
+      ])
+      const content = result.message?.content || ''
+      setAiVariations(content.split('\n').filter((l: string) => l.trim().length > 5).slice(0, 5))
+    } catch {
+      setAiVariations(['An error occurred.'])
+    } finally {
+      setAiLoading(false)
+    }
+  }
+
+  function handleRegionDataChange(data: PdfDocumentData | null) {
+    setRegionData(data)
+    setSaved(false)
+  }
+
+  function handleUpdateStructuredField(field: string, value: string) {
+    console.log('Update field:', field, value)
+  }
+
+  const commands = [
+    { id: 'save', label: 'Save changes', action: forceSave },
+    { id: 'open-styles', label: 'Open Fonts panel', action: () => openPanel('styles') },
+    { id: 'open-sections', label: 'Open Data panel', action: () => openPanel('sections') },
+    { id: 'open-ai', label: 'Open AI panel', action: () => openPanel('ai') },
+    { id: 'export-pdf', label: 'Export as PDF', action: () => { setExportPopoverOpen(true) } },
+    { id: 'zoom-in', label: 'Zoom in', action: () => setZoom(z => Math.min(2, z + 0.1)) },
+    { id: 'zoom-out', label: 'Zoom out', action: () => setZoom(z => Math.max(0.3, z - 0.1)) },
+    { id: 'go-back', label: 'Back to resumes', action: () => navigate('/resumes') },
+  ]
 
   if (isLoading) return <LoadingState />
   if (!id) { navigate('/resumes', { replace: true }); return null }
 
-  const Layout = getTemplateLayout(templateId)
-  const style = getTemplateStyle(templateId)
-  const marginPx = (6 + localData.design.margins * 3) * 3.78
-
-  const sheetStyle = {
-    fontFamily: `"${localData.design.bodyFont}", -apple-system, BlinkMacSystemFont, sans-serif`,
-    fontSize: `${localData.design.bodyFontSize}px`,
-    lineHeight: localData.design.lineSpacing,
-    padding: `${marginPx}px`,
-  } as React.CSSProperties
+  const hasPdf = !!(resume?.fileUrl || resume?.filename)
 
   return (
     <div className="flex flex-col h-screen bg-[#D4CFC6]">
@@ -209,36 +221,53 @@ export default function EditorPage() {
         resumeTitle={resume?.title || 'Untitled'}
         saved={saved}
         onSave={forceSave}
-        onUndo={handleUndo}
-        onRedo={handleRedo}
-        canUndo={undoStack.length > 0}
-        canRedo={redoStack.length > 0}
-        editMode={editMode}
-        onEditModeToggle={() => setEditMode(e => !e)}
         zoom={zoom}
         onZoomIn={() => setZoom(z => Math.min(2, z + 0.1))}
         onZoomOut={() => setZoom(z => Math.max(0.3, z - 0.1))}
         onZoomReset={() => setZoom(0.75)}
         onOpenPanel={openPanel}
         activePanel={panelOpen ? panelTab : null}
-        onExport={() => window.location.href = `/export/${id}`}
+        onExport={() => setExportPopoverOpen(o => !o)}
         onBack={() => navigate('/resumes')}
+      />
+
+      <ExtractionNotification
+        visible={showExtractionNote && !!resume?.rawText}
+        onDismiss={() => setShowExtractionNote(false)}
       />
 
       <div className="flex-1 flex overflow-hidden relative">
         <EditorCanvas zoom={zoom}>
-          <ResumePaper>
-            {editMode ? (
-              <div className="p-8">
-                <EditableResumeView data={localData} onUpdate={updateLocalFull} redFlags={resume?.redFlags as any} />
-              </div>
-            ) : (
-              <div style={sheetStyle}>
-                <Layout data={localData} design={localData.design} style={style} />
-              </div>
-            )}
-          </ResumePaper>
+          {hasPdf ? (
+            <PdfEditor
+              resumeId={id}
+              fileUrl={resume?.fileUrl}
+              fontDefaults={fontDefaults}
+              onFontDefaultsChange={setFontDefaults}
+              onRegionsChange={handleRegionDataChange}
+              initialRegionData={regionData}
+            />
+          ) : (
+            <div className="flex flex-col items-center justify-center min-h-[60vh] text-center px-8">
+              <p className="text-sm text-muted mb-3">No PDF uploaded yet</p>
+              <SuggestionTray suggestions={[]} onApply={() => {}} onDismiss={() => {}} />
+            </div>
+          )}
         </EditorCanvas>
+
+        <SelectionToolbar
+          onRewrite={handleAiRewrite}
+          onImprove={handleAiImprove}
+        />
+
+        <AiDrawer
+          open={aiDrawerOpen}
+          loading={aiLoading}
+          variations={aiVariations}
+          onSelect={() => setAiDrawerOpen(false)}
+          onRegenerate={() => {}}
+          onClose={() => setAiDrawerOpen(false)}
+        />
 
         <AnimatePresence>
           {panelOpen && (
@@ -247,23 +276,66 @@ export default function EditorPage() {
               onClose={() => setPanelOpen(false)}
             >
               {panelTab === 'styles' && (
-                <StylesPanel
-                  templateId={templateId}
-                  design={localData.design}
-                  onTemplateChange={setTemplateId}
-                  onDesignChange={d => updateLocal('design', d)}
+                <FontsPanel
+                  fontDefaults={fontDefaults}
+                  docData={regionData}
+                  onApplyDefaults={setFontDefaults}
+                  onResetRegion={(page, regionId) => {
+                    setRegionData(prev => {
+                      if (!prev) return prev
+                      return {
+                        ...prev,
+                        pages: prev.pages.map(p =>
+                          p.pageNumber !== page ? p : {
+                            ...p,
+                            regions: p.regions.map(r =>
+                              r.id !== regionId ? r : {
+                                ...r,
+                                edited: false,
+                                fontName: r.originalFontName,
+                                fontSize: r.originalFontSize,
+                                fontColor: r.originalFontColor,
+                              }
+                            ),
+                          }
+                        ),
+                      }
+                    })
+                  }}
                 />
               )}
               {panelTab === 'sections' && (
-                <SectionsPanel data={localData} onUpdate={updateLocalFull} />
+                <DataPanel
+                  resume={resume}
+                  onUpdateField={handleUpdateStructuredField}
+                />
               )}
               {panelTab === 'ai' && (
-                <div className="p-4 text-sm text-muted">AI panel — coming in Phase 9</div>
+                <AiPanel
+                  score={resume?.overallScore}
+                  strengths={resume?.strengths}
+                  issues={resume?.redFlags?.map((f: any) => f.message)}
+                  onQuickAction={handleQuickAction}
+                />
               )}
             </FloatingPanel>
           )}
         </AnimatePresence>
       </div>
+
+      <ExportPopover
+        open={exportPopoverOpen}
+        onClose={() => setExportPopoverOpen(false)}
+        onExportPdf={() => window.open(`/export/${id}`, '_blank')}
+        onExportDocx={async () => {}}
+        onExportDrive={async () => {}}
+      />
+
+      <CommandPalette
+        open={commandPaletteOpen}
+        onClose={() => setCommandPaletteOpen(false)}
+        commands={commands}
+      />
     </div>
   )
 }
