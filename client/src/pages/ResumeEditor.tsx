@@ -17,6 +17,7 @@ import { ExecutiveTemplate } from './editor/ExecutiveTemplate'
 import type { LocalData, ResumeShim, DesignSettings, SkillEntry, CustomSection } from './editor/types'
 import { DEFAULT_DESIGN, BUILTIN_SECTIONS, ALL_SECTION_NAMES } from './editor/types'
 import { SummarySection, ExperienceSection, EducationSection, SkillsSection, CertificationsSection, LanguagesSection, LinksSection } from './editor/GuidedFormSections'
+import { DirectEditPreview } from './editor/DirectEditPreview'
 import { IconWand, IconChevronLeft, IconDownload, IconPlus, IconX, IconAlertTriangle, IconEye, IconZoomIn, IconZoomOut, IconCircleCheck, IconRefresh, IconEdit, IconLoader2, IconFileText, IconLayout, IconTemplate, IconDeviceFloppy, IconCommand, IconHelpCircle, IconDots, IconLayoutGrid, IconPencil } from '@tabler/icons-react'
 import { useFontLoader, designPreviewStyle } from './editor/DesignPreviewWrapper'
 
@@ -790,6 +791,10 @@ function ResumeEditorInner() {
                   <span className="text-[11px] text-muted w-7 text-center tabular-nums">{Math.round(zoom * 100)}%</span>
                   <button onClick={() => setZoom((z) => Math.min(2, z + 0.1))} className="p-1 rounded text-muted hover:text-ink hover:bg-white transition-colors cursor-pointer"><IconZoomIn className="h-3 w-3" /></button>
                 </div>
+                <div className="flex items-center gap-1 px-2 py-1 rounded-lg bg-amber/10 border border-amber/20 text-[10px] font-medium text-amber-700 whitespace-nowrap">
+                  <IconAlertTriangle className="h-3 w-3" />
+                  <span>1 page</span>
+                </div>
                 <span className="h-5 w-px bg-border shrink-0 hidden sm:block" />
                 <ColorPicker selected={localData.design.primaryColor} onChange={(c) => handleDesignChange({ ...localData.design, primaryColor: c })} />
                 <span className="h-5 w-px bg-border shrink-0" />
@@ -817,30 +822,50 @@ function ResumeEditorInner() {
               </div>
             ) : editMode === 'direct' ? (
               <div className="w-full max-w-[210mm]">
-                <div className="bg-white shadow-lg rounded-sm p-10" style={{ transform: `scale(${zoom})`, transformOrigin: 'top center', ...designPreviewStyle(localData.design) }}>
-                  {renderTemplate()}
+                <div style={{ transform: `scale(${zoom})`, transformOrigin: 'top center' }}>
+                  <DirectEditPreview localData={localData} onUpdate={updateLocalFull} />
+                </div>
+                <div className="flex justify-center py-3">
+                  <button
+                    onClick={() => setShowAddSection(true)}
+                    className="flex items-center gap-1.5 px-4 py-2 text-[11px] text-muted hover:text-ink hover:bg-paper-dark rounded-lg transition-colors cursor-pointer"
+                  >
+                    <IconPlus className="h-3.5 w-3.5" />
+                    Add section
+                  </button>
                 </div>
               </div>
             ) : (
-              <MultiPagePreview zoom={zoom} singlePage={template.id === 'modern'} contentKey={template.id + '-' + (resume?._id || '')}>
-                {({ showSections, pageIndex }) => {
-                  const commonProps = {
-                    resume: resume || { _id: id || '', title: '' },
-                    localData: previewData,
-                    redFlags,
-                    primaryColor: localData.design.primaryColor,
-                    showSections,
-                    pageIndex,
-                    templateStyle: template.style,
-                  }
-                  const tpl = template.layout === 'sidebar' || template.layout === 'two-column'
-                    ? <ModernTemplate {...commonProps} />
-                    : template.style.header === 'dark-block' && template.style.font === 'serif'
-                    ? <ExecutiveTemplate {...commonProps} />
-                    : <MinimalTemplate {...commonProps} />
-                  return <div style={designPreviewStyle(localData.design)}>{tpl}</div>
-                }}
-              </MultiPagePreview>
+              <>
+                <MultiPagePreview zoom={zoom} singlePage={template.id === 'modern'} contentKey={template.id + '-' + (resume?._id || '')}>
+                  {({ showSections, pageIndex }) => {
+                    const commonProps = {
+                      resume: resume || { _id: id || '', title: '' },
+                      localData: previewData,
+                      redFlags,
+                      primaryColor: localData.design.primaryColor,
+                      showSections,
+                      pageIndex,
+                      templateStyle: template.style,
+                    }
+                    const tpl = template.layout === 'sidebar' || template.layout === 'two-column'
+                      ? <ModernTemplate {...commonProps} />
+                      : template.style.header === 'dark-block' && template.style.font === 'serif'
+                      ? <ExecutiveTemplate {...commonProps} />
+                      : <MinimalTemplate {...commonProps} />
+                    return <div style={designPreviewStyle(localData.design)}>{tpl}</div>
+                  }}
+                </MultiPagePreview>
+                <div className="flex justify-center pb-4">
+                  <button
+                    onClick={() => setShowAddSection(true)}
+                    className="flex items-center gap-1.5 px-4 py-2 text-[11px] text-muted hover:text-ink hover:bg-paper-dark rounded-lg transition-colors cursor-pointer"
+                  >
+                    <IconPlus className="h-3.5 w-3.5" />
+                    Add section
+                  </button>
+                </div>
+              </>
             )}
           </div>
         </div>

@@ -1,7 +1,7 @@
 import { cn } from '../../lib/utils'
 import type { LocalData, ResumeShim, SectionName } from './types'
 import type { TemplateStyle } from '../../templates/types'
-import { fontClass, spacingClass, renderHeader, headingClass, headingStyle, bulletChar } from './template-utils'
+import { spacingClass, renderHeader, headingClass, headingStyle, bulletChar, designFontStyle, designHeadingFontStyle } from './template-utils'
 
 interface Props {
   resume: ResumeShim
@@ -45,9 +45,12 @@ export function MinimalTemplate({ resume, localData, redFlags, primaryColor, sho
     </>
   )
 
+  const designCss = designFontStyle(localData.design, templateStyle.font)
+
   return (
-    <div className={cn(fontClass(templateStyle.font), 'leading-relaxed text-ink', spacingClass(templateStyle.spacing))}>
+    <div className={cn('leading-relaxed text-ink', spacingClass(templateStyle.spacing))} style={designCss}>
       {renderHeader(templateStyle, localData.name || resume.name || 'Your Name', contactLines, accentColor, pageIndex)}
+
 
       {section('summary', showSections) && (localData.summary || resume.summary) && (
         <div data-section="summary" className={cn('mb-5 break-inside-avoid', hasIssue('summary') && 'border-l-2 border-amber pl-3 bg-amber/5')}>

@@ -1,0 +1,152 @@
+import { cn } from '../../../lib/utils'
+import { IconChevronLeft, IconLayout, IconLayoutGrid, IconWand, IconDownload, IconPencil, IconEye, IconZoomIn, IconZoomOut } from '@tabler/icons-react'
+
+interface EditorToolbarProps {
+  resumeTitle: string
+  saved: boolean
+  onSave: () => void
+  onUndo: () => void
+  onRedo: () => void
+  canUndo: boolean
+  canRedo: boolean
+  editMode: boolean
+  onEditModeToggle: () => void
+  zoom: number
+  onZoomIn: () => void
+  onZoomOut: () => void
+  onZoomReset: () => void
+  onOpenPanel: (tab: 'styles' | 'sections' | 'ai') => void
+  activePanel: 'styles' | 'sections' | 'ai' | null
+  onExport: () => void
+  onBack: () => void
+}
+
+export default function EditorToolbar({
+  resumeTitle,
+  saved,
+  onBack,
+  editMode,
+  onEditModeToggle,
+  zoom,
+  onZoomIn,
+  onZoomOut,
+  onOpenPanel,
+  activePanel,
+  onExport,
+}: EditorToolbarProps) {
+  return (
+    <header className="h-12 bg-white border-b border-border flex items-center justify-between px-3 shrink-0 z-20">
+      <div className="flex items-center gap-2 min-w-0">
+        <button
+          onClick={onBack}
+          className="p-1.5 rounded-lg text-muted hover:text-ink hover:bg-paper-dark transition-colors cursor-pointer"
+          title="Back to resumes"
+        >
+          <IconChevronLeft className="h-4 w-4" />
+        </button>
+        <span className="text-[13px] font-medium text-ink truncate max-w-[200px]">
+          {resumeTitle}
+        </span>
+        <div className="flex items-center gap-1 ml-2">
+          <div className={cn(
+            'h-1.5 w-1.5 rounded-full',
+            saved ? 'bg-success' : 'bg-amber',
+          )} />
+          <span className={cn(
+            'text-[10px] font-medium',
+            saved ? 'text-success' : 'text-amber',
+          )}>
+            {saved ? 'Saved' : 'Unsaved'}
+          </span>
+        </div>
+      </div>
+
+      <div className="flex items-center gap-0.5">
+        <ToolbarButton
+          icon={IconLayout}
+          label="Sections"
+          active={activePanel === 'sections'}
+          onClick={() => onOpenPanel('sections')}
+        />
+        <ToolbarButton
+          icon={IconLayoutGrid}
+          label="Styles"
+          active={activePanel === 'styles'}
+          onClick={() => onOpenPanel('styles')}
+        />
+        <ToolbarButton
+          icon={IconWand}
+          label="AI"
+          active={activePanel === 'ai'}
+          onClick={() => onOpenPanel('ai')}
+        />
+
+        <div className="w-px h-5 bg-border mx-1" />
+
+        <ToolbarButton
+          icon={editMode ? IconPencil : IconEye}
+          label={editMode ? 'Edit' : 'Preview'}
+          active={editMode}
+          onClick={onEditModeToggle}
+        />
+
+        <div className="w-px h-5 bg-border mx-1" />
+
+        <div className="flex items-center gap-0.5 bg-paper border border-border rounded-lg p-0.5">
+          <button
+            onClick={onZoomOut}
+            className="p-1 rounded text-muted hover:text-ink hover:bg-white transition-colors cursor-pointer"
+            title="Zoom out"
+          >
+            <IconZoomOut className="h-3.5 w-3.5" />
+          </button>
+          <span className="text-[10px] text-muted w-8 text-center tabular-nums select-none">
+            {Math.round(zoom * 100)}%
+          </span>
+          <button
+            onClick={onZoomIn}
+            className="p-1 rounded text-muted hover:text-ink hover:bg-white transition-colors cursor-pointer"
+            title="Zoom in"
+          >
+            <IconZoomIn className="h-3.5 w-3.5" />
+          </button>
+        </div>
+
+        <div className="w-px h-5 bg-border mx-1" />
+
+        <ToolbarButton
+          icon={IconDownload}
+          label="Export"
+          onClick={onExport}
+        />
+      </div>
+    </header>
+  )
+}
+
+function ToolbarButton({
+  icon: Icon,
+  label,
+  active,
+  onClick,
+}: {
+  icon: React.ComponentType<{ className?: string }>
+  label: string
+  active?: boolean
+  onClick: () => void
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className={cn(
+        'flex items-center gap-1.5 px-2.5 h-8 rounded-lg text-[11px] font-medium transition-colors cursor-pointer',
+        active
+          ? 'bg-teal-light text-teal'
+          : 'text-muted hover:text-ink hover:bg-paper-dark',
+      )}
+    >
+      <Icon className="h-3.5 w-3.5" />
+      <span className="hidden sm:inline">{label}</span>
+    </button>
+  )
+}

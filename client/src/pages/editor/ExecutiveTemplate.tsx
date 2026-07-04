@@ -1,4 +1,5 @@
 import type { LocalData, ResumeShim, SectionName } from './types'
+import { designFontStyle } from './template-utils'
 
 interface Props {
   resume: ResumeShim
@@ -6,18 +7,19 @@ interface Props {
   primaryColor?: string
   showSections?: Set<SectionName>
   pageIndex?: number
+  templateStyle?: { font?: string; spacing?: string }
 }
 
 function section(s: SectionName, show?: Set<SectionName>): boolean {
   return !show || show.has(s)
 }
 
-export function ExecutiveTemplate({ resume, localData, primaryColor, showSections, pageIndex }: Props) {
+export function ExecutiveTemplate({ resume, localData, primaryColor, showSections, pageIndex, templateStyle }: Props) {
   const accentColor = primaryColor || '#0F6E56'
   const showHeader = pageIndex === undefined || pageIndex === 0
   const links = (localData.links && localData.links.length > 0 ? localData.links : resume.links || []).filter(l => l.title || l.url)
   return (
-    <div className="font-serif text-[11px] leading-relaxed">
+    <div className="text-[11px] leading-relaxed" style={designFontStyle(localData.design, (templateStyle?.font as any) || 'serif')}>
       {showHeader && (
       <div className="bg-ink text-white text-center py-6 px-8 -mx-10 -mt-10 mb-6">
         <h1 className="font-serif text-[24px] font-bold tracking-wide mb-1">

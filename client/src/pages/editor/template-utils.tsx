@@ -1,5 +1,6 @@
-import type { ReactNode } from 'react'
+import type { ReactNode, CSSProperties } from 'react'
 import type { TemplateStyle, FontStyle } from '../../templates/types'
+import type { DesignSettings } from './types'
 
 export function fontClass(font: FontStyle): string {
   switch (font) {
@@ -7,6 +8,27 @@ export function fontClass(font: FontStyle): string {
     case 'display': return 'font-display'
     case 'mono': return 'font-mono'
     default: return 'font-sans'
+  }
+}
+
+const SYSTEM_FONTS = {
+  sans: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
+  serif: 'Georgia, "Times New Roman", serif',
+  display: '"SF Pro Display", "Helvetica Neue", sans-serif',
+  mono: '"SF Mono", "Fira Code", "Fira Mono", Menlo, Consolas, monospace',
+}
+
+export function designFontStyle(design: DesignSettings, templateFont: FontStyle): CSSProperties {
+  return {
+    fontFamily: design.bodyFont ? `"${design.bodyFont}", ${SYSTEM_FONTS[templateFont]}` : SYSTEM_FONTS[templateFont],
+    fontSize: design.fontSize ? `${design.fontSize}px` : undefined,
+    lineHeight: design.lineHeight || undefined,
+  }
+}
+
+export function designHeadingFontStyle(design: DesignSettings, templateFont: FontStyle): CSSProperties {
+  return {
+    fontFamily: design.headingFont ? `"${design.headingFont}", ${SYSTEM_FONTS[templateFont]}` : SYSTEM_FONTS[templateFont],
   }
 }
 

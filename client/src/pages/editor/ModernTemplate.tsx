@@ -1,7 +1,7 @@
 import { cn } from '../../lib/utils'
 import type { LocalData, ResumeShim, SectionName } from './types'
 import type { TemplateStyle } from '../../templates/types'
-import { fontClass, spacingClass, headingClass, headingStyle, bulletChar } from './template-utils'
+import { spacingClass, headingClass, headingStyle, bulletChar, designFontStyle } from './template-utils'
 
 interface Props {
   resume: ResumeShim
@@ -24,7 +24,7 @@ export function ModernTemplate({ resume, localData, primaryColor, showSections, 
   const hStyle = headingStyle(templateStyle, accentColor)
 
   return (
-    <div className={cn('flex leading-relaxed h-full', fontClass(templateStyle.font), spacingClass(templateStyle.spacing))}>
+    <div className={cn('flex leading-relaxed h-full', spacingClass(templateStyle.spacing))} style={designFontStyle(localData.design, templateStyle.font)}>
       {showHeader && (
       <div data-header="true" className="w-[90px] min-h-full p-4 shrink-0" style={{ backgroundColor: accentColor }}>
         <div className="text-center mb-4">

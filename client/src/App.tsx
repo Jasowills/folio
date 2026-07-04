@@ -9,7 +9,7 @@ import Signup from './pages/Signup'
 import AuthCallback from './pages/AuthCallback'
 import Dashboard from './pages/Dashboard'
 import ResumeBuilder from './pages/ResumeBuilder'
-import ResumeEditor from './pages/ResumeEditor'
+import EditorPage from './features/resume-editor/EditorPage'
 import ResumeReview from './pages/ResumeReview'
 import AtsScorer from './pages/AtsScorer'
 import CoverLetter from './pages/CoverLetter'
@@ -83,7 +83,7 @@ function AppRoutes() {
         <Route path="/terms" element={<Legal />} />
         <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
         <Route path="/resumes" element={<ProtectedRoute><ResumeBuilder /></ProtectedRoute>} />
-        <Route path="/resume/:id" element={<ProtectedRoute><ResumeEditor /></ProtectedRoute>} />
+        <Route path="/resume/:id" element={<ProtectedRoute><EditorPage /></ProtectedRoute>} />
         <Route path="/resume/:id/review" element={<ProtectedRoute><ResumeReview /></ProtectedRoute>} />
         <Route path="/ats" element={<ProtectedRoute><AtsScorer /></ProtectedRoute>} />
         <Route path="/cover-letters" element={<ProtectedRoute><CoverLetter /></ProtectedRoute>} />

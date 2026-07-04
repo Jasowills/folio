@@ -454,9 +454,9 @@ export class AiService {
     messages: ChatMessage[],
     maxTokens?: number,
   ): Promise<string> {
-    const url = `${this.groqBaseUrl}/chat/completions`;
+      const url = `${this.groqBaseUrl}/chat/completions`;
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 120_000);
+    const timeout = setTimeout(() => controller.abort(), 15_000);
 
     const finish = () => clearTimeout(timeout);
 

@@ -230,6 +230,9 @@ export class InterviewsGateway implements OnGatewayConnection, OnGatewayDisconne
     sessionId: string,
     event: DeepgramTranscriptEvent,
   ) {
+    // Skip empty interim transcripts — they flood the client with noise after a turn ends
+    if (!event.isFinal && !event.transcript.trim()) return
+
     this.server.to(sessionId).emit('transcript', {
       speaker: 'candidate',
       text: event.transcript,
@@ -365,7 +368,7 @@ export class InterviewsGateway implements OnGatewayConnection, OnGatewayDisconne
           questionIndex: state.questionIndex,
         })
       }
-    }, 20_000)
+    }, 35_000)
 
     try {
       const doc = await this.interviewsService.getSessionForAi(sessionId)

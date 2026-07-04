@@ -6,7 +6,7 @@ import { ResearchJob, ResearchJobDocument } from './schemas/research-job.schema'
 import { AiService } from '../ai/ai.service';
 import { COMPANY_RESEARCH_SYSTEM } from '../ai/prompts';
 
-const MAX_PAGES = 30;
+const MAX_PAGES = 10;
 const SOCIAL_DOMAINS = ['linkedin.com', 'twitter.com', 'x.com', 'crunchbase.com', 'glassdoor.com', 'github.io'];
 const PAGE_TIMEOUT = 30000;
 
