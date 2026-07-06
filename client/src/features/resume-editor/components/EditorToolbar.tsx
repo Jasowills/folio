@@ -1,5 +1,5 @@
 import { cn } from '../../../lib/utils'
-import { IconChevronLeft, IconLayoutGrid, IconList, IconWand, IconDownload, IconZoomIn, IconZoomOut } from '@tabler/icons-react'
+import { IconChevronLeft, IconLayoutGrid, IconList, IconWand, IconDownload, IconZoomIn, IconZoomOut, IconCode } from '@tabler/icons-react'
 
 interface ZoomProps {
   zoom: number
@@ -17,6 +17,8 @@ interface EditorToolbarProps {
   onExport: () => void
   onBack: () => void
   zoom?: ZoomProps
+  debugMode?: boolean
+  onDebugToggle?: () => void
 }
 
 export default function EditorToolbar({
@@ -27,6 +29,8 @@ export default function EditorToolbar({
   activePanel,
   onExport,
   zoom,
+  debugMode,
+  onDebugToggle,
 }: EditorToolbarProps) {
   return (
     <header className="h-12 bg-white border-b border-border flex items-center justify-between px-3 shrink-0 z-20">
@@ -69,6 +73,19 @@ export default function EditorToolbar({
             <div className="w-px h-5 bg-border mx-1" />
           </>
         )}
+
+        {onDebugToggle && (
+          <>
+            <ToolbarButton
+              icon={IconCode}
+              label="Debug"
+              active={debugMode}
+              onClick={onDebugToggle}
+            />
+            <div className="w-px h-5 bg-border mx-1" />
+          </>
+        )}
+
         <ToolbarButton
           icon={IconList}
           label="Sections"

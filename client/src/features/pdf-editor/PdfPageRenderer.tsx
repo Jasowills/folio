@@ -14,6 +14,9 @@ interface PdfPageRendererProps {
   onMoveBlock: (pageNumber: number, blockId: string, x: number, y: number) => void
   onResizeBlock: (pageNumber: number, blockId: string, width: number, height: number) => void
   onAddBlock: (pageNumber: number) => void
+  debugMode?: boolean
+  debugBackground?: string | null
+  debugOpacity?: number
 }
 
 export default function PdfPageRenderer({
@@ -28,6 +31,9 @@ export default function PdfPageRenderer({
   onMoveBlock,
   onResizeBlock,
   onAddBlock,
+  debugMode,
+  debugBackground,
+  debugOpacity = 0.4,
 }: PdfPageRendererProps) {
   const handleDelete = useCallback((blockId: string) => onDeleteBlock(page.pageNumber, blockId), [page.pageNumber, onDeleteBlock])
   const handleMove = useCallback((blockId: string, x: number, y: number) => onMoveBlock(page.pageNumber, blockId, x, y), [page.pageNumber, onMoveBlock])
@@ -43,6 +49,61 @@ export default function PdfPageRenderer({
         margin: '0 auto 32px auto',
       }}
     >
+      {debugMode && debugBackground && (
+        <img
+          src={debugBackground}
+          alt={`Original PDF page ${page.pageNumber}`}
+          className="absolute inset-0 pointer-events-none select-none"
+          style={{
+            width: '100%',
+            height: '100%',
+            opacity: debugOpacity,
+            zIndex: 0,
+            objectFit: 'fill',
+          }}
+        />
+      )}
+
+      {/* Render decorations (lines, rects) behind text blocks */}
+      {(page.decorations || []).map((dec, i) => {
+        if (dec.type === 'line') {
+          return (
+            <div
+              key={`dec-${i}`}
+              className="pointer-events-none"
+              style={{
+                position: 'absolute',
+                left: `${dec.x}pt`,
+                top: `${dec.y}pt`,
+                width: `${dec.width}pt`,
+                height: `${dec.height}pt`,
+                backgroundColor: dec.color,
+                zIndex: 0,
+              }}
+            />
+          )
+        }
+        if (dec.type === 'rect') {
+          return (
+            <div
+              key={`dec-${i}`}
+              className="pointer-events-none"
+              style={{
+                position: 'absolute',
+                left: `${dec.x}pt`,
+                top: `${dec.y}pt`,
+                width: `${dec.width}pt`,
+                height: `${dec.height}pt`,
+                backgroundColor: dec.fill || 'transparent',
+                border: dec.stroke ? `${dec.strokeWidth || 1}pt solid ${dec.stroke}` : undefined,
+                zIndex: 0,
+              }}
+            />
+          )
+        }
+        return null
+      })}
+
       {(page.blocks || []).map((block) => {
         const issue = issueMap?.get(block.id)
         return (
@@ -59,9 +120,19 @@ export default function PdfPageRenderer({
             onDelete={handleDelete}
             onMove={handleMove}
             onResize={handleResize}
+            debugMode={debugMode}
           />
         )
       })}
+
+      {debugMode && (
+        <div
+          className="absolute bottom-1 left-1 bg-black/70 text-white text-[9px] px-1.5 py-0.5 rounded font-mono pointer-events-none"
+          style={{ zIndex: 10 }}
+        >
+          {page.width}×{page.height}pt · {page.blocks.length} blocks
+        </div>
+      )}
 
       <button
         onClick={() => onAddBlock(page.pageNumber)}

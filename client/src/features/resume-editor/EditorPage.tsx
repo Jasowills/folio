@@ -67,6 +67,7 @@ export default function EditorPage() {
   const [extractingLayout, setExtractingLayout] = useState(false)
   const [layoutDoc, setLayoutDoc] = useState<PdfLayoutDocument | null>(null)
   const [pdfZoom, setPdfZoom] = useState(1)
+  const [debugMode, setDebugMode] = useState(false)
 
   const analyzeResume = useAnalyzeResume()
   const saveAttemptRef = useRef(0)
@@ -255,6 +256,8 @@ export default function EditorPage() {
             onZoomOut: () => setPdfZoom(z => Math.max(0.25, z - 0.1)),
             onZoomReset: () => setPdfZoom(1),
           }}
+          debugMode={debugMode}
+          onDebugToggle={() => setDebugMode(d => !d)}
         />
 
         <ExtractionNotification
@@ -282,6 +285,8 @@ export default function EditorPage() {
             onAiImprove={handleAiImprove}
             zoom={pdfZoom}
             onZoomChange={setPdfZoom}
+            fileUrl={resume?.fileUrl}
+            debugMode={debugMode}
           />
         )}
 

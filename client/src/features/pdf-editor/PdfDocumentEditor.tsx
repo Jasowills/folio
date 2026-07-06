@@ -4,6 +4,7 @@ import PdfPageRenderer from './PdfPageRenderer'
 import TextSelectionToolbar from './TextSelectionToolbar'
 import { usePdfUndo } from './hooks/usePdfUndo'
 import { usePdfReflow } from './hooks/usePdfReflow'
+import { usePdfPageRenderer } from './hooks/usePdfPageRenderer'
 
 interface PdfDocumentEditorProps {
   layoutDocument: PdfLayoutDocument
@@ -13,19 +14,30 @@ interface PdfDocumentEditorProps {
   issues?: Array<{ message: string; severity: 'low' | 'medium' | 'high'; section: string }>
   zoom?: number
   onZoomChange?: (zoom: number) => void
+  fileUrl?: string
+  debugMode?: boolean
+  debugOpacity?: number
 }
 
 let blockCounter = Date.now()
 
-export default function PdfDocumentEditor({ layoutDocument, onSave, onAiRewrite, onAiImprove, issues, zoom: externalZoom, onZoomChange }: PdfDocumentEditorProps) {
+export default function PdfDocumentEditor({ layoutDocument, onSave, onAiRewrite, onAiImprove, issues, zoom: externalZoom, onZoomChange, fileUrl, debugMode: externalDebug, debugOpacity: externalOpacity }: PdfDocumentEditorProps) {
   const [pages, setPages] = useState<PdfLayoutPage[]>(layoutDocument.pages)
   const [focusedBlockId, setFocusedBlockId] = useState<string | null>(null)
   const [internalZoom, setInternalZoom] = useState(1)
+  const [debugOpacity, setDebugOpacity] = useState(externalOpacity ?? 0.4)
+  const debugMode = externalDebug ?? false
   const zoom = externalZoom ?? internalZoom
   const setZoom = onZoomChange ?? setInternalZoom
   const prevPages = useRef(pages)
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const canvasRef = useRef<HTMLDivElement>(null!)
+
+  const { pageImages, loading: pdfLoading } = usePdfPageRenderer(
+    fileUrl,
+    layoutDocument.pageCount,
+    !!debugMode,
+  )
 
   const issueMap = useRef<Map<string, { severity: 'amber' | 'danger'; message: string }>>(new Map())
   useEffect(() => {
@@ -158,8 +170,6 @@ export default function PdfDocumentEditor({ layoutDocument, onSave, onAiRewrite,
     })
   }, [layoutDocument, pushSnapshot, scheduleSave])
 
-
-
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
       if ((e.metaKey || e.ctrlKey) && e.key === 'z' && !e.shiftKey) {
@@ -212,6 +222,12 @@ export default function PdfDocumentEditor({ layoutDocument, onSave, onAiRewrite,
         backgroundSize: '24px 24px',
       }}
     >
+      {debugMode && pdfLoading && (
+        <div className="fixed top-14 right-4 bg-blue-600 text-white text-[11px] px-3 py-1.5 rounded-lg shadow-lg z-50 animate-pulse">
+          Rendering original PDF pages...
+        </div>
+      )}
+
       <div
         className="flex flex-col items-center py-10 min-h-full"
         style={{ transform: `scale(${scale})`, transformOrigin: 'top center' }}
@@ -230,9 +246,69 @@ export default function PdfDocumentEditor({ layoutDocument, onSave, onAiRewrite,
             onMoveBlock={handleMoveBlock}
             onResizeBlock={handleResizeBlock}
             onAddBlock={handleAddBlock}
+            debugMode={debugMode}
+            debugBackground={pageImages[page.pageNumber - 1] ?? null}
+            debugOpacity={debugOpacity}
           />
         ))}
       </div>
+
+      {debugMode && (
+        <div
+          className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-gray-900/90 text-white rounded-xl shadow-2xl flex items-center gap-4 px-4 py-2.5 z-50 select-none"
+          style={{ backdropFilter: 'blur(8px)' }}
+        >
+          <span className="text-[11px] font-medium text-gray-300 whitespace-nowrap">Original PDF</span>
+          <input
+            type="range"
+            min="0.05"
+            max="0.9"
+            step="0.05"
+            value={debugOpacity}
+            onChange={(e) => setDebugOpacity(parseFloat(e.target.value))}
+            className="w-24 h-1 accent-teal cursor-pointer"
+          />
+          <span className="text-[11px] font-mono text-gray-400 w-8">{Math.round(debugOpacity * 100)}%</span>
+          <div className="w-px h-5 bg-white/20" />
+          <div className="flex items-center gap-2 text-[11px] text-gray-300">
+            <span className="inline-block w-3 h-3 rounded border border-dashed border-blue-400 bg-blue-50/20" />
+            <span>Blocks</span>
+          </div>
+          <div className="w-px h-5 bg-white/20" />
+          <button
+            onClick={() => {
+              const lines: string[] = []
+              for (const p of pages) {
+                lines.push(`--- Page ${p.pageNumber} (${p.width}x${p.height}pt) ---`)
+                for (const b of p.blocks) {
+                  lines.push(`[${b.id}] x=${b.x} y=${b.y} w=${b.width} h=${b.height} fs=${b.fontSize} fw=${b.fontWeight} ff=${b.fontFamily}: ${b.text}`)
+                }
+              }
+              navigator.clipboard?.writeText(lines.join('\n')).catch(() => {})
+            }}
+            className="text-[11px] text-gray-300 hover:text-white bg-white/10 hover:bg-white/20 px-2 py-1 rounded-md transition-colors cursor-pointer font-mono"
+            title="Copy all block texts with position info"
+          >
+            Copy all
+          </button>
+          <button
+            onClick={() => {
+              const lines: string[] = []
+              for (const p of pages) {
+                lines.push(`Page ${p.pageNumber}:`)
+                for (const b of p.blocks) {
+                  lines.push(`  ${b.text}`)
+                }
+              }
+              navigator.clipboard?.writeText(lines.join('\n')).catch(() => {})
+            }}
+            className="text-[11px] text-gray-300 hover:text-white bg-white/10 hover:bg-white/20 px-2 py-1 rounded-md transition-colors cursor-pointer font-mono"
+            title="Copy plain text only (no metadata)"
+          >
+            Copy text
+          </button>
+        </div>
+      )}
 
       <TextSelectionToolbar
         canvasRef={canvasRef}

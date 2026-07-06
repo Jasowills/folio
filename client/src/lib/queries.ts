@@ -66,13 +66,37 @@ export interface PdfLayoutBlock {
   isAllCaps: boolean
   isLikelyHeading: boolean
   lineCount: number
+  lineHeight: number | null
 }
+
+export interface PdfLineDecoration {
+  type: 'line'
+  x: number
+  y: number
+  width: number
+  height: number
+  color: string
+}
+
+export interface PdfRectDecoration {
+  type: 'rect'
+  x: number
+  y: number
+  width: number
+  height: number
+  fill?: string
+  stroke?: string
+  strokeWidth?: number
+}
+
+export type PdfDecoration = PdfLineDecoration | PdfRectDecoration
 
 export interface PdfLayoutPage {
   pageNumber: number
   width: number
   height: number
   blocks: PdfLayoutBlock[]
+  decorations: PdfDecoration[]
 }
 
 export interface PdfLayoutDocument {

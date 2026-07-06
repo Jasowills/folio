@@ -513,7 +513,7 @@ Raw Text:\n${rawText.slice(0, 5000)}\n\nStructured Data:\n${JSON.stringify(struc
             font-style:${b.fontStyle};
             font-family:${fontFamily};
             color:${cssColor(b)};
-            line-height:1.25;
+            line-height:1;
             white-space:pre-wrap;
             word-break:break-word;
             padding:0;

@@ -63,7 +63,7 @@ export class ExportService {
             font-style:${b.fontStyle};
             font-family:${fontFamily};
             color:${b.color || 'rgb(0,0,0)'};
-            line-height:1.25;
+            line-height:1;
             white-space:pre-wrap;
             word-break:break-word;
             padding:0;
