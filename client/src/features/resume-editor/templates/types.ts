@@ -1,4 +1,3 @@
-import type { ReactNode } from 'react'
 import type { LocalData, DesignSettings } from '../../../pages/editor/types'
 import type { TemplateStyle } from '../../../templates/types'
 

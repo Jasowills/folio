@@ -155,10 +155,10 @@ export default function InterviewerAvatar({ name, title, state, size }: Intervie
 
       {!isSmall && (
         <div className="text-center mt-4">
-          <p className="text-[15px] font-semibold text-white/90" style={{ fontFamily: 'Inter, sans-serif' }}>
+          <p className="text-[15px] font-semibold text-white/90" style={{ fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif" }}>
             {name}
           </p>
-          <p className="text-[12px] text-white/50 mt-0.5" style={{ fontFamily: 'Inter, sans-serif' }}>
+          <p className="text-[12px] text-white/50 mt-0.5" style={{ fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif" }}>
             {title}
           </p>
         </div>
@@ -166,7 +166,7 @@ export default function InterviewerAvatar({ name, title, state, size }: Intervie
 
       {isSmall && (
         <div className="text-center mt-2">
-          <p className="text-[11px] font-medium text-white/70" style={{ fontFamily: 'Inter, sans-serif' }}>
+          <p className="text-[11px] font-medium text-white/70" style={{ fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif" }}>
             {name}
           </p>
         </div>

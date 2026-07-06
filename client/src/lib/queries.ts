@@ -51,14 +51,48 @@ interface ResumeCertification {
   date?: string
 }
 
+export interface PdfLayoutBlock {
+  id: string
+  text: string
+  x: number
+  y: number
+  width: number
+  height: number
+  fontSize: number
+  fontWeight: number
+  fontStyle: string
+  fontFamily: string
+  color: string
+  isAllCaps: boolean
+  isLikelyHeading: boolean
+  lineCount: number
+}
+
+export interface PdfLayoutPage {
+  pageNumber: number
+  width: number
+  height: number
+  blocks: PdfLayoutBlock[]
+}
+
+export interface PdfLayoutDocument {
+  pages: PdfLayoutPage[]
+  dominantFontSize: number
+  dominantFontFamily: string
+  pageCount: number
+}
+
 export interface Resume {
   _id: string
   title: string
   filename: string
+  source?: 'upload' | 'builder'
   name?: string
   fileUrl?: string
   cloudinaryPublicId?: string
   rawText?: string
+  layoutDocument?: PdfLayoutDocument
+  layoutDocumentUpdatedAt?: string
   overallScore?: number
   strengths?: string[]
   sectionScores?: Record<string, number>
@@ -201,6 +235,33 @@ export function useRewriteBullet() {
     mutationFn: async ({ resumeId, bullet, context }: { resumeId: string; bullet: string; context?: string }) => {
       const { data } = await api.post(`/resumes/${resumeId}/rewrite-bullet`, { bullet, context })
       return (data.data || data) as { variations: string[] }
+    },
+  })
+}
+
+export function useExtractLayout() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { data } = await api.post(`/resumes/${id}/extract-layout`)
+      return (data.data || data) as PdfLayoutDocument
+    },
+    onSettled: (_data, _err, id) => {
+      qc.invalidateQueries({ queryKey: ['resume', id] })
+    },
+  })
+}
+
+export function useSaveLayoutDocument() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async ({ id, layoutDocument }: { id: string; layoutDocument: PdfLayoutDocument }) => {
+      const { data } = await api.put(`/resumes/${id}`, { layoutDocument })
+      return data.data || data
+    },
+    onSettled: (_data, _err, { id }) => {
+      qc.invalidateQueries({ queryKey: ['resume', id] })
+      qc.invalidateQueries({ queryKey: ['resumes'] })
     },
   })
 }

@@ -23,11 +23,120 @@ export class ExportService {
 
     this.logger.log(`exportPdf: generating PDF for resume ${resumeId}, template=${template || 'default'}, color=${primaryColor || 'default'}`);
 
+    if (resume.layoutDocument) {
+      const html = this.buildLayoutHtml(resume.layoutDocument as Record<string, any>);
+      const pdf = await this.renderLayoutPdf(html);
+      this.logger.log(`exportPdf: layout PDF generated (${pdf.length} bytes)`);
+      return pdf;
+    }
+
     const html = this.buildHtml(resume, primaryColor || '#0F6E56');
     const pdf = await this.renderPdf(html);
 
     this.logger.log(`exportPdf: PDF generated (${pdf.length} bytes)`);
     return pdf;
+  }
+
+  private buildLayoutHtml(doc: Record<string, any>): string {
+    const pageWidth = doc.pages?.[0]?.width || 595;
+    const pageHeight = doc.pages?.[0]?.height || 842;
+    const unit = 'pt';
+
+    const pagesHtml = (doc.pages || []).map((page: any) => {
+      const blocksHtml = (page.blocks || [])
+        .filter((b: any) => b.text.trim())
+        .map((b: any) => {
+          const fontFamily = b.fontFamily === 'serif'
+            ? '"DM Serif Display", Georgia, serif'
+            : b.fontFamily === 'monospace'
+              ? '"Roboto Mono", "Courier New", monospace'
+              : '"Plus Jakarta Sans", "Helvetica Neue", Arial, sans-serif';
+
+          return `<div style="
+            position:absolute;
+            left:${b.x}${unit};
+            top:${b.y}${unit};
+            width:${b.width}${unit};
+            min-height:${b.height}${unit};
+            font-size:${b.fontSize}${unit};
+            font-weight:${b.fontWeight};
+            font-style:${b.fontStyle};
+            font-family:${fontFamily};
+            color:${b.color || 'rgb(0,0,0)'};
+            line-height:1.25;
+            white-space:pre-wrap;
+            word-break:break-word;
+            padding:0;
+            margin:0;
+          ">${this.esc(b.text)}</div>`;
+        }).join('\n');
+
+      return `<div style="
+        position:relative;
+        width:${page.width}${unit};
+        height:${page.height}${unit};
+        background:white;
+        overflow:hidden;
+        margin:0;
+      ">${blocksHtml}</div>`;
+    }).join('\n');
+
+    const widthIn = (pageWidth / 72).toFixed(2);
+    const heightIn = (pageHeight / 72).toFixed(2);
+
+    return `<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=Plus+Jakarta+Sans:wght@400;500;600;700&family=Roboto+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  @page { margin:0; size:${widthIn}in ${heightIn}in; }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { background:white; }
+</style>
+</head>
+<body>${pagesHtml}</body>
+</html>`;
+  }
+
+  private async renderLayoutPdf(html: string): Promise<Buffer> {
+    let browser;
+    try {
+      browser = await chromium.launch({
+        channel: 'chromium',
+        headless: true,
+      });
+      const page = await browser.newPage();
+      await page.setContent(html, { waitUntil: 'networkidle' });
+
+      // Extract first page dimensions from the rendered page divs (in CSS pixels).
+      // pdfplumber returns points; the HTML uses pt units; offsetWidth returns CSS pixels.
+      // At 96 DPI: 1pt = 1.333px. We convert back: pt = px * 72/96.
+      const pageDims = await page.evaluate(() => {
+        const first = document.querySelector('body > div') as HTMLElement | undefined;
+        if (!first) return null;
+        return {
+          width: Math.round(first.offsetWidth * 72 / 96),
+          height: Math.round(first.offsetHeight * 72 / 96),
+        };
+      });
+
+      if (!pageDims) throw new Error('No pages to render');
+
+      // Use points for the PDF paper size — matches the @page rule.
+      // Each page div is exactly one paper-sized block, so Playwright paginates naturally.
+      const pdf = await page.pdf({
+        width: `${pageDims.width}pt`,
+        height: `${pageDims.height}pt`,
+        printBackground: true,
+        margin: { top: 0, right: 0, bottom: 0, left: 0 },
+      });
+      return Buffer.from(pdf);
+    } finally {
+      if (browser) await browser.close().catch(() => {});
+    }
   }
 
   private buildHtml(resume: ResumeDocument, color: string): string {

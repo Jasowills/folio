@@ -1,5 +1,5 @@
 import { ScoreRing } from '../ScoreRing'
-import { IconX, IconExternalLink, IconCalendar, IconMapPin, IconBriefcase, IconLanguage } from '@tabler/icons-react'
+import { IconX, IconExternalLink, IconCalendar, IconMapPin, IconBriefcase } from '@tabler/icons-react'
 import { decodeHtml, formatJobDescription, extractUrl } from '../../lib/utils'
 
 interface FeedJobDetailsPanelProps {

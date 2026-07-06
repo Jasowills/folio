@@ -367,7 +367,7 @@ export default function InterviewLive() {
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.6, duration: 0.5 }}
                 className="text-sm text-white/40 font-body"
-                style={{ fontFamily: 'Inter, sans-serif' }}
+                style={{ fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif" }}
               >
                 Preparing your interview...
               </motion.p>
@@ -391,7 +391,7 @@ export default function InterviewLive() {
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.5, duration: 0.8 }}
                 className="font-display text-white text-2xl"
-                style={{ fontFamily: "'Playfair Display', Georgia, serif" }}
+                style={{ fontFamily: "'DM Serif Display', Georgia, serif" }}
               >
                 Interview complete.
               </motion.p>
@@ -400,7 +400,7 @@ export default function InterviewLive() {
                 animate={{ opacity: 1 }}
                 transition={{ delay: 1.2, duration: 0.8 }}
                 className="text-sm text-white/40"
-                style={{ fontFamily: 'Inter, sans-serif' }}
+                style={{ fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif" }}
               >
                 Your results are being prepared.
               </motion.p>
@@ -427,7 +427,7 @@ export default function InterviewLive() {
             className="fixed inset-0 z-50 bg-[#1C1C1A] flex items-center justify-center"
           >
             <div className="flex flex-col items-center gap-4">
-              <p className="text-sm text-white/40" style={{ fontFamily: 'Inter, sans-serif' }}>
+              <p className="text-sm text-white/40" style={{ fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif" }}>
                 Ending interview...
               </p>
               <span className="text-teal text-2xl font-display animate-pulse">&amp;</span>
@@ -458,14 +458,14 @@ export default function InterviewLive() {
               </div>
               <h2
                 className="text-white text-xl"
-                style={{ fontFamily: "'Playfair Display', Georgia, serif" }}
+                style={{ fontFamily: "'DM Serif Display', Georgia, serif" }}
               >
                 Paused
               </h2>
-              <p className="text-sm text-white/40 text-center" style={{ fontFamily: 'Inter, sans-serif' }}>
+              <p className="text-sm text-white/40 text-center" style={{ fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif" }}>
                 {pausesRemaining} of 2 pauses remaining &middot; Max 2 minutes each
               </p>
-              <div className="text-lg text-white/70 font-mono tabular-nums" style={{ fontFamily: 'Inter, sans-serif' }}>
+              <div className="text-lg text-white/70 font-mono tabular-nums" style={{ fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif" }}>
                 {formatTime(pauseTimer)} / 02:00
               </div>
               <button
@@ -535,11 +535,11 @@ export default function InterviewLive() {
       <div className="flex-1 flex flex-col min-h-0 relative">
         {/* Top Bar (32px) */}
         <div className="shrink-0 h-8 flex items-center justify-between px-4 relative z-10">
-          <span className="text-[11px] text-white/20 tracking-wider font-body uppercase select-none" style={{ fontFamily: 'Inter, sans-serif' }}>
+          <span className="text-[11px] text-white/20 tracking-wider font-body uppercase select-none" style={{ fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif" }}>
             Folio &amp;
           </span>
 
-          <span className="text-[13px] text-white/40 font-mono tabular-nums" style={{ fontFamily: 'Inter, sans-serif' }}>
+          <span className="text-[13px] text-white/40 font-mono tabular-nums" style={{ fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif" }}>
             {formatTime(elapsed)}
           </span>
 
@@ -579,7 +579,7 @@ export default function InterviewLive() {
         {/* Question counter */}
         {totalQuestions > 0 && (
           <div className="absolute top-8 right-4 z-10">
-            <span className="text-[10px] uppercase text-white/20 tracking-widest font-medium" style={{ fontFamily: 'Inter, sans-serif' }}>
+            <span className="text-[10px] uppercase text-white/20 tracking-widest font-medium" style={{ fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif" }}>
               Question {currentQuestionIdx + 1} of {totalQuestions}
             </span>
           </div>
@@ -609,7 +609,7 @@ export default function InterviewLive() {
                         exit={{ opacity: 0, y: -4 }}
                         transition={{ duration: 0.3 }}
                         className="text-center text-[#E8E4DC] text-base leading-relaxed max-w-xl px-8 overflow-y-auto max-h-32"
-                        style={{ fontFamily: 'Inter, sans-serif' }}
+                        style={{ fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif" }}
                       >
                         {captionParagraphs.map((p, i) => (
                           <p key={i} className={i > 0 ? 'mt-3' : ''}>
@@ -703,7 +703,7 @@ export default function InterviewLive() {
                       value={codeLanguage}
                       onChange={(e) => setCodeLanguage(e.target.value)}
                       className="bg-transparent text-[11px] text-white/60 border border-white/10 rounded px-2 py-1 outline-none cursor-pointer"
-                      style={{ fontFamily: 'Inter, sans-serif' }}
+                      style={{ fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif" }}
                     >
                       {LANGUAGES.map((l) => (
                         <option key={l.id} value={l.id} className="bg-[#1E1E1E]">{l.label}</option>
@@ -716,7 +716,7 @@ export default function InterviewLive() {
                       className={`text-[11px] px-2.5 py-1 rounded transition-colors cursor-pointer ${
                         showTestCases ? 'bg-teal/20 text-teal' : 'text-white/40 hover:text-white/60'
                       }`}
-                      style={{ fontFamily: 'Inter, sans-serif' }}
+                      style={{ fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif" }}
                     >
                       Test Cases
                     </button>
@@ -724,7 +724,7 @@ export default function InterviewLive() {
                       onClick={handleCodeSubmit}
                       disabled={isCodeRunning}
                       className="flex items-center gap-1.5 text-[11px] px-3 py-1.5 rounded bg-teal text-white hover:bg-teal-dark transition-colors disabled:opacity-50 cursor-pointer"
-                      style={{ fontFamily: 'Inter, sans-serif' }}
+                      style={{ fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif" }}
                     >
                       {isCodeRunning ? (
                         <span className="w-3 h-3 rounded-full border border-white border-t-transparent animate-spin" />
@@ -766,7 +766,7 @@ export default function InterviewLive() {
                       className="shrink-0 bg-[#1E1E1E] border-t border-white/5 overflow-hidden"
                     >
                       <div className="p-3">
-                        <p className="text-[11px] text-white/30" style={{ fontFamily: 'Inter, sans-serif' }}>
+                        <p className="text-[11px] text-white/30" style={{ fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif" }}>
                           Test cases will appear here during the interview.
                         </p>
                       </div>
@@ -809,7 +809,7 @@ export default function InterviewLive() {
                     className="absolute bottom-2 left-1/2 -translate-x-1/2 z-10"
                   >
                     <div className="text-[#E8E4DC] text-sm leading-relaxed text-center max-w-lg px-4 py-2 rounded-lg bg-black/40 backdrop-blur-sm overflow-y-auto max-h-32"
-                          style={{ fontFamily: 'Inter, sans-serif' }}
+                          style={{ fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif" }}
                     >
                       {captionParagraphs.map((p, i) => (
                         <p key={i} className={i > 0 ? 'mt-2' : ''}>
@@ -835,7 +835,7 @@ export default function InterviewLive() {
             exit={{ opacity: 0, y: -8 }}
             transition={{ duration: 0.2 }}
             className="fixed top-20 left-1/2 -translate-x-1/2 z-30 bg-amber-500/20 text-amber-300 text-[11px] px-3 py-1.5 rounded-full border border-amber-500/30 font-medium"
-            style={{ fontFamily: 'Inter, sans-serif' }}
+            style={{ fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif" }}
           >
             Interrupted
           </motion.div>
@@ -850,7 +850,7 @@ export default function InterviewLive() {
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -4 }}
             className="fixed top-10 left-1/2 -translate-x-1/2 z-30 bg-danger/90 text-white text-xs px-4 py-2 rounded-lg"
-            style={{ fontFamily: 'Inter, sans-serif' }}
+            style={{ fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif" }}
           >
             {error}
           </motion.div>
@@ -909,7 +909,7 @@ export default function InterviewLive() {
                 ? 'bg-white/5 text-white/50'
                 : 'bg-white/5 text-white/50'
             }`}
-            style={{ fontFamily: 'Inter, sans-serif' }}
+            style={{ fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif" }}
           >
             {turnState === 'interviewer' && (
               <>

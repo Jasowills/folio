@@ -4,7 +4,6 @@ import JobCard from './JobCard'
 import EmptyStates from './EmptyStates'
 import FeedJobDetailsPanel from './FeedJobDetailsPanel'
 import { cn, decodeHtml } from '../../lib/utils'
-import { IconAdjustmentsHorizontal } from '@tabler/icons-react'
 
 const SOURCE_OPTIONS = [
   { value: 'greenhouse', label: 'Greenhouse' },
@@ -100,11 +99,6 @@ export default function DiscoverFeed() {
     ? getTimeSince(new Date(feedStats.lastCrawledAt))
     : null
 
-  const resumeName = prefs?.resumeId
-    ? 'your selected resume'
-    : hasNoResume
-      ? null
-      : 'your resume'
 
   return (
     <div className="max-w-4xl mx-auto space-y-8">

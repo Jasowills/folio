@@ -92,8 +92,6 @@ export default function Dashboard() {
   const highFlags = latestResume?.redFlags?.filter((f) => f.severity === 'high') ?? []
   const isFirstTime = !hasResume && !initialUpload
 
-  const skillCount = latestResume?.skills?.length ?? 0
-  const expCount = latestResume?.experience?.length ?? 0
   const certCount = latestResume?.certifications?.length ?? 0
   const quality = latestResume?.quality
 

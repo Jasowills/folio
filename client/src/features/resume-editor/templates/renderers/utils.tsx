@@ -1,4 +1,4 @@
-import type { CSSProperties, ReactNode } from 'react'
+import type { CSSProperties } from 'react'
 import type { TemplateStyle } from '../../../../templates/types'
 import type { DesignSettings } from '../../../../pages/editor/types'
 

@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { motion } from 'framer-motion'
-import { IconDownload, IconFileTypePdf, IconFileTypeDocx, IconBrandGoogleDrive } from '@tabler/icons-react'
+import { IconFileTypePdf, IconFileTypeDocx, IconBrandGoogleDrive } from '@tabler/icons-react'
 
 interface ExportPopoverProps {
   open: boolean

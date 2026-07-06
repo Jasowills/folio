@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, type KeyboardEvent, type FocusEvent } from 'react'
+import { useState, useRef, useEffect, type KeyboardEvent } from 'react'
 
 interface EditableFieldProps {
   value: string

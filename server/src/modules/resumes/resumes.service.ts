@@ -13,6 +13,13 @@ import {
   RESUME_EXTRACTION_SYSTEM,
 } from '../ai/prompts';
 import { randomUUID } from 'crypto';
+import { execFile } from 'child_process';
+import { promisify } from 'util';
+import * as path from 'path';
+import * as fs from 'fs';
+import https from 'https';
+
+const execFileAsync = promisify(execFile);
 
 @Injectable()
 export class ResumesService {
@@ -77,9 +84,14 @@ export class ResumesService {
     rawText: string,
     fileUrl?: string,
     cloudinaryPublicId?: string,
+    fileName?: string,
   ): Promise<ResumeDocument> {
     const resume = await this.create(userId);
+    resume.source = 'upload';
     resume.rawText = rawText;
+    if (fileName) {
+      resume.title = fileName.replace(/\.[^/.]+$/, '').trim();
+    }
     if (fileUrl) resume.fileUrl = fileUrl;
     if (cloudinaryPublicId) resume.cloudinaryPublicId = cloudinaryPublicId;
 
@@ -413,6 +425,128 @@ Raw Text:\n${rawText.slice(0, 5000)}\n\nStructured Data:\n${JSON.stringify(struc
     return { token, ...result };
   }
 
+  private async downloadWithRetry(url: string, maxAttempts = 3): Promise<Buffer> {
+    const agent = new https.Agent({ maxVersion: 'TLSv1.2', keepAlive: true });
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      try {
+        const buffer = await new Promise<Buffer>((resolve, reject) => {
+          https.get(url, { agent, timeout: 30000 }, (res) => {
+            if (!res.statusCode || res.statusCode >= 400) {
+              reject(new Error(`HTTP ${res.statusCode}`));
+              return;
+            }
+            const chunks: Buffer[] = [];
+            res.on('data', (c) => chunks.push(c));
+            res.on('end', () => resolve(Buffer.concat(chunks)));
+          }).on('error', reject).on('timeout', function () {
+            this.destroy();
+            reject(new Error('timeout'));
+          });
+        });
+        this.logger.log(`downloadWithRetry: downloaded ${buffer.length} bytes from ${url}`);
+        return buffer;
+      } catch (err: any) {
+        this.logger.warn(`downloadWithRetry: attempt ${attempt}/${maxAttempts} failed for ${url} — ${err.message}`);
+        if (attempt === maxAttempts) throw new Error(`Failed to fetch PDF: ${err.message}`);
+      }
+    }
+    throw new Error('Failed to fetch PDF');
+  }
+
+  async extractLayout(id: string, userId: string): Promise<Record<string, unknown>> {
+    const resume = await this.findById(id, userId);
+    if (!resume.fileUrl) {
+      throw new BadRequestException('No PDF file for this resume');
+    }
+
+    const url = resume.fileUrl;
+    this.logger.log(`extractLayout: downloading PDF for resume ${id} from ${url}`);
+    const buffer = await this.downloadWithRetry(url);
+
+    const tempFile = path.join(
+      process.cwd(),
+      `temp_layout_${Date.now()}_${Math.random().toString(36).slice(2)}.pdf`,
+    );
+    try {
+      fs.writeFileSync(tempFile, buffer);
+      const pythonScript = path.resolve(__dirname, '..', '..', '..', 'scripts', 'extract_pdf.py');
+      const { stdout } = await execFileAsync('python3', [pythonScript, '--mode', 'layout', tempFile], { timeout: 60000 });
+      const result = JSON.parse(stdout);
+      if (result.error) throw new Error(result.error);
+
+      resume.layoutDocument = result;
+      resume.layoutDocumentUpdatedAt = new Date();
+      await resume.save();
+
+      this.logger.log(`extractLayout: layout extracted — ${result.pageCount} pages, ${result.pages.reduce((s: number, p: any) => s + p.blocks.length, 0)} blocks`);
+      return result;
+    } finally {
+      if (fs.existsSync(tempFile)) fs.unlinkSync(tempFile);
+    }
+  }
+
+  async renderHtml(id: string, userId: string): Promise<string> {
+    const resume = await this.findById(id, userId);
+    const doc = resume.layoutDocument as Record<string, any> | undefined;
+    if (!doc || !doc.pages) throw new BadRequestException('No layout document available');
+
+    const cssColor = (block: any) => block.color || 'rgb(0,0,0)';
+
+    const pagesHtml = doc.pages.map((page: any) => {
+      const blocksHtml = (page.blocks || [])
+        .filter((b: any) => b.text.trim())
+        .map((b: any) => {
+          const fontFamily = b.fontFamily === 'serif'
+            ? '"DM Serif Display", Georgia, serif'
+            : b.fontFamily === 'monospace'
+              ? '"Roboto Mono", "Courier New", monospace'
+              : '"Plus Jakarta Sans", "Helvetica Neue", Arial, sans-serif';
+
+          return `<div style="
+            position:absolute;
+            left:${b.x}pt;
+            top:${b.y}pt;
+            width:${b.width}pt;
+            min-height:${b.height}pt;
+            font-size:${b.fontSize}pt;
+            font-weight:${b.fontWeight};
+            font-style:${b.fontStyle};
+            font-family:${fontFamily};
+            color:${cssColor(b)};
+            line-height:1.25;
+            white-space:pre-wrap;
+            word-break:break-word;
+            padding:0;
+            margin:0;
+          ">${this.esc(b.text)}</div>`;
+        }).join('\n');
+
+      return `<div style="
+        position:relative;
+        width:${page.width}pt;
+        height:${page.height}pt;
+        background:white;
+        overflow:hidden;
+        margin:0 auto 32px auto;
+      ">${blocksHtml}</div>`;
+    }).join('\n');
+
+    return `<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=Plus+Jakarta+Sans:wght@400;500;600;700&family=Roboto+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { background:#D4CFC6; padding:40px 0; }
+</style>
+</head>
+<body>${pagesHtml}</body>
+</html>`;
+  }
+
   async rewriteBullet(
     id: string,
     userId: string,
@@ -657,6 +791,10 @@ Raw Text:\n${rawText.slice(0, 3000)}\n\nStructured Data:\n${JSON.stringify(resum
       rawText,
       this.filterFutureDateFlags((result.flags as any[]) || []),
     );
+  }
+
+  private esc(s: string): string {
+    return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
   }
 
   private async saveVersion(resume: ResumeDocument): Promise<void> {

@@ -15,21 +15,6 @@ export default function EditableBulletList({ bullets, onChange, className = '' }
     onChange(next)
   }
 
-  function handleKeyDown(e: React.KeyboardEvent, index: number) {
-    if (e.key === 'Enter') {
-      e.preventDefault()
-      const next = [...bullets]
-      next.splice(index + 1, 0, '')
-      onChange(next)
-    }
-    if (e.key === 'Backspace' && bullets[index] === '') {
-      e.preventDefault()
-      if (bullets.length <= 1) return
-      const next = bullets.filter((_, i) => i !== index)
-      onChange(next)
-    }
-  }
-
   return (
     <ul className={`list-none ${className}`}>
       {bullets.map((bullet, i) => (

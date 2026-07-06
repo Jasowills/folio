@@ -26,7 +26,7 @@ const severityBgs = {
   high: 'bg-danger/5',
 }
 
-export default function IssueHighlight({ section, flags, children, className = '' }: IssueHighlightProps) {
+export default function IssueHighlight({ section: _section, flags, children, className = '' }: IssueHighlightProps) {
   const [showTooltip, setShowTooltip] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
 

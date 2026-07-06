@@ -40,6 +40,7 @@ import { execFile } from 'child_process';
 import { promisify } from 'util';
 import * as path from 'path';
 import * as fs from 'fs';
+import https from 'https';
 
 const execFileAsync = promisify(execFile);
 
@@ -159,6 +160,7 @@ export class ResumesController {
       text,
       uploadResult?.url || '',
       uploadResult?.publicId || '',
+      file.originalname,
     );
     this.logger.log(`uploadFile: saved resume ${saved._id} — fileUrl=${saved.fileUrl || '(empty)'}, cloudinaryPublicId=${saved.cloudinaryPublicId || '(empty)'}`);
     return saved;
@@ -259,6 +261,34 @@ export class ResumesController {
 
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
+  @Post(':id/extract-layout')
+  @Throttle({ default: { limit: 5, ttl: 60000 } })
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Extract layout document from PDF using pdfplumber' })
+  async extractLayout(
+    @Param('id') id: string,
+    @CurrentUser() user: UserDocument,
+  ) {
+    return this.resumesService.extractLayout(id, user._id.toString());
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @Get(':id/render-html')
+  @Header('Content-Type', 'text/html; charset=utf-8')
+  @ApiOperation({ summary: 'Get self-contained HTML render of the layout document for Puppeteer export' })
+  async renderHtml(
+    @Param('id') id: string,
+    @CurrentUser() user: UserDocument,
+    @Res() res: any,
+  ) {
+    const html = await this.resumesService.renderHtml(id, user._id.toString());
+    res.setHeader('Content-Type', 'text/html; charset=utf-8');
+    res.send(html);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
   @Post(':id/rewrite-bullet')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'AI rewrite a bullet point' })
@@ -286,16 +316,26 @@ export class ResumesController {
     @CurrentUser() user: UserDocument,
   ) {
     const resume = await this.resumesService.findById(id, user._id.toString());
-    if (!resume.fileUrl) throw new NotFoundException('No PDF file for this resume');
+    const fileUrl = resume.fileUrl;
+    if (!fileUrl) throw new NotFoundException('No PDF file for this resume');
 
-    this.logger.log(`getPdf: fetching ${resume.fileUrl.slice(0, 100)}...`);
+    this.logger.log(`getPdf: fetching ${fileUrl.slice(0, 100)}...`);
     try {
-      const res = await fetch(resume.fileUrl);
-      if (!res.ok) {
-        this.logger.error(`getPdf: Cloudinary returned ${res.status} for ${resume.fileUrl.slice(0, 80)}`);
-        throw new Error(`Cloudinary fetch failed: ${res.status}`);
-      }
-      const buffer = Buffer.from(await res.arrayBuffer());
+      const agent = new https.Agent({ maxVersion: 'TLSv1.2', keepAlive: true });
+      const buffer = await new Promise<Buffer>((resolve, reject) => {
+        https.get(fileUrl, { agent, timeout: 30000 }, (res) => {
+          if (!res.statusCode || res.statusCode >= 400) {
+            reject(new Error(`Cloudinary returned ${res.statusCode}`));
+            return;
+          }
+          const chunks: Buffer[] = [];
+          res.on('data', (c) => chunks.push(c));
+          res.on('end', () => resolve(Buffer.concat(chunks)));
+        }).on('error', reject).on('timeout', function () {
+          this.destroy();
+          reject(new Error('timeout'));
+        });
+      });
       this.logger.log(`getPdf: returned ${buffer.length} bytes`);
       return new StreamableFile(buffer);
     } catch (err) {

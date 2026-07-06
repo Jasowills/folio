@@ -17,8 +17,8 @@ export interface DesignSettings {
 }
 
 export const DEFAULT_DESIGN: DesignSettings = {
-  headingFont: 'Playfair Display',
-  bodyFont: 'Inter',
+  headingFont: 'DM Serif Display',
+  bodyFont: 'Plus Jakarta Sans',
   bodyFontSize: 10,
   lineSpacing: 1.5,
   primaryColor: '#0F6E56',

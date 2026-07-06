@@ -1,13 +1,12 @@
 import { useState } from 'react'
 import { TEMPLATES, TEMPLATE_PREVIEWS } from '../../../templates'
-import type { ResumeTemplate } from '../../../templates/types'
 import type { DesignSettings } from '../../../pages/editor/types'
 import { cn } from '../../../lib/utils'
 import { IconTypography, IconPalette, IconLayout, IconTemplate } from '@tabler/icons-react'
 import type { TemplateId } from '../templates'
 
-const HEADING_FONTS = ['Playfair Display', 'Georgia', 'Garamond', 'Merriweather', 'EB Garamond', 'Lora', 'Libre Baskerville']
-const BODY_FONTS = ['Inter', 'Calibri', 'Helvetica Neue', 'Source Sans Pro', 'Open Sans', 'Roboto', 'Lato', 'Nunito']
+const HEADING_FONTS = ['DM Serif Display', 'Georgia', 'Garamond', 'Merriweather', 'EB Garamond', 'Lora', 'Libre Baskerville']
+const BODY_FONTS = ['Plus Jakarta Sans', 'Calibri', 'Helvetica Neue', 'Source Sans Pro', 'Open Sans', 'Roboto', 'Lato', 'Nunito']
 
 const PRESET_COLORS = [
   { name: 'Teal', value: '#0F6E56' },

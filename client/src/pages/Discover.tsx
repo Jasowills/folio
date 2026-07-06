@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
-import { useDiscoverPreferences, useUpdateDiscoverPreferences, useDiscoverFeedStats } from '../lib/queries'
-import { useAuth } from '../hooks/useAuth'
+import { useDiscoverPreferences } from '../lib/queries'
 import DiscoverFeed from '../components/discover/DiscoverFeed'
 import DiscoverTracker from '../components/discover/DiscoverTracker'
 import SetupCard from '../components/discover/SetupCard'
@@ -11,10 +10,7 @@ import { IconSettings } from '@tabler/icons-react'
 export default function Discover() {
   const location = useLocation()
   const navigate = useNavigate()
-  const { user } = useAuth()
   const { data: prefs, isLoading: prefsLoading } = useDiscoverPreferences()
-  const { data: feedStats } = useDiscoverFeedStats()
-  const updatePrefs = useUpdateDiscoverPreferences()
   const [tab, setTab] = useState<'feed' | 'tracker'>(
     location.pathname.includes('tracker') ? 'tracker' : 'feed',
   )

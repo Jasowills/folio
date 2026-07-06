@@ -1,6 +1,4 @@
-import type { ReactNode } from 'react'
 import type { ResumeRenderProps } from '../types'
-import HeaderRenderer from '../renderers/HeaderRenderer'
 import SummaryRenderer from '../renderers/SummaryRenderer'
 import ExperienceRenderer from '../renderers/ExperienceRenderer'
 import EducationRenderer from '../renderers/EducationRenderer'

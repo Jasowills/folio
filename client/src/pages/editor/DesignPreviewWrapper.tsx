@@ -2,14 +2,14 @@ import { useEffect } from 'react'
 import type { DesignSettings } from './types'
 
 const FONT_URLS: Record<string, string> = {
-  'Playfair Display': 'Playfair+Display:wght@400;600;700',
+  'DM Serif Display': 'DM+Serif+Display:ital@0;1',
   'Georgia': '',
   'Garamond': '',
   'Merriweather': 'Merriweather:wght@300;400;700',
   'EB Garamond': 'EB+Garamond:wght@400;500;600',
   'Lora': 'Lora:wght@400;500;600',
   'Libre Baskerville': 'Libre+Baskerville:wght@400;700',
-  'Inter': 'Inter:wght@300;400;500;600;700',
+  'Plus Jakarta Sans': 'Plus+Jakarta+Sans:wght@400;500;600;700',
   'Calibri': '',
   'Helvetica Neue': '',
   'Source Sans Pro': 'Source+Sans+Pro:wght@300;400;600;700',
@@ -38,14 +38,14 @@ export function useFontLoader(headingFont: string, bodyFont: string) {
 
 export function fontFamilyFor(font: string): string {
   const map: Record<string, string> = {
-    'Playfair Display': "'Playfair Display', Georgia, serif",
+    'DM Serif Display': "'DM Serif Display', Georgia, serif",
     'Georgia': 'Georgia, "Times New Roman", serif',
     'Garamond': 'Garamond, Baskerville, "Baskerville Old Face", "Times New Roman", serif',
     'Merriweather': "'Merriweather', Georgia, serif",
     'EB Garamond': "'EB Garamond', Garamond, serif",
     'Lora': "'Lora', Georgia, serif",
     'Libre Baskerville': "'Libre Baskerville', Georgia, serif",
-    'Inter': "'Inter', -apple-system, BlinkMacSystemFont, sans-serif",
+    'Plus Jakarta Sans': "'Plus Jakarta Sans', system-ui, -apple-system, sans-serif",
     'Calibri': 'Calibri, "Helvetica Neue", Arial, sans-serif',
     'Helvetica Neue': '"Helvetica Neue", Helvetica, Arial, sans-serif',
     'Source Sans Pro': "'Source Sans Pro', -apple-system, BlinkMacSystemFont, sans-serif",

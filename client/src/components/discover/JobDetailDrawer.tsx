@@ -243,7 +243,7 @@ function ChecklistItem({ label, checked, onToggle }: { label: string; checked: b
   )
 }
 
-function formatSalary(min: number, max: number | null, currency: string | null): string {
+function formatSalary(min: number, max: number | null, _currency: string | null): string {
   const fmt = (n: number) => {
     if (n >= 1000) return `$${Math.round(n / 1000)}K`
     return `$${n}`

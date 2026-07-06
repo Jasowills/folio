@@ -5,26 +5,6 @@ import MiniPrepPanel from './MiniPrepPanel'
 import { cn, decodeHtml, formatJobDescription, extractUrl } from '../../lib/utils'
 import { IconX, IconCircleCheck, IconExternalLink, IconMapPin, IconClock } from '@tabler/icons-react'
 
-const SOURCE_LABELS: Record<string, string> = {
-  greenhouse: 'Greenhouse',
-  lever: 'Lever',
-  workday: 'Workday',
-  weworkremotely: 'WeWorkRemotely',
-  remoteok: 'RemoteOK',
-  otta: 'Otta',
-  hn: 'Hacker News',
-  ycombinator: 'YC',
-  twitter: 'Twitter',
-  linkedin: 'LinkedIn',
-  cryptojobslist: 'Crypto',
-  bitcoinerjobs: 'Bitcoin',
-  remotive: 'Remotive',
-  arc: 'Arc',
-  wellfound: 'Wellfound',
-  builtin: 'Built In',
-  techtree: 'TechTree',
-}
-
 const SOURCE_ABBREV: Record<string, string> = {
   greenhouse: 'GH',
   lever: 'LV',
@@ -55,13 +35,10 @@ interface JobCardProps {
 export default function JobCard({ job, onHide, onTracked, onSelect }: JobCardProps) {
   const trackJob = useTrackJob()
   const [showPrep, setShowPrep] = useState(false)
-  const [undoTimeout, setUndoTimeout] = useState<ReturnType<typeof setTimeout> | null>(null)
   const [hidden, setHidden] = useState(false)
 
   const match = job.match
   const score = match?.atsScore ?? 0
-  const matchedCount = match?.matchedKeywords?.length ?? 0
-  const missingCount = match?.missingKeywords?.length ?? 0
 
   const postedDate = job.postedAt ? new Date(job.postedAt) : null
   const timeAgo = postedDate ? getTimeSince(postedDate) : ''
@@ -80,8 +57,7 @@ export default function JobCard({ job, onHide, onTracked, onSelect }: JobCardPro
   const handleHide = () => {
     setHidden(true)
     onHide()
-    const timeout = setTimeout(() => setHidden(false), 5000)
-    setUndoTimeout(timeout)
+    setTimeout(() => setHidden(false), 5000)
   }
 
   const handleApply = () => {

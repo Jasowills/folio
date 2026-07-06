@@ -1,5 +1,5 @@
 import { useState, useRef } from 'react'
-import { useDiscoverPreferences, useUpdateDiscoverPreferences, useResumes, useUploadResume } from '../../lib/queries'
+import { useUpdateDiscoverPreferences, useResumes, useUploadResume } from '../../lib/queries'
 
 interface SetupCardProps {
   onComplete: () => void

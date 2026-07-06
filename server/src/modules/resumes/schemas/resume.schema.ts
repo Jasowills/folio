@@ -1,6 +1,8 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { Document, Types } from 'mongoose';
 
+type LayoutDocument = Record<string, unknown>;
+
 export type ResumeDocument = Resume & Document;
 
 interface ResumeContact {
@@ -76,6 +78,9 @@ export class Resume {
   @Prop()
   name?: string;
 
+  @Prop()
+  title?: string;
+
   @Prop({ type: Object })
   contact?: ResumeContact;
 
@@ -100,7 +105,10 @@ export class Resume {
   @Prop({ type: [{ type: Object }] })
   links?: Array<{ title: string; url: string }>;
 
-  @Prop()
+  @Prop({ type: String, enum: ['upload', 'builder'], default: 'builder' })
+  source?: string;
+
+  @Prop({ type: Object })
   fileUrl?: string;
 
   @Prop()
@@ -108,6 +116,12 @@ export class Resume {
 
   @Prop({ type: Object })
   rawText?: string;
+
+  @Prop({ type: Object })
+  layoutDocument?: LayoutDocument;
+
+  @Prop({ type: Date, default: null })
+  layoutDocumentUpdatedAt?: Date;
 
   @Prop({ type: [{ type: Object }] })
   redFlags?: RedFlag[];

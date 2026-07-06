@@ -1,35 +1,31 @@
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { AnimatePresence } from 'framer-motion'
-import { useResume, useUpdateResume } from '../../lib/queries'
+import { useResume, useUpdateResume, useAnalyzeResume, useExtractLayout, useSaveLayoutDocument } from '../../lib/queries'
+import type { PdfLayoutDocument } from '../../lib/queries'
 import { AiService } from '../../lib/ai'
+import type { LocalData, DesignSettings } from '../../pages/editor/types'
+import { DEFAULT_DESIGN } from '../../pages/editor/types'
+import type { TemplateId } from './templates/types'
+import { resumeToLocalData, localDataToResumeUpdates, getDefaultLocalData } from './utils/resumeBridge'
+import PdfDocumentEditor from '../pdf-editor/PdfDocumentEditor'
 import EditorToolbar from './components/EditorToolbar'
-import EditorCanvas from './components/EditorCanvas'
+import EditableResumeView from './components/EditableResumeView'
+import PreviewPane from './components/PreviewPane'
 import FloatingPanel from './components/FloatingPanel'
-import SelectionToolbar from './components/SelectionToolbar'
 import AiDrawer from './components/AiDrawer'
 import CommandPalette from './components/CommandPalette'
 import ExportPopover from './components/ExportPopover'
 import ExtractionNotification from './components/ExtractionNotification'
 import AiPanel from './components/AiPanel'
-import SuggestionTray from './components/SuggestionTray'
-import PdfEditor from './components/PdfEditor'
-import FontsPanel from './components/FontsPanel'
-import DataPanel from './components/DataPanel'
+import StylesPanel from './components/StylesPanel'
+import SectionsPanel from './components/SectionsPanel'
 import useEditorKeyboard from './hooks/useEditorKeyboard'
-import type { DocumentFontDefaults, PdfDocumentData } from './types/pdf'
-
-const DEFAULT_FONTS: DocumentFontDefaults = {
-  fontName: 'Helvetica',
-  fontSize: 11,
-  fontColor: '#000000',
-  lineSpacing: 1.2,
-}
 
 function LoadingState() {
   return (
-    <div className="flex flex-col h-screen bg-[#D4CFC6]">
-      <div className="h-12 bg-surface border-b border-border flex items-center justify-between px-4 shrink-0">
+    <div className="flex flex-col h-screen bg-surface">
+      <div className="h-12 bg-white border-b border-border flex items-center justify-between px-4 shrink-0">
         <div className="animate-pulse flex items-center gap-3">
           <div className="h-4 w-4 bg-border/40 rounded" />
           <div className="h-4 w-32 bg-border/40 rounded" />
@@ -52,8 +48,13 @@ export default function EditorPage() {
   const navigate = useNavigate()
   const { data: resume, isLoading } = useResume(id!)
   const updateResume = useUpdateResume()
+  const extractLayout = useExtractLayout()
+  const saveLayoutDoc = useSaveLayoutDocument()
+
+  const [localData, setLocalData] = useState<LocalData | null>(null)
+  const [templateId, setTemplateId] = useState<TemplateId>('minimal')
+  const [design, setDesign] = useState<DesignSettings>(DEFAULT_DESIGN)
   const [saved, setSaved] = useState(true)
-  const [zoom, setZoom] = useState(0.75)
   const [panelOpen, setPanelOpen] = useState(false)
   const [panelTab, setPanelTab] = useState<'styles' | 'sections' | 'ai'>('styles')
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false)
@@ -62,9 +63,15 @@ export default function EditorPage() {
   const [aiLoading, setAiLoading] = useState(false)
   const [aiVariations, setAiVariations] = useState<string[]>([])
   const [showExtractionNote, setShowExtractionNote] = useState(true)
-  const [fontDefaults, setFontDefaults] = useState<DocumentFontDefaults>(DEFAULT_FONTS)
-  const [regionData, setRegionData] = useState<PdfDocumentData | null>(null)
+  const [parsing, setParsing] = useState(false)
+  const [extractingLayout, setExtractingLayout] = useState(false)
+  const [layoutDoc, setLayoutDoc] = useState<PdfLayoutDocument | null>(null)
+  const [pdfZoom, setPdfZoom] = useState(1)
+
+  const analyzeResume = useAnalyzeResume()
   const saveAttemptRef = useRef(0)
+
+  const isUploadSource = resume?.source === 'upload'
 
   useEditorKeyboard({
     onSave: forceSave,
@@ -76,22 +83,54 @@ export default function EditorPage() {
     onToggleSections: () => openPanel('sections'),
     onToggleAi: () => openPanel('ai'),
     onClosePanels: () => { setPanelOpen(false); setExportPopoverOpen(false); setCommandPaletteOpen(false) },
-    onZoomIn: () => setZoom(z => Math.min(2, z + 0.1)),
-    onZoomOut: () => setZoom(z => Math.max(0.3, z - 0.1)),
-    onZoomReset: () => setZoom(0.75),
+    onZoomIn: () => {},
+    onZoomOut: () => {},
+    onZoomReset: () => {},
   })
 
-  const hasEdits = regionData?.pages.some(p => p.regions.some(r => r.edited))
+  useEffect(() => {
+    if (resume) {
+      const savedLayout = resume.layoutDocument as PdfLayoutDocument | undefined
+      if (savedLayout) setLayoutDoc(savedLayout)
+
+      const savedDesign = (resume as any).design as DesignSettings | undefined
+      const savedTemplate = (resume as any).templateId as string | undefined
+      const savedSectionOrder = (resume as any).sectionOrder as string[] | undefined
+      setLocalData(resumeToLocalData(resume, savedDesign, savedSectionOrder))
+      if (savedTemplate && isTemplateId(savedTemplate)) setTemplateId(savedTemplate)
+      if (savedDesign) setDesign(savedDesign)
+    }
+  }, [resume])
 
   useEffect(() => {
-    if (!saved && id && hasEdits && regionData) {
+    if (resume?.rawText && !resume.experience?.length && !parsing) {
+      setParsing(true)
+      analyzeResume.mutate(id!, {
+        onSettled: () => {
+          setParsing(false)
+          setShowExtractionNote(true)
+        },
+      })
+    }
+  }, [resume?.rawText, resume?.experience?.length])
+
+  useEffect(() => {
+    if (isUploadSource && resume && !resume.layoutDocument && !extractingLayout) {
+      setExtractingLayout(true)
+      extractLayout.mutate(id!, {
+        onSuccess: (doc) => setLayoutDoc(doc),
+        onSettled: () => setExtractingLayout(false),
+      })
+    }
+  }, [isUploadSource, resume, extractingLayout, id])
+
+  useEffect(() => {
+    if (!saved && id && localData) {
       const attempt = ++saveAttemptRef.current
       const timer = setTimeout(async () => {
         try {
-          await updateResume.mutateAsync({
-            id,
-            data: { pdfRegions: JSON.stringify(regionData) },
-          })
+          const updates = localDataToResumeUpdates(localData)
+          await updateResume.mutateAsync({ id, data: { ...updates, templateId, design } })
           if (saveAttemptRef.current === attempt) setSaved(true)
         } catch {
           if (saveAttemptRef.current === attempt) setSaved(false)
@@ -99,17 +138,7 @@ export default function EditorPage() {
       }, 1500)
       return () => clearTimeout(timer)
     }
-  }, [saved, id, regionData, hasEdits, updateResume])
-
-  useEffect(() => {
-    if (resume && (resume as any).pdfRegions) {
-      try {
-        const parsed = JSON.parse((resume as any).pdfRegions)
-        setRegionData(parsed)
-        if (parsed.fontDefaults) setFontDefaults(parsed.fontDefaults)
-      } catch { /* ignore parse errors */ }
-    }
-  }, [resume])
+  }, [saved, id, localData, templateId, design, updateResume])
 
   useEffect(() => {
     function handleBeforeUnload(e: BeforeUnloadEvent) {
@@ -120,20 +149,25 @@ export default function EditorPage() {
   }, [saved])
 
   function forceSave() {
-    if (!id) return
-    const data: Record<string, unknown> = {}
-    if (regionData) data.pdfRegions = JSON.stringify(regionData)
-    updateResume.mutate({ id, data })
+    if (!id || !localData) return
+    const updates = localDataToResumeUpdates(localData)
+    updateResume.mutate({ id, data: { ...updates, templateId, design } })
     setSaved(true)
   }
 
   function openPanel(tab: 'styles' | 'sections' | 'ai') {
-    if (panelOpen && panelTab === tab) {
-      setPanelOpen(false)
-    } else {
-      setPanelTab(tab)
-      setPanelOpen(true)
-    }
+    if (panelOpen && panelTab === tab) setPanelOpen(false)
+    else { setPanelTab(tab); setPanelOpen(true) }
+  }
+
+  function handleLocalDataChange(data: LocalData) {
+    setLocalData(data)
+    setSaved(false)
+  }
+
+  function handleLayoutDocSave(updatedDoc: PdfLayoutDocument) {
+    setLayoutDoc(updatedDoc)
+    saveLayoutDoc.mutate({ id: id!, layoutDocument: updatedDoc })
   }
 
   async function handleAiRewrite(text: string) {
@@ -166,7 +200,7 @@ export default function EditorPage() {
 
   async function handleQuickAction(action: string) {
     const prompts: Record<string, string> = {
-      'improve-summary': `Improve this resume summary: "${resume?.summary || ''}"`,
+      'improve-summary': `Improve this resume summary: "${localData?.summary || ''}"`,
       'rewrite-weak': 'List 3 improvements for weak bullet points.',
       'suggest-skills': 'Suggest 5 relevant skills to add.',
       'ats-score': 'List 3 ATS optimization tips.',
@@ -190,41 +224,105 @@ export default function EditorPage() {
     }
   }
 
-  function handleRegionDataChange(data: PdfDocumentData | null) {
-    setRegionData(data)
-    setSaved(false)
-  }
-
-  function handleUpdateStructuredField(field: string, value: string) {
-    console.log('Update field:', field, value)
-  }
-
   const commands = [
     { id: 'save', label: 'Save changes', action: forceSave },
-    { id: 'open-styles', label: 'Open Fonts panel', action: () => openPanel('styles') },
-    { id: 'open-sections', label: 'Open Data panel', action: () => openPanel('sections') },
+    { id: 'open-styles', label: 'Open Styles panel', action: () => openPanel('styles') },
+    { id: 'open-sections', label: 'Open Sections panel', action: () => openPanel('sections') },
     { id: 'open-ai', label: 'Open AI panel', action: () => openPanel('ai') },
     { id: 'export-pdf', label: 'Export as PDF', action: () => { setExportPopoverOpen(true) } },
-    { id: 'zoom-in', label: 'Zoom in', action: () => setZoom(z => Math.min(2, z + 0.1)) },
-    { id: 'zoom-out', label: 'Zoom out', action: () => setZoom(z => Math.max(0.3, z - 0.1)) },
     { id: 'go-back', label: 'Back to resumes', action: () => navigate('/resumes') },
   ]
 
   if (isLoading) return <LoadingState />
   if (!id) { navigate('/resumes', { replace: true }); return null }
 
-  const hasPdf = !!(resume?.fileUrl || resume?.filename)
+  const currentData = localData || getDefaultLocalData()
+
+  if (isUploadSource) {
+    return (
+      <div className="flex flex-col h-screen bg-surface">
+        <EditorToolbar
+          resumeTitle={resume?.title || 'Untitled'}
+          saved={saved}
+          onSave={forceSave}
+          onOpenPanel={openPanel}
+          activePanel={panelOpen ? panelTab : null}
+          onExport={() => setExportPopoverOpen(o => !o)}
+          onBack={() => navigate('/resumes')}
+          zoom={{
+            zoom: pdfZoom,
+            onZoomIn: () => setPdfZoom(z => Math.min(2, z + 0.1)),
+            onZoomOut: () => setPdfZoom(z => Math.max(0.25, z - 0.1)),
+            onZoomReset: () => setPdfZoom(1),
+          }}
+        />
+
+        <ExtractionNotification
+          visible={showExtractionNote && !!resume?.rawText}
+          onDismiss={() => setShowExtractionNote(false)}
+        />
+
+        {extractingLayout && (
+          <div className="flex items-center justify-center py-4 bg-amber/5 border-b border-amber/20 shrink-0">
+            <div className="flex items-center gap-2 text-[12px] text-amber">
+              <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24" fill="none">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+              </svg>
+              Extracting layout from PDF...
+            </div>
+          </div>
+        )}
+
+        {layoutDoc && (
+          <PdfDocumentEditor
+            layoutDocument={layoutDoc}
+            onSave={handleLayoutDocSave}
+            onAiRewrite={handleAiRewrite}
+            onAiImprove={handleAiImprove}
+            zoom={pdfZoom}
+            onZoomChange={setPdfZoom}
+          />
+        )}
+
+        {!layoutDoc && !extractingLayout && (
+          <div className="flex-1 flex items-center justify-center text-sm text-muted">
+            <p>No layout data available. This PDF may be a scanned image.</p>
+          </div>
+        )}
+
+        <AiDrawer
+          open={aiDrawerOpen}
+          loading={aiLoading}
+          variations={aiVariations}
+          onSelect={() => setAiDrawerOpen(false)}
+          onRegenerate={() => {}}
+          onClose={() => setAiDrawerOpen(false)}
+        />
+
+        <ExportPopover
+          open={exportPopoverOpen}
+          onClose={() => setExportPopoverOpen(false)}
+          onExportPdf={() => window.open(`/export/${id}`, '_blank')}
+          onExportDocx={async () => {}}
+          onExportDrive={async () => {}}
+        />
+
+        <CommandPalette
+          open={commandPaletteOpen}
+          onClose={() => setCommandPaletteOpen(false)}
+          commands={commands}
+        />
+      </div>
+    )
+  }
 
   return (
-    <div className="flex flex-col h-screen bg-[#D4CFC6]">
+    <div className="flex flex-col h-screen bg-surface">
       <EditorToolbar
         resumeTitle={resume?.title || 'Untitled'}
         saved={saved}
         onSave={forceSave}
-        zoom={zoom}
-        onZoomIn={() => setZoom(z => Math.min(2, z + 0.1))}
-        onZoomOut={() => setZoom(z => Math.max(0.3, z - 0.1))}
-        onZoomReset={() => setZoom(0.75)}
         onOpenPanel={openPanel}
         activePanel={panelOpen ? panelTab : null}
         onExport={() => setExportPopoverOpen(o => !o)}
@@ -236,29 +334,38 @@ export default function EditorPage() {
         onDismiss={() => setShowExtractionNote(false)}
       />
 
-      <div className="flex-1 flex overflow-hidden relative">
-        <EditorCanvas zoom={zoom}>
-          {hasPdf ? (
-            <PdfEditor
-              resumeId={id}
-              fileUrl={resume?.fileUrl}
-              fontDefaults={fontDefaults}
-              onFontDefaultsChange={setFontDefaults}
-              onRegionsChange={handleRegionDataChange}
-              initialRegionData={regionData}
-            />
-          ) : (
-            <div className="flex flex-col items-center justify-center min-h-[60vh] text-center px-8">
-              <p className="text-sm text-muted mb-3">No PDF uploaded yet</p>
-              <SuggestionTray suggestions={[]} onApply={() => {}} onDismiss={() => {}} />
-            </div>
-          )}
-        </EditorCanvas>
+      {parsing && (
+        <div className="flex items-center justify-center py-4 bg-amber/5 border-b border-amber/20 shrink-0">
+          <div className="flex items-center gap-2 text-[12px] text-amber">
+            <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24" fill="none">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+            </svg>
+            Parsing resume content...
+          </div>
+        </div>
+      )}
 
-        <SelectionToolbar
-          onRewrite={handleAiRewrite}
-          onImprove={handleAiImprove}
-        />
+      <div className="flex-1 flex overflow-hidden">
+        <div className="flex-1 flex overflow-hidden">
+          <div className="w-[480px] min-w-[320px] overflow-y-auto border-r border-border bg-white">
+            <div className="px-6 py-8">
+              <EditableResumeView
+                data={currentData}
+                onUpdate={handleLocalDataChange}
+                redFlags={resume?.redFlags || []}
+              />
+            </div>
+          </div>
+
+          <div className="flex-1 overflow-auto bg-[#D4CFC6]">
+            <PreviewPane
+              data={currentData}
+              design={design}
+              templateId={templateId}
+            />
+          </div>
+        </div>
 
         <AiDrawer
           open={aiDrawerOpen}
@@ -276,38 +383,17 @@ export default function EditorPage() {
               onClose={() => setPanelOpen(false)}
             >
               {panelTab === 'styles' && (
-                <FontsPanel
-                  fontDefaults={fontDefaults}
-                  docData={regionData}
-                  onApplyDefaults={setFontDefaults}
-                  onResetRegion={(page, regionId) => {
-                    setRegionData(prev => {
-                      if (!prev) return prev
-                      return {
-                        ...prev,
-                        pages: prev.pages.map(p =>
-                          p.pageNumber !== page ? p : {
-                            ...p,
-                            regions: p.regions.map(r =>
-                              r.id !== regionId ? r : {
-                                ...r,
-                                edited: false,
-                                fontName: r.originalFontName,
-                                fontSize: r.originalFontSize,
-                                fontColor: r.originalFontColor,
-                              }
-                            ),
-                          }
-                        ),
-                      }
-                    })
-                  }}
+                <StylesPanel
+                  templateId={templateId}
+                  design={design}
+                  onTemplateChange={setTemplateId}
+                  onDesignChange={d => { setDesign(d); setSaved(false) }}
                 />
               )}
               {panelTab === 'sections' && (
-                <DataPanel
-                  resume={resume}
-                  onUpdateField={handleUpdateStructuredField}
+                <SectionsPanel
+                  data={currentData}
+                  onUpdate={handleLocalDataChange}
                 />
               )}
               {panelTab === 'ai' && (
@@ -338,4 +424,10 @@ export default function EditorPage() {
       />
     </div>
   )
+}
+
+const TEMPLATE_IDS: TemplateId[] = ['minimal', 'modern', 'executive', 'compact', 'classic', 'sidebar', 'bold', 'creative', 'tech', 'academic']
+
+function isTemplateId(v: string): v is TemplateId {
+  return (TEMPLATE_IDS as string[]).includes(v)
 }

@@ -1,6 +1,6 @@
 import type { LocalData } from '../../../pages/editor/types'
 import { ALL_SECTION_NAMES } from '../../../pages/editor/types'
-import { IconPlus, IconTrash } from '@tabler/icons-react'
+import { IconPlus, IconTrash, IconGripVertical } from '@tabler/icons-react'
 import { useState } from 'react'
 
 interface Props {

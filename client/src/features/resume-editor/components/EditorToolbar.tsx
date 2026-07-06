@@ -1,30 +1,32 @@
 import { cn } from '../../../lib/utils'
-import { IconChevronLeft, IconLayout, IconLayoutGrid, IconWand, IconDownload, IconZoomIn, IconZoomOut } from '@tabler/icons-react'
+import { IconChevronLeft, IconLayoutGrid, IconList, IconWand, IconDownload, IconZoomIn, IconZoomOut } from '@tabler/icons-react'
+
+interface ZoomProps {
+  zoom: number
+  onZoomIn: () => void
+  onZoomOut: () => void
+  onZoomReset: () => void
+}
 
 interface EditorToolbarProps {
   resumeTitle: string
   saved: boolean
   onSave: () => void
-  zoom: number
-  onZoomIn: () => void
-  onZoomOut: () => void
-  onZoomReset: () => void
   onOpenPanel: (tab: 'styles' | 'sections' | 'ai') => void
   activePanel: 'styles' | 'sections' | 'ai' | null
   onExport: () => void
   onBack: () => void
+  zoom?: ZoomProps
 }
 
 export default function EditorToolbar({
   resumeTitle,
   saved,
   onBack,
-  zoom,
-  onZoomIn,
-  onZoomOut,
   onOpenPanel,
   activePanel,
   onExport,
+  zoom,
 }: EditorToolbarProps) {
   return (
     <header className="h-12 bg-white border-b border-border flex items-center justify-between px-3 shrink-0 z-20">
@@ -54,15 +56,28 @@ export default function EditorToolbar({
       </div>
 
       <div className="flex items-center gap-0.5">
+        {zoom && (
+          <>
+            <ToolbarButton icon={IconZoomOut} label="" onClick={zoom.onZoomOut} />
+            <button
+              onClick={zoom.onZoomReset}
+              className="text-[11px] font-medium text-muted hover:text-ink transition-colors w-8 text-center cursor-pointer"
+            >
+              {Math.round(zoom.zoom * 100)}%
+            </button>
+            <ToolbarButton icon={IconZoomIn} label="" onClick={zoom.onZoomIn} />
+            <div className="w-px h-5 bg-border mx-1" />
+          </>
+        )}
         <ToolbarButton
-          icon={IconLayout}
-          label="Data"
+          icon={IconList}
+          label="Sections"
           active={activePanel === 'sections'}
-          onClick={() => onOpenPanel('sections')}
+            onClick={() => onOpenPanel('sections')}
         />
         <ToolbarButton
           icon={IconLayoutGrid}
-          label="Fonts"
+          label="Styles"
           active={activePanel === 'styles'}
           onClick={() => onOpenPanel('styles')}
         />
@@ -72,28 +87,6 @@ export default function EditorToolbar({
           active={activePanel === 'ai'}
           onClick={() => onOpenPanel('ai')}
         />
-
-        <div className="w-px h-5 bg-border mx-1" />
-
-        <div className="flex items-center gap-0.5 bg-paper border border-border rounded-lg p-0.5">
-          <button
-            onClick={onZoomOut}
-            className="p-1 rounded text-muted hover:text-ink hover:bg-white transition-colors cursor-pointer"
-            title="Zoom out"
-          >
-            <IconZoomOut className="h-3.5 w-3.5" />
-          </button>
-          <span className="text-[10px] text-muted w-8 text-center tabular-nums select-none">
-            {Math.round(zoom * 100)}%
-          </span>
-          <button
-            onClick={onZoomIn}
-            className="p-1 rounded text-muted hover:text-ink hover:bg-white transition-colors cursor-pointer"
-            title="Zoom in"
-          >
-            <IconZoomIn className="h-3.5 w-3.5" />
-          </button>
-        </div>
 
         <div className="w-px h-5 bg-border mx-1" />
 
