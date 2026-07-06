@@ -7,6 +7,17 @@ import ThreeBackground from '../components/ThreeBackground'
 import FloatingElements from '../components/FloatingElements'
 import { useGuestUploadResume } from '../lib/queries'
 import { useAuth } from '../hooks/useAuth'
+import SocialProofStrip from '../components/landing/SocialProofStrip'
+import AtsScorerSection from '../components/landing/AtsScorerSection'
+import ResumeEditorSection from '../components/landing/ResumeEditorSection'
+import CoverLetterSection from '../components/landing/CoverLetterSection'
+import JobDiscoverSection from '../components/landing/JobDiscoverSection'
+import InterviewPrepSection from '../components/landing/InterviewPrepSection'
+import PortfolioSection from '../components/landing/PortfolioSection'
+import HowItWorksSection from '../components/landing/HowItWorksSection'
+import ComparisonTable from '../components/landing/ComparisonTable'
+import FinalCtaSection from '../components/landing/FinalCtaSection'
+import Footer from '../components/landing/Footer'
 
 const statusSteps = [
   'File received and parsed',
@@ -113,7 +124,7 @@ function LoadingScreen({
           </div>
         </div>
 
-        <p className="text-xs text-muted mt-3">This takes about 10–15 seconds</p>
+        <p className="text-xs text-muted mt-3">This takes about 30–60 seconds</p>
       </div>
     </motion.div>
   )
@@ -175,7 +186,12 @@ export default function Home() {
     intervalsRef.current = [stepInterval, progressInterval]
 
     try {
-      const result = await guestUpload.mutateAsync(file)
+      const result = await Promise.race([
+        guestUpload.mutateAsync(file),
+        new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error('The upload is taking longer than expected. Check your file and try again.')), 120_000)
+        ),
+      ])
       intervalsRef.current.forEach(clearInterval)
       intervalsRef.current = []
 
@@ -201,11 +217,9 @@ export default function Home() {
   return (
     <>
       <AnimatePresence mode="wait">
-      {phase === 'processing' && (
+      {phase === 'processing' ? (
         <LoadingScreen key="loading" currentStep={currentStep} progress={progress} />
-      )}
-
-      {phase === 'error' && (
+      ) : phase === 'error' ? (
         <motion.div
           key="error"
           initial={{ opacity: 0 }}
@@ -223,9 +237,7 @@ export default function Home() {
             Try another file
           </button>
         </motion.div>
-      )}
-
-      {phase === 'drop' && !user && (
+      ) : phase === 'drop' && !user ? (
         <motion.div
           key="home"
           initial={{ opacity: 0 }}
@@ -268,19 +280,20 @@ export default function Home() {
               className="text-center max-w-2xl"
             >
               <span className="label-uppercase text-teal mb-5 block tracking-[0.15em]">
-                AI resume intelligence
+                ATS scores, AI rewrites, job matches
               </span>
               <HeroHeadline />
               <p className="font-body text-body-lg text-muted mt-4 max-w-lg mx-auto leading-relaxed">
-                Drop your resume and find out exactly what recruiters and ATS systems see — in under 30 seconds. No sign up needed.
+                Drop your resume. See what recruiters and ATS systems see in under 30 seconds. No account needed.
               </p>
             </motion.div>
 
             <motion.div
+              id="upload"
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.2, duration: 0.5 }}
-              className="mt-8 w-full max-w-lg"
+              className="mt-8 w-full max-w-lg scroll-mt-24"
             >
               <UploadZone onFile={handleFile} />
             </motion.div>
@@ -300,29 +313,22 @@ export default function Home() {
               )}
             </motion.div>
           </div>
-        </motion.div>
-      )}
-    </AnimatePresence>
 
-    <footer className="w-full border-t border-border/40 mt-32 py-8">
-      <div className="max-w-6xl mx-auto px-4 sm:px-8 flex flex-col sm:flex-row items-center justify-between gap-4">
-        <div className="flex items-center gap-2">
-          <span className="font-display text-ink text-sm font-bold">Folio</span>
-          <span className="font-display text-teal text-lg font-bold">&amp;</span>
-        </div>
-        <div className="flex items-center gap-6">
-          <Link to="/privacy" className="flex items-center gap-1.5 text-xs text-muted hover:text-ink transition-colors">
-            <IconShieldLock className="h-3.5 w-3.5" />
-            Privacy Policy
-          </Link>
-          <Link to="/terms" className="flex items-center gap-1.5 text-xs text-muted hover:text-ink transition-colors">
-            <IconFileDescription className="h-3.5 w-3.5" />
-            Terms &amp; Conditions
-          </Link>
-        </div>
-        <p className="text-[10px] text-muted/40">&copy; {new Date().getFullYear()} Folio &amp;. All rights reserved.</p>
-      </div>
-    </footer>
+          {/* Landing page sections (visible when hero is shown) */}
+          <SocialProofStrip />
+          <AtsScorerSection />
+          <ResumeEditorSection />
+          <CoverLetterSection />
+          <JobDiscoverSection />
+          <InterviewPrepSection />
+          <PortfolioSection />
+          <HowItWorksSection />
+          <ComparisonTable />
+          <FinalCtaSection />
+          <Footer />
+        </motion.div>
+      ) : null}
+    </AnimatePresence>
   </>
   )
 }

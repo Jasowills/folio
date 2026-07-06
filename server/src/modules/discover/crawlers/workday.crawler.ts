@@ -53,7 +53,7 @@ export class WorkdayCrawler extends BaseCrawler {
         const jobs = await this.crawlCompany(company);
         allJobs.push(...jobs);
       } catch (err) {
-        throw err;
+        this.logger.warn(`Skipped ${company.name}: ${(err as Error).message}`);
       }
     }
     return allJobs;
@@ -66,7 +66,7 @@ export class WorkdayCrawler extends BaseCrawler {
       browser = await chromium.launch({ headless: true });
       const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
       await page.route('**/*.{png,jpg,jpeg,gif,svg,ico,woff,woff2,ttf,mp4,mp3,avi,webm}', (route) => route.abort());
-      await page.goto(company.baseUrl, { waitUntil: 'networkidle', timeout: 30000 });
+      await page.goto(company.baseUrl, { waitUntil: 'load', timeout: 25000 });
       await page.waitForTimeout(3000);
 
       const jobSelector = '[class*="job"], [data-automation-id*="job"], [class*="posting"], a[href*="job"]';

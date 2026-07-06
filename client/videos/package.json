@@ -1,0 +1,30 @@
+{
+  "name": "folio-videos",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "remotion studio",
+    "build": "remotion render",
+    "render:hero": "remotion render hero-upload public/videos/hero-upload.mp4",
+    "render:ats": "remotion render ats-scorer public/videos/ats-scorer.mp4",
+    "render:cover": "remotion render cover-letter public/videos/cover-letter.mp4",
+    "render:interview": "remotion render interview-prep public/videos/interview-prep.mp4",
+    "render:discover": "remotion render job-discovery public/videos/job-discovery.mp4",
+    "render:editor": "remotion render resume-editor public/videos/resume-editor.mp4",
+    "render:all": "npm run render:hero && npm run render:ats && npm run render:cover && npm run render:interview && npm run render:discover && npm run render:editor"
+  },
+  "dependencies": {
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "remotion": "^4.0.0",
+    "@remotion/cli": "^4.0.0",
+    "@remotion/media": "^4.0.0",
+    "@remotion/transitions": "^4.0.0",
+    "@remotion/shapes": "^4.0.0",
+    "@remotion/google-fonts": "^4.0.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.5.0",
+    "@types/react": "^19.0.0"
+  }
+}

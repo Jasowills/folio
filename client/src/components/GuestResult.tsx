@@ -159,8 +159,8 @@ export default function GuestResult({
             <PdfViewer fileUrl={data.fileUrl} className="p-4" />
           ) : data.resumeText ? (
             <div className="p-6">
-              <h3 className="font-display text-xs text-muted uppercase tracking-wider mb-3">Extracted Text</h3>
-              <pre className="text-xs text-ink leading-relaxed whitespace-pre-wrap font-sans">{data.resumeText}</pre>
+                <h3 className="font-display text-xs text-muted uppercase tracking-wider mb-3">Extracted Text</h3>
+                <pre className="text-xs text-ink leading-relaxed whitespace-pre-wrap font-sans select-text cursor-text">{data.resumeText}</pre>
             </div>
           ) : (
             <div className="flex items-center justify-center h-full text-muted text-xs">No preview available</div>
@@ -168,7 +168,7 @@ export default function GuestResult({
           {data.resumeText && data.issues.length > 0 && (
             <div className="border-t border-border px-6 py-4">
               <details className="group">
-                <summary className="list-none flex items-center gap-2 text-xs font-semibold text-teal uppercase tracking-wider cursor-pointer hover:text-teal-dark transition-colors select-none">
+                <summary className="list-none flex items-center gap-2 text-xs font-semibold text-teal uppercase tracking-wider cursor-pointer hover:text-teal-dark transition-colors">
                   <svg
                     className="h-3 w-3 text-teal transition-transform duration-200 group-open:rotate-90"
                     viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"
@@ -411,8 +411,10 @@ export default function GuestResult({
                       { icon: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#0F6E56" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>, title: 'Fix every issue', desc: 'Rewrite bullets and strengthen your summary with AI.', iconBg: 'bg-teal-light' },
                       { icon: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#BA7517" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>, title: 'ATS score for any job', desc: 'Match against real job descriptions.', iconBg: 'bg-amber-light' },
                       { icon: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#0F6E56" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>, title: 'Cover letter', desc: 'Generated from your resume and JD.', iconBg: 'bg-teal-light' },
+                      { icon: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#0F6E56" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/><line x1="9" y1="10" x2="15" y2="10"/></svg>, title: 'Mock interview', desc: 'Voice interview with AI that read your resume.', iconBg: 'bg-teal-light' },
+                      { icon: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#BA7517" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>, title: 'Discover jobs', desc: 'Feed scored against your resume.', iconBg: 'bg-amber-light' },
                       { icon: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#BA7517" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><path d="M2 12h20"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>, title: 'Portfolio check', desc: 'Compare your site against your resume claims.', iconBg: 'bg-amber-light' },
-                    ].map((f, i) => (
+                    ].sort(() => Math.random() - 0.5).map((f, i) => (
                       <motion.div key={i} initial={{ opacity: 0, y: 12 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ delay: i * 0.06, duration: 0.3 }}
                         className="card p-3">
                         <div className={`h-8 w-8 rounded-lg ${f.iconBg} flex items-center justify-center mb-2`}>{f.icon}</div>

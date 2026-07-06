@@ -86,9 +86,55 @@ function Stamp({ size }: { size: number }) {
   )
 }
 
+function Sparkle({ size }: { size: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="#0F6E56" strokeWidth="1.5" opacity="0.3">
+      <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
+    </svg>
+  )
+}
+
+function ChatBubble({ size }: { size: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="#1A1A1A" strokeWidth="1.5" opacity="0.2">
+      <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+    </svg>
+  )
+}
+
+function Target({ size }: { size: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="#0F6E56" strokeWidth="1.5" opacity="0.25">
+      <circle cx="12" cy="12" r="10" />
+      <circle cx="12" cy="12" r="6" />
+      <circle cx="12" cy="12" r="2" />
+    </svg>
+  )
+}
+
+function CheckmarkBadge({ size }: { size: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="#0F6E56" strokeWidth="1.5" opacity="0.2">
+      <circle cx="12" cy="12" r="10" />
+      <path d="M8 12l2.5 2.5 5-5" />
+    </svg>
+  )
+}
+
+function PercentBadge({ size }: { size: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="#BA7517" strokeWidth="1.5" opacity="0.2">
+      <circle cx="12" cy="12" r="10" />
+      <path d="M8 16l8-8" />
+      <circle cx="9" cy="9" r="1" fill="#BA7517" />
+      <circle cx="15" cy="15" r="1" fill="#BA7517" />
+    </svg>
+  )
+}
+
 export default function FloatingElements() {
   return (
-    <div className="fixed inset-0 z-[1] pointer-events-none overflow-hidden">
+    <div className="absolute inset-0 z-[1] pointer-events-none overflow-hidden">
       {/* Ghost & character */}
       <div
         className="absolute right-[-100px] top-1/2 -translate-y-1/2 font-display text-ink leading-none select-none pointer-events-none"
@@ -137,6 +183,51 @@ export default function FloatingElements() {
       {/* Stamp */}
       <DriftWrapper duration={5.8} delay={1.8} className="top-[8%] right-[20%]">
         <Stamp size={32} />
+      </DriftWrapper>
+
+      {/* Extra resume docs */}
+      <DriftWrapper duration={4.6} delay={0.9} className="top-[48%] left-[6%] -rotate-2">
+        <ResumeDoc width={50} height={65} />
+      </DriftWrapper>
+      <DriftWrapper duration={5.4} delay={2} className="bottom-[8%] right-[15%] rotate-1">
+        <ResumeDoc width={60} height={78} />
+      </DriftWrapper>
+
+      {/* Sparkles */}
+      <DriftWrapper duration={4} delay={0.2} className="top-[12%] left-[30%]">
+        <Sparkle size={22} />
+      </DriftWrapper>
+      <DriftWrapper duration={4.8} delay={1.4} className="bottom-[18%] left-[20%]">
+        <Sparkle size={18} />
+      </DriftWrapper>
+      <DriftWrapper duration={3.8} delay={2.2} className="top-[22%] right-[35%]">
+        <Sparkle size={16} />
+      </DriftWrapper>
+
+      {/* Chat bubbles */}
+      <DriftWrapper duration={5.2} delay={0.4} className="bottom-[35%] left-[8%] -rotate-6">
+        <ChatBubble size={28} />
+      </DriftWrapper>
+      <DriftWrapper duration={4.4} delay={1.6} className="top-[30%] right-[15%] rotate-3">
+        <ChatBubble size={22} />
+      </DriftWrapper>
+
+      {/* Target */}
+      <DriftWrapper duration={6} delay={0.7} className="top-[60%] right-[4%]">
+        <Target size={30} />
+      </DriftWrapper>
+
+      {/* Checkmark badges */}
+      <DriftWrapper duration={5} delay={1.1} className="bottom-[50%] left-[2%]">
+        <CheckmarkBadge size={26} />
+      </DriftWrapper>
+      <DriftWrapper duration={4.2} delay={2.5} className="top-[5%] left-[50%]">
+        <CheckmarkBadge size={20} />
+      </DriftWrapper>
+
+      {/* Percent badge */}
+      <DriftWrapper duration={5.6} delay={0.3} className="bottom-[15%] right-[30%] rotate-3">
+        <PercentBadge size={26} />
       </DriftWrapper>
     </div>
   )

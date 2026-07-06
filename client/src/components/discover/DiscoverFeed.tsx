@@ -106,7 +106,7 @@ export default function DiscoverFeed() {
       <div>
         <h1 className="font-display text-h2 text-ink text-wrap-balance">Discover</h1>
         {hasNoResume ? (
-          <p className="text-sm text-muted mt-1">Upload a resume to see personalized match scores and recommendations</p>
+          <p className="text-sm text-muted mt-1">Upload a resume to see match scores and recommendations</p>
         ) : (
           <p className="text-sm text-muted mt-1">
             {feedStats?.totalJobs ?? 0} roles matched

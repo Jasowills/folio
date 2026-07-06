@@ -156,7 +156,7 @@ export default function CoverLetter() {
           <div>
             <h1 className="page-title">Cover Letter</h1>
             <p className="page-subtitle">
-              Generate a tailored cover letter for any role
+              Write a cover letter for the role
             </p>
           </div>
           <Button

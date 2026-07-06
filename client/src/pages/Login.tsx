@@ -7,11 +7,9 @@ import { Input } from '../components/ui/input'
 import api from '../lib/api'
 
 const quotes = [
-  { text: 'Your resume is not a list of what you did. It is a story of what you made happen.', author: '— &Folio' },
-  { text: 'The best time to fix your resume was before you sent it. The second best time is now.', author: '— &Folio' },
-  { text: 'Every career is a work in progress. The & is never finished.', author: '— &Folio' },
-  { text: 'Recruiters scan for six seconds. Make every word earn its place.', author: '— &Folio' },
-  { text: 'Your career story is not what you have done. It is what you are building toward.', author: '— &Folio' },
+  { text: 'Recruiters scan for six seconds. Make each word earn its place.', author: '— &Folio' },
+  { text: 'The best time to fix your resume is before you send it. The second best time is now.', author: '— &Folio' },
+  { text: 'A resume is a record of what you made happen. Not what you did.', author: '— &Folio' },
 ]
 
 function ResumeIllustration() {

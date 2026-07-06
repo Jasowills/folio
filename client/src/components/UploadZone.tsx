@@ -102,7 +102,7 @@ export function UploadZone({ onFile, disabled, className }: UploadZoneProps) {
           Drop your resume here
         </p>
         <p className="text-xs text-muted mt-1">
-          We'll analyse it instantly — no account needed
+          We'll analyse it. No account needed.
         </p>
         <div className="mt-4">
           <span className="inline-flex items-center gap-1.5 text-xs font-medium text-white bg-teal px-4 py-2 rounded-md hover:bg-teal-dark transition-colors">

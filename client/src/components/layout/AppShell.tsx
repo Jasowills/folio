@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { NavLink, useLocation, useNavigate } from 'react-router-dom'
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu'
-import { IconLayoutDashboard, IconFileText, IconTargetArrow, IconMail, IconGlobe, IconMessage, IconFlask, IconChevronDown, IconUser, IconSettings, IconCreditCard, IconHelpCircle, IconLogout, IconMenu2, IconX, IconCompass } from '@tabler/icons-react'
+import { IconLayoutDashboard, IconFileText, IconTargetArrow, IconMail, IconGlobe, IconMessage, IconFlask, IconChevronDown, IconSettings, IconLogout, IconMenu2, IconX, IconCompass } from '@tabler/icons-react'
 import { useAuth } from '../../hooks/useAuth'
 import { useResumes, useDiscoverFeedStats } from '../../lib/queries'
 import { cn } from '../../lib/utils'
@@ -33,6 +33,12 @@ const navGroups = [
     items: [
       { to: '/ats', label: 'ATS Scorer', icon: IconTargetArrow },
       { to: '/interview/new', label: 'Interview Prep', icon: IconMessage },
+    ],
+  },
+  {
+    label: 'Settings',
+    items: [
+      { to: '/settings', label: 'Account', icon: IconSettings },
     ],
   },
 ]
@@ -144,27 +150,6 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
             </div>
           ))}
 
-          <div className="mt-auto pt-2">
-            <NavLink
-              to="/settings"
-              onClick={() => setMobileNavOpen(false)}
-              className={({ isActive }) =>
-                cn(
-                  'flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-all duration-150 group relative',
-                  isActive
-                    ? 'bg-teal-light text-teal font-semibold'
-                    : 'text-muted hover:text-ink hover:bg-paper-dark/50',
-                )
-              }
-            >
-              {({ isActive }) => (
-                <>
-                  <IconSettings className={cn('h-4 w-4 shrink-0', isActive ? 'text-teal' : 'text-muted group-hover:text-ink transition-colors')} />
-                  <span>Settings</span>
-                </>
-              )}
-            </NavLink>
-          </div>
         </nav>
 
         <div className="border-t border-border shrink-0">
@@ -175,14 +160,9 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                   {initials}
                 </div>
                 <div className="flex-1 min-w-0 text-left">
-                  <div className="flex items-center gap-1.5">
-                    <p className="text-sm font-medium text-ink truncate leading-tight">
-                      {user.name}
-                    </p>
-                    <span className="text-[9px] font-semibold uppercase tracking-wider bg-amber/10 text-amber px-1 py-0.5 rounded">
-                      {user.plan || 'Free'}
-                    </span>
-                  </div>
+                  <p className="text-sm font-medium text-ink truncate whitespace-nowrap">
+                    {user.name}
+                  </p>
                   <p className="text-[11px] text-muted truncate leading-tight mt-0.5">{user.email}</p>
                 </div>
                 <IconChevronDown className={cn(
@@ -196,45 +176,29 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
               <DropdownMenu.Content
                 align="start"
                 side="top"
-                sideOffset={4}
-                className="z-50 min-w-[200px] bg-surface border border-border rounded-lg shadow-lg p-1.5"
+                sideOffset={6}
+                className="z-50 w-[240px] bg-surface border border-border rounded-xl shadow-xl p-1 pb-2 origin-bottom-left"
               >
+                <div className="px-3 py-2.5 border-b border-border mb-1">
+                  <p className="text-[13px] font-medium text-ink truncate whitespace-nowrap">{user.name}</p>
+                  <p className="text-[11px] text-muted truncate">{user.email}</p>
+                </div>
                 <DropdownMenu.Item
                   onSelect={() => navigate('/settings')}
-                  className="flex items-center gap-2.5 px-3 py-2 rounded-md text-sm text-ink hover:bg-paper-dark/50 cursor-pointer outline-none transition-colors"
+                  className="flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm text-ink hover:bg-paper-dark/50 cursor-pointer outline-none transition-all duration-150 group"
                 >
-                  <IconUser className="h-3.5 w-3.5 text-muted" />
-                  Profile
+                  <IconSettings className="h-3.5 w-3.5 text-muted group-hover:text-teal transition-colors" />
+                  <span className="flex-1">Account settings</span>
+                  <span className="text-[10px] text-muted-light opacity-0 group-hover:opacity-100 transition-opacity">&rarr;</span>
                 </DropdownMenu.Item>
-                <DropdownMenu.Item
-                  onSelect={() => navigate('/settings')}
-                  className="flex items-center gap-2.5 px-3 py-2 rounded-md text-sm text-ink hover:bg-paper-dark/50 cursor-pointer outline-none transition-colors"
-                >
-                  <IconSettings className="h-3.5 w-3.5 text-muted" />
-                  Settings
-                </DropdownMenu.Item>
-                <DropdownMenu.Item
-                  onSelect={() => {}}
-                  className="flex items-center gap-2.5 px-3 py-2 rounded-md text-sm text-ink hover:bg-paper-dark/50 cursor-pointer outline-none transition-colors"
-                >
-                  <IconCreditCard className="h-3.5 w-3.5 text-muted" />
-                  Billing
-                </DropdownMenu.Item>
-                <DropdownMenu.Separator className="my-1 h-px bg-border" />
-                <DropdownMenu.Item
-                  onSelect={() => {}}
-                  className="flex items-center gap-2.5 px-3 py-2 rounded-md text-sm text-ink hover:bg-paper-dark/50 cursor-pointer outline-none transition-colors"
-                >
-                  <IconHelpCircle className="h-3.5 w-3.5 text-muted" />
-                  Help & Support
-                </DropdownMenu.Item>
-                <DropdownMenu.Separator className="my-1 h-px bg-border" />
+                <DropdownMenu.Separator className="my-1 h-px bg-border/60" />
                 <DropdownMenu.Item
                   onSelect={logout}
-                  className="flex items-center gap-2.5 px-3 py-2 rounded-md text-sm text-danger hover:bg-danger-light cursor-pointer outline-none transition-colors"
+                  className="flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm text-danger hover:bg-danger-light/50 cursor-pointer outline-none transition-all duration-150 group"
                 >
                   <IconLogout className="h-3.5 w-3.5" />
-                  Sign out
+                  <span className="flex-1">Sign out</span>
+                  <span className="text-[10px] text-danger/40 opacity-0 group-hover:opacity-100 transition-opacity">&rarr;</span>
                 </DropdownMenu.Item>
               </DropdownMenu.Content>
             </DropdownMenu.Portal>

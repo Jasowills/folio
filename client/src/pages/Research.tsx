@@ -667,7 +667,7 @@ export default function Research() {
                   <IconMail className="h-8 w-8 text-teal" />
                   <div className="flex-1">
                     <p className="text-sm font-medium text-ink">Write a cover letter</p>
-                    <p className="text-xs text-muted mt-1">Generate a letter that references what they're actually building</p>
+                    <p className="text-xs text-muted mt-1">Generate a letter that references what they build</p>
                   </div>
                   <Button
                     variant="ghost"

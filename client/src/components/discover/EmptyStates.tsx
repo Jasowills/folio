@@ -60,7 +60,7 @@ export default function EmptyStates({ type, lastCrawledAt, onLowerScore, onExten
         </div>
         <h2 className="font-display text-h4 text-ink mb-2">Upload your resume to get started</h2>
         <p className="text-sm text-muted max-w-md mb-6 leading-relaxed">
-          Discover matches jobs to your skills and experience. Upload a PDF or DOCX to see match scores, skill gaps, and personalized recommendations.
+          Discover matches jobs to your skills and experience. Upload a PDF or DOCX to see match scores, skill gaps, and recommendations.
         </p>
         <button
           onClick={onUploadResume}

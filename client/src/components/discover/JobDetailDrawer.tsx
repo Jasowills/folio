@@ -113,7 +113,7 @@ export default function JobDetailDrawer({ app, onClose }: JobDetailDrawerProps) 
             </div>
             <div className="space-y-1.5">
               <ChecklistItem
-                label="Tailor your resume for this role"
+                label="Rewrite your resume for this role"
                 checked={checklist.resumeTailored}
                 onToggle={(v) => handleChecklistToggle('resumeTailored', v)}
               />

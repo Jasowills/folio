@@ -8,10 +8,10 @@ import { Button } from '../components/ui/button'
 import { IconFileText, IconTargetArrow, IconMail, IconGlobe, IconArrowRight, IconAlertTriangle, IconTrendingUp, IconBulb, IconBolt, IconUpload, IconSparkles, IconUser, IconStar, IconTags } from '@tabler/icons-react'
 
 const GREETINGS = [
-  { start: 6, end: 12, text: 'Good morning', icon: IconSparkles, subtitle: 'Ready to tell your career story today?' },
-  { start: 12, end: 17, text: 'Good afternoon', icon: IconTrendingUp, subtitle: 'Keep building — opportunities don\'t wait.' },
-  { start: 17, end: 22, text: 'Good evening', icon: IconBulb, subtitle: 'Perfect time to polish your resume.' },
-  { start: 22, end: 6, text: 'Working late', icon: IconBolt, subtitle: 'Dedication looks great on a resume.' },
+  { start: 6, end: 12, text: 'Good morning', icon: IconSparkles, subtitle: 'Time to work on your resume.' },
+  { start: 12, end: 17, text: 'Good afternoon', icon: IconTrendingUp, subtitle: 'Keep your resume updated.' },
+  { start: 17, end: 22, text: 'Good evening', icon: IconBulb, subtitle: 'Good time to polish your resume.' },
+  { start: 22, end: 6, text: 'Working late', icon: IconBolt, subtitle: 'Dedication shows.' },
 ]
 
 function useGreeting() {
@@ -557,7 +557,7 @@ export default function Dashboard() {
                     bg: 'bg-teal-light',
                     color: 'text-teal',
                     title: 'Generate cover letter',
-                    desc: 'Tailor a letter in under a minute.',
+                    desc: 'Write a letter in under a minute.',
                   },
                   {
                     show: !!latestResume,
@@ -566,7 +566,7 @@ export default function Dashboard() {
                     bg: 'bg-purple-500/10',
                     color: 'text-purple',
                     title: 'Review suggestions',
-                    desc: 'Fix red flags and boost your score.',
+                    desc: 'Fix weak spots and raise your score.',
                   },
                 ]
                   .filter((s) => s.show)

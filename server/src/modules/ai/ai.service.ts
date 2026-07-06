@@ -203,7 +203,12 @@ export class AiService {
     const inFlight = this.cache.getPending(cacheKey);
     if (inFlight) {
       this.logger.debug('Dedup: waiting for in-flight request');
-      return inFlight;
+      const result = await Promise.race([
+        inFlight,
+        new Promise<null>((r) => setTimeout(() => r(null), 15_000)),
+      ]);
+      if (result) return result;
+      this.logger.debug('Dedup: in-flight request timed out, making new call');
     }
 
     const promise = this.callAi(system, user, model);
@@ -330,12 +335,12 @@ export class AiService {
       return await this.callOpenRouter(model, messages, maxTokens);
     } catch (err) {
       const msg = (err as Error)?.message || String(err);
-      const is429 = msg.includes('429');
-      if (is429) {
-        this.setCooldown(key, CIRCUIT_BREAKER_TTL);
+      this.setCooldown(key, CIRCUIT_BREAKER_TTL);
+      if (msg.includes('429') || msg.includes('402')) {
         this.logger.warn(`${provider}/${model} rate-limited, circuit open for 30s`);
+      } else {
+        this.logger.warn(`${provider}/${model} error: ${msg}`);
       }
-      if (!is429) this.logger.warn(`${provider}/${model} error: ${msg}`);
       return null;
     }
   }
@@ -361,22 +366,28 @@ export class AiService {
       const r1 = await this.tryProvider(primaryProvider, primaryModel, messages, tokens);
       if (valid(r1)) return r1;
 
-      // If Ollama is primary, try OpenRouter as fallback
+      // If Ollama is primary, try Groq next (OpenRouter consistently 402s)
       if (usesOllama) {
-        const r2 = await this.tryProvider('openrouter', this.openrouterDefaultModel, messages, tokens);
-        if (valid(r2)) return r2;
-      }
-
-      // Try OpenRouter fallback model
-      const r3 = await this.tryProvider('openrouter', fallbackModel, messages, tokens);
-      if (valid(r3)) return r3;
-
-      // Try Groq as tertiary fallback
-      if (this.groqConfigured) {
-        const r4 = await this.tryProvider('groq', this.groqDefaultModel, messages, tokens);
+        if (this.groqConfigured) {
+          const r2 = await this.tryProvider('groq', this.groqDefaultModel, messages, tokens);
+          if (valid(r2)) return r2;
+          const r3 = await this.tryProvider('groq', this.groqFallbackModel, messages, tokens);
+          if (valid(r3)) return r3;
+        }
+        const r4 = await this.tryProvider('openrouter', this.openrouterDefaultModel, messages, tokens);
         if (valid(r4)) return r4;
-        const r5 = await this.tryProvider('groq', this.groqFallbackModel, messages, tokens);
+        const r5 = await this.tryProvider('openrouter', fallbackModel, messages, tokens);
         if (valid(r5)) return r5;
+      } else {
+        // OpenRouter is primary — try Groq before OpenRouter fallback
+        const r2 = await this.tryProvider('openrouter', fallbackModel, messages, tokens);
+        if (valid(r2)) return r2;
+        if (this.groqConfigured) {
+          const r3 = await this.tryProvider('groq', this.groqDefaultModel, messages, tokens);
+          if (valid(r3)) return r3;
+          const r4 = await this.tryProvider('groq', this.groqFallbackModel, messages, tokens);
+          if (valid(r4)) return r4;
+        }
       }
 
       if (attempt < 3) {
@@ -396,7 +407,7 @@ export class AiService {
   ): Promise<string> {
     const url = `${this.openrouterBaseUrl}/chat/completions`;
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 30_000);
+    const timeout = setTimeout(() => controller.abort(), 60_000);
 
     const finish = () => clearTimeout(timeout);
 
@@ -456,7 +467,7 @@ export class AiService {
   ): Promise<string> {
       const url = `${this.groqBaseUrl}/chat/completions`;
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 15_000);
+    const timeout = setTimeout(() => controller.abort(), 60_000);
 
     const finish = () => clearTimeout(timeout);
 

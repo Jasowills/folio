@@ -351,28 +351,35 @@ export class ResumesService {
 
     const stagger = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
-    const roleResult = await this.aiService.chat(
-      ROLE_DETECTION_SYSTEM,
-      `${TODAY} Analyze this resume for target role:\n${JSON.stringify(structured)}`,
-    ).catch(() => ({}));
-    const detectedRole = (roleResult as any)?.role || 'unknown';
-    const seniority = (roleResult as any)?.seniority || 'mid';
+    // Extract role from parsed experience instead of AI guessing
+    const currentEntry = parsed.experience.find((e) => e.current);
+    const title = currentEntry?.title || parsed.experience[0]?.title || '';
+    const company = currentEntry?.company || parsed.experience[0]?.company || '';
+    const detectedRole = title || 'unknown';
 
-    await stagger(1000);
+    const seniority = (() => {
+      const lower = title.toLowerCase();
+      if (/^(chief|ceo|cfo|cto|coo|vice president|vp|director|head of|principal|partner|owner|founder)/.test(lower)) return 'lead';
+      if (/^(senior|sr|lead|staff|principal|architect)/.test(lower)) return 'senior';
+      if (/^(junior|jr|associate|assistant|entry|graduate|intern)/.test(lower)) return 'entry';
+      return 'mid';
+    })();
+
+    await stagger(500);
 
     const [rawRedFlagsResult, qualityResult] = await (async () => {
       const redFlagsResult = await this.aiService.chat(
         RED_FLAG_SYSTEM,
         `${linkNote}${TODAY} Detected role: ${detectedRole} (${seniority})
 Check this resume for red flags:
-Raw Text:\n${rawText.slice(0, 3000)}\n\nStructured Data:\n${JSON.stringify(structured)}`,
+Raw Text:\n${rawText.slice(0, 8000)}\n\nStructured Data:\n${JSON.stringify(structured)}`,
       ).catch(() => ({ flags: [] }));
       await stagger(1000);
       const qualityResult = await this.aiService.chat(
         RESUME_QUALITY_SYSTEM,
         `${linkNote}${TODAY} Detected target role: ${detectedRole} (${seniority})
 Evaluate the presentation quality of this resume:
-Raw Text:\n${rawText.slice(0, 5000)}\n\nStructured Data:\n${JSON.stringify(structured)}`,
+Raw Text:\n${rawText.slice(0, 10000)}\n\nStructured Data:\n${JSON.stringify(structured)}`,
       ).catch(() => ({}));
       return [redFlagsResult, qualityResult] as const;
     })();
@@ -385,11 +392,11 @@ Raw Text:\n${rawText.slice(0, 5000)}\n\nStructured Data:\n${JSON.stringify(struc
       ),
     };
 
-    this.logger.log(`guestExtractFromText: role="${(roleResult as any)?.role}", seniority="${(roleResult as any)?.seniority}", confidence=${(roleResult as any)?.confidence}`);
+    this.logger.log(`guestExtractFromText: role="${detectedRole}", seniority="${seniority}"`);
     this.logger.log(`guestExtractFromText: quality overall=${(qualityResult as any)?.overallQuality}, flags=${(redFlagsResult.flags as any[])?.length}`);
 
     const score = this.computeOverallScore(
-      (roleResult as any)?.seniority,
+      seniority,
       (redFlagsResult.flags as any[]) || [],
       (qualityResult as any)?.overallQuality,
     );
@@ -403,10 +410,10 @@ Raw Text:\n${rawText.slice(0, 5000)}\n\nStructured Data:\n${JSON.stringify(struc
       score,
       redFlags: (redFlagsResult.flags as any[]) || [],
       detectedRole: {
-        role: (roleResult as any)?.role || null,
-        seniority: (roleResult as any)?.seniority || null,
-        industries: (roleResult as any)?.industries || [],
-        confidence: (roleResult as any)?.confidence || 0,
+        role: detectedRole,
+        seniority,
+        industries: [],
+        confidence: 100,
       },
       quality: {
         layoutScore: (qualityResult as any)?.layoutScore ?? 0,
