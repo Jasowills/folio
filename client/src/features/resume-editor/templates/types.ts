@@ -20,6 +20,11 @@ export const TEMPLATE_DEFS = [
   { id: 'creative', name: 'Creative', description: 'Colorful two-column for design roles', layout: 'two-column' as const },
   { id: 'tech', name: 'Tech', description: 'Clean two-column for engineering roles', layout: 'two-column' as const },
   { id: 'academic', name: 'Academic', description: 'Serif with left-bar headings, research emphasis', layout: 'single-column' as const },
+  { id: 'charter', name: 'Charter', description: 'Dark header block, serif, small-caps headings', layout: 'single-column' as const },
+  { id: 'prestige', name: 'Prestige', description: 'Centered-line header, check bullets, sidebar', layout: 'sidebar' as const },
+  { id: 'engineer', name: 'Engineer', description: 'Monospace two-column with badge headings', layout: 'two-column' as const },
+  { id: 'contemporary', name: 'Contemporary', description: 'Top-stripe header, left-bar sections, airy', layout: 'two-column' as const },
+  { id: 'folio', name: 'Folio', description: 'Left-accent headings, display font, clean', layout: 'single-column' as const },
 ] as const
 
 export type TemplateId = (typeof TEMPLATE_DEFS)[number]['id']

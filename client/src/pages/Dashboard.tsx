@@ -159,7 +159,7 @@ export default function Dashboard() {
           </p>
           <UploadZone onFile={handleFile} />
           <Link
-            to="/resumes"
+            to="/resumes/builder"
             className="inline-block mt-5 text-sm text-teal font-medium hover:text-teal-dark transition-colors"
           >
             or build from scratch &rarr;

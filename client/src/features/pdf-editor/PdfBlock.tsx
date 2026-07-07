@@ -172,6 +172,7 @@ export default function PdfBlock({
         top: `${block.y}pt`,
         width: `${block.width}pt`,
         minHeight: `${block.height}pt`,
+
       }}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
@@ -220,33 +221,35 @@ export default function PdfBlock({
       </button>
 
       {/* Block content */}
-      <div
-        ref={ref}
-        contentEditable
-        suppressContentEditableWarning
-        role="textbox"
-        tabIndex={0}
-        onFocus={handleFocus}
-        onBlur={handleBlur}
-        onKeyDown={handleKeyDown}
-        onPaste={handlePaste}
-        className={`outline-none cursor-text transition-none ${issueClass} ${focusClass} ${debugClass}`}
-        style={{
-          fontSize: `${block.fontSize}pt`,
-          fontWeight: block.fontWeight,
-          fontStyle: block.fontStyle,
-          fontFamily: mapCanvasFont(block.fontFamily),
-          color: block.color,
-          lineHeight: 1,
-          whiteSpace: 'pre-wrap',
-          wordBreak: 'break-word',
-          padding: '1px 4px',
-          margin: 0,
-          minHeight: `${block.height}pt`,
-          borderLeft: issueClass || focusClass ? undefined : '1.5px solid transparent',
-        }}
-      >
-        {block.text}
+      <div style={{ height: `${block.height}pt`, overflow: 'hidden' }}>
+        <div
+          ref={ref}
+          contentEditable
+          suppressContentEditableWarning
+          role="textbox"
+          tabIndex={0}
+          onFocus={handleFocus}
+          onBlur={handleBlur}
+          onKeyDown={handleKeyDown}
+          onPaste={handlePaste}
+          className={`outline-none cursor-text transition-none ${issueClass} ${focusClass} ${debugClass}`}
+          style={{
+            fontSize: `${block.fontSize}pt`,
+            fontWeight: block.fontWeight,
+            fontStyle: block.fontStyle,
+            fontFamily: mapCanvasFont(block.fontFamily, block.originalFontFamily),
+            color: block.color,
+            lineHeight: block.height / block.fontSize,
+            whiteSpace: 'pre',
+            wordBreak: 'normal',
+            padding: 0,
+            margin: 0,
+            minHeight: `${block.height}pt`,
+            borderLeft: issueClass || focusClass ? undefined : '1.5px solid transparent',
+          }}
+        >
+          {block.text}
+        </div>
       </div>
 
       {/* Resize handle */}
@@ -275,7 +278,7 @@ export default function PdfBlock({
             className="absolute -top-4 left-0 bg-blue-500/80 text-white text-[8px] px-1 rounded-t font-mono whitespace-nowrap pointer-events-none"
             style={{ zIndex: 10, lineHeight: '14px' }}
           >
-            {block.fontSize}pt {block.fontFamily} w{block.fontWeight} {block.x},{block.y}
+            {block.fontSize}pt {block.originalFontFamily || block.fontFamily} w{block.fontWeight} {block.x},{block.y} h{block.height}
           </div>
           <button
             onClick={() => {

@@ -1,304 +1,565 @@
 import type { ResumeTemplate, ResumeColorTheme, TemplateStyle } from './types'
 
-// ---- SVG preview generators ----
+// ---- SVG preview helpers ----
 
-function rect(x: number, y: number, w: number, h: number, fill: string, r = 0): string {
+const _accent = 'currentColor'
+const _dk = '#1A1A2E'
+const _lt = '#E2DFD9'
+const _mut = '#9A99A6'
+const _bg = '#FAFAF8'
+
+function esc(s: string): string {
+  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
+}
+function _r(x: number, y: number, w: number, h: number, fill: string, r = 0): string {
   return `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="${r}" fill="${fill}"/>`
 }
-
-function line(x1: number, y1: number, x2: number, y2: number, stroke: string, w = 0.5): string {
+function _ln(x1: number, y1: number, x2: number, y2: number, stroke: string, w = 0.5): string {
   return `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${stroke}" stroke-width="${w}"/>`
 }
+// ---- Boilerplate content ----
 
-function contentLines(x: number, y: number, count: number, w: number, h: number, gap: number, color: string): string {
-  let out = ''
-  for (let i = 0; i < count; i++) {
-    out += rect(x, y + i * (h + gap), w, h, color, 0.5)
+const _L = 14
+const _R = 136 // right edge for text-anchor=end
+
+const SANS = 'sans-serif'
+const SERIF = 'Georgia, serif'
+
+const TXT = {
+  name: 'Your Name',
+  contact: 'Your City, ST 12345  |  (123) 456-7890  |  no_reply@example.com',
+
+  exp: 'EXPERIENCE',
+  e1_t: 'Job Title',
+  e1_c: 'Company, Location',
+  e1_d: 'MONTH 20XX \u2014 Present',
+  e1_b: 'Lorem ipsum dolor sit amet, consectetuer adipiscing',
+  e1_b2: 'Sed diam nonummy nibh euismod tincidunt ut laoreet',
+  e2_t: 'Job Title',
+  e2_c: 'Company, Location',
+  e2_d: 'MONTH 20XX \u2014 MONTH 20XX',
+  e2_b: 'Lorem ipsum dolor sit amet, consectetuer adipiscing',
+
+  edu: 'EDUCATION',
+  edu1_s: 'School Name',
+  edu1_d: 'Degree \u2014 Field of Study',
+  edu1_da: 'MONTH 20XX \u2014 MONTH 20XX',
+
+  skills: 'SKILLS',
+  s1: 'Lorem ipsum',
+  s2: 'Consectetuer',
+  s3: 'Sed diam nonummy',
+  s4: 'Laoreet dolore',
+
+  langs: 'LANGUAGES',
+  l1: 'Lorem ipsum  \u00b7  Dolor sit amet  \u00b7  Consectetuer',
+}
+
+// ---- Text helpers ----
+
+function _tx(x: number, y: number, s: number, text: string, fill = _dk, bold = false, family = SANS): string {
+  return `<text x="${x}" y="${y}" font-size="${s}" fill="${fill}" font-family="${family}"${bold ? ' font-weight="700"' : ''}>${esc(text)}</text>`
+}
+function _txU(x: number, y: number, s: number, text: string, fill = _dk, bold = false, family = SANS): string {
+  return _tx(x, y, s, text.toUpperCase(), fill, bold, family)
+}
+function _txC(x: number, y: number, s: number, text: string, fill = _dk, bold = false, family = SANS): string {
+  return `<text x="${x}" y="${y}" font-size="${s}" fill="${fill}" font-family="${family}"${bold ? ' font-weight="700"' : ''} text-anchor="middle">${esc(text)}</text>`
+}
+function _txR(x: number, y: number, s: number, text: string, fill = _dk, bold = false, family = SANS): string {
+  return `<text x="${x}" y="${y}" font-size="${s}" fill="${fill}" font-family="${family}"${bold ? ' font-weight="700"' : ''} text-anchor="end">${esc(text)}</text>`
+}
+
+// ---- Structural section builders (match actual template renderers) ----
+
+function sectionHd(x: number, y: number, text: string, color = _accent, family = SANS): string {
+  return _txU(x, y, 2.2, text, color, true, family)
+}
+function hdUnderline(y: number, x = _L): string {
+  return _r(x, y + 1, 28, 0.8, _accent)
+}
+function hdLeftBar(y: number, x = _L): string {
+  return _r(x - 3, y - 1.5, 2.5, 5, _accent)
+}
+function hdBadge(x: number, y: number, text: string, color = _accent): string {
+  const w = text.length * 2.5 + 4
+  return _r(x, y - 2.5, w, 6, color, 1) + _txC(x + w / 2, y + 1, 2, text, '#fff', true, SANS)
+}
+
+function headerBlock(y: number, centered = false, family = SANS): string {
+  if (centered) {
+    return _txC(75, y, 4, TXT.name, _dk, true, family)
+      + _txC(75, y + 5, 1.5, TXT.contact, _mut, false, family)
   }
-  return out
+  return _tx(_L, y, 4, TXT.name, _dk, true, family)
+    + _tx(_L, y + 4.5, 1.5, TXT.contact, _mut, false, family)
 }
 
-function headerBlock(h: number, color: string, w = 150): string {
-  return rect(0, 0, w, h, color)
+function expTitleRow(y: number, title: string, dates: string, family = SANS): string {
+  return _txR(_R, y, 1.4, dates, _accent, true, family)
+    + _tx(_L, y, 1.8, title, _dk, true, family)
+}
+function expCompany(y: number, company: string, family = SANS): string {
+  return _tx(_L, y, 1.5, company, _mut, false, family)
+}
+function expBullet(y: number, text: string): string {
+  return _tx(_L - 0.5, y, 1.4, '\u2022', _accent, true)
+    + _tx(_L + 2.5, y, 1.5, text, _dk)
+}
+function expEntry(y: number, title: string, company: string, dates: string, bullets: string[], family = SANS): string {
+  let o = expTitleRow(y, title, dates, family)
+  o += expCompany(y + 2.3, company, family)
+  bullets.forEach((b, i) => {
+    o += expBullet(y + 4.5 + i * 2, b)
+  })
+  return o
 }
 
-function sectionTitle(x: number, y: number, w: number, color: string): string {
-  return rect(x, y, w, 1.5, color, 0.5)
+function eduEntry(y: number, school: string, detail: string, dates: string, family = SANS): string {
+  return _txR(_R, y, 1.4, dates, _accent, true, family)
+    + _tx(_L, y, 1.8, school, _dk, true, family)
+    + _tx(_L, y + 2.3, 1.5, detail, _dk, false, family)
 }
 
-// Single column generators
+function skillsTags(y: number, skills: string[], x = _L, color = _accent): string {
+  let o = _txU(x, y, 2.2, TXT.skills, color, true, SANS)
+  let cy = y + 4
+  skills.forEach((s, i) => {
+    const w = s.length * 2 + 4
+    if (x + w > 140) { x = _L; cy += 3.5 }
+    o += _r(x, cy - 1.2, w, 3, _lt, 1)
+    o += _tx(x + 2, cy, 1.3, s, _mut)
+    x += w + 3
+  })
+  return o
+}
+
+function langsLine(y: number, x = _L): string {
+  return _txU(x, y, 2.2, TXT.langs, _accent, true, SANS)
+    + _tx(x, y + 3.5, 1.5, TXT.l1, _dk)
+}
+
+// ---- Column-aware helpers for multi-column layouts ----
+// These accept an explicit x position for the left edge of the content column
+// (instead of using the global _L = 14).
+
+function _eTR(x: number, y: number, title: string, dates: string, family = SANS): string {
+  return _txR(_R, y, 1.4, dates, _accent, true, family)
+    + _tx(x, y, 1.8, title, _dk, true, family)
+}
+function _eCO(x: number, y: number, company: string, family = SANS): string {
+  return _tx(x, y, 1.5, company, _mut, false, family)
+}
+function _eBL(x: number, y: number, text: string): string {
+  return _tx(x - 0.5, y, 1.4, '\u2022', _accent, true)
+    + _tx(x + 2.5, y, 1.5, text, _dk)
+}
+function _eEN(x: number, y: number, school: string, detail: string, dates: string, family = SANS): string {
+  return _txR(_R, y, 1.4, dates, _accent, true, family)
+    + _tx(x, y, 1.8, school, _dk, true, family)
+    + _tx(x, y + 2.3, 1.5, detail, _dk, false, family)
+}
+
+// Single column previews — 10 variants
 function singleColPreview(i: number): string {
-  const accent = 'currentColor'
-  const dark = '#1A1A2E'
-  const light = '#E0DDD7'
-  const muted = '#8E8E9A'
+  const a = _accent, d = _dk, l = _lt, m = _mut, bg = _bg
 
-  const styles = [
-    // 0: clean minimal
-    () => `${rect(15, 15, 40, 3, dark, 1)}
-${rect(15, 22, 80, 1.5, muted, 0.5)}
-${rect(15, 32, 120, 0.5, light)}
-${sectionTitle(15, 40, 50, dark)}
-${contentLines(15, 47, 3, 100, 1, 4, light)}
-${sectionTitle(15, 68, 50, dark)}
-${contentLines(15, 75, 2, 95, 1, 4, light)}
-${sectionTitle(15, 96, 50, dark)}
-${contentLines(15, 103, 2, 60, 1, 4, light)}`,
-    // 1: left accent bar
-    () => `${rect(0, 10, 3, 20, accent, 1)}
-${rect(12, 12, 100, 3, dark, 1)}
-${rect(12, 19, 70, 1.5, muted, 0.5)}
-${rect(0, 42, 3, 20, accent, 1)}
-${sectionTitle(12, 44, 40, dark)}
-${contentLines(12, 51, 3, 110, 1.5, 3, light)}
-${rect(0, 76, 3, 20, accent, 1)}
-${sectionTitle(12, 78, 40, dark)}
-${contentLines(12, 85, 2, 100, 1.5, 3, light)}`,
-    // 2: dark header
-    () => `${headerBlock(30, dark)}
-${rect(20, 8, 50, 2, '#FFFFFF', 1)}
-${rect(25, 14, 60, 1, 'rgba(255,255,255,0.5)')}
-${sectionTitle(15, 42, 50, dark)}
-${contentLines(15, 49, 3, 110, 1, 4, light)}
-${sectionTitle(15, 70, 50, dark)}
-${contentLines(15, 77, 3, 105, 1, 4, light)}
-${sectionTitle(15, 98, 50, dark)}
-${contentLines(15, 105, 2, 80, 1, 4, light)}`,
-    // 3: thin header line
-    () => `${line(15, 15, 135, 15, dark, 1.5)}
-${rect(15, 20, 80, 2, dark, 1)}
-${rect(15, 26, 50, 1, muted, 0.5)}
-${line(15, 35, 135, 35, light)}
-${sectionTitle(15, 43, 40, accent)}
-${contentLines(15, 50, 3, 110, 1, 4, light)}
-${sectionTitle(15, 71, 40, accent)}
-${contentLines(15, 78, 2, 100, 1, 4, light)}
-${sectionTitle(15, 99, 40, accent)}
-${contentLines(15, 106, 2, 70, 1, 4, light)}`,
-    // 4: spaced elegant
-    () => `${rect(20, 15, 110, 2, dark, 1)}
-${rect(20, 21, 60, 1, muted, 0.5)}
-${rect(20, 38, 35, 1.5, accent, 0.5)}
-${contentLines(20, 45, 3, 90, 1, 5, light)}
-${rect(20, 68, 35, 1.5, accent, 0.5)}
-${contentLines(20, 75, 2, 85, 1, 5, light)}
-${rect(20, 98, 35, 1.5, accent, 0.5)}
-${contentLines(20, 105, 2, 60, 1, 5, light)}`,
-    // 5: compact dense
-    () => `${rect(10, 10, 130, 2.5, dark, 1)}
-${rect(10, 16, 90, 1, muted, 0.5)}
-${rect(10, 24, 130, 0.5, light)}
-${sectionTitle(10, 30, 35, accent)}
-${contentLines(10, 35, 4, 120, 0.8, 2.5, light)}
-${sectionTitle(10, 52, 35, accent)}
-${contentLines(10, 57, 4, 115, 0.8, 2.5, light)}
-${sectionTitle(10, 74, 35, accent)}
-${contentLines(10, 79, 3, 100, 0.8, 2.5, light)}`,
-    // 6: bold accents
-    () => `${rect(0, 0, 150, 4, accent)}
-${rect(15, 15, 100, 3, dark, 1)}
-${rect(15, 22, 70, 1.5, muted, 0.5)}
-${rect(0, 35, 150, 1, light)}
-${sectionTitle(15, 43, 45, dark)}
-${contentLines(15, 50, 3, 105, 1.5, 4, light)}
-${sectionTitle(15, 73, 45, dark)}
-${contentLines(15, 80, 2, 95, 1.5, 4, light)}
-${sectionTitle(15, 103, 45, dark)}
-${contentLines(15, 110, 1, 80, 1.5, 4, light)}`,
-    // 7: centered header
-    () => `${rect(30, 12, 90, 3, dark, 1)}
-${rect(35, 19, 60, 1, muted, 0.5)}
-${line(30, 30, 120, 30, light, 0.5)}
-${sectionTitle(15, 38, 40, dark)}
-${contentLines(15, 45, 3, 110, 1, 4, light)}
-${sectionTitle(15, 66, 40, dark)}
-${contentLines(15, 73, 2, 100, 1, 4, light)}
-${sectionTitle(15, 94, 40, dark)}
-${contentLines(15, 101, 2, 70, 1, 4, light)}`,
-    // 8: journal
-    () => `${rect(15, 10, 3, 25, accent, 1)}
-${rect(22, 12, 90, 2.5, dark, 1)}
-${rect(22, 18, 60, 1.5, muted, 0.5)}
-${rect(15, 48, 3, 20, accent, 1)}
-${sectionTitle(22, 50, 45, dark)}
-${contentLines(22, 57, 3, 100, 1, 4, light)}
-${rect(15, 88, 3, 20, accent, 1)}
-${sectionTitle(22, 90, 45, dark)}
-${contentLines(22, 97, 2, 90, 1, 4, light)}`,
-    // 9: serif classic
-    () => `${rect(15, 12, 120, 4, dark, 1)}
-${rect(30, 20, 80, 1.5, muted, 0.5)}
-${line(15, 30, 135, 30, dark, 0.5)}
-${rect(15, 38, 60, 2, dark, 0.5)}
-${contentLines(15, 46, 3, 110, 1.5, 4, light)}
-${rect(15, 68, 60, 2, dark, 0.5)}
-${contentLines(15, 76, 3, 105, 1.5, 4, light)}
-${rect(15, 98, 60, 2, dark, 0.5)}
-${contentLines(15, 106, 2, 80, 1.5, 4, light)}`,
+  // Base content: header + 2 exp entries + 1 edu entry + skills tags + langs
+  function body(family = SANS): string {
+    return headerBlock(10, false, family)
+      + '\n' + sectionHd(_L, 23, TXT.exp, a, family)
+      + '\n' + expEntry(27, TXT.e1_t, TXT.e1_c, TXT.e1_d, [TXT.e1_b, TXT.e1_b2], family)
+      + '\n' + expEntry(39, TXT.e2_t, TXT.e2_c, TXT.e2_d, [TXT.e2_b], family)
+      + '\n' + sectionHd(_L, 53, TXT.edu, a, family)
+      + '\n' + eduEntry(57, TXT.edu1_s, TXT.edu1_d, TXT.edu1_da, family)
+      + '\n' + skillsTags(66, [TXT.s1, TXT.s2, TXT.s3, TXT.s4])
+      + '\n' + langsLine(82)
+  }
+
+  const variants: Array<() => string> = [
+    // 0: Clean Minimal — left name, thin underline headings
+    () => `<rect width="150" height="200" fill="${bg}"/>
+${headerBlock(10, false, SANS)}
+${_ln(14, 21, 136, 21, l)}
+${sectionHd(_L, 24, TXT.exp, a, SANS)}${hdUnderline(24)}
+${expEntry(28, TXT.e1_t, TXT.e1_c, TXT.e1_d, [TXT.e1_b, TXT.e1_b2], SANS)}
+${expEntry(40, TXT.e2_t, TXT.e2_c, TXT.e2_d, [TXT.e2_b], SANS)}
+${sectionHd(_L, 54, TXT.edu, a, SANS)}${hdUnderline(54)}
+${eduEntry(58, TXT.edu1_s, TXT.edu1_d, TXT.edu1_da, SANS)}
+${skillsTags(67, [TXT.s1, TXT.s2, TXT.s3, TXT.s4])}
+${langsLine(83)}`,
+
+    // 1: Executive — centered serif name, dark divider
+    () => `<rect width="150" height="200" fill="${bg}"/>
+${_txC(75, 10, 4.5, TXT.name, d, true, SERIF)}
+${_txC(75, 15.5, 1.5, TXT.contact, m, false, SERIF)}
+${_ln(20, 21, 130, 21, d, 0.8)}
+${sectionHd(_L, 26, TXT.exp, a, SERIF)}
+${expEntry(30, TXT.e1_t, TXT.e1_c, TXT.e1_d, [TXT.e1_b], SERIF)}
+${expEntry(42, TXT.e2_t, TXT.e2_c, TXT.e2_d, [TXT.e2_b], SERIF)}
+${sectionHd(_L, 56, TXT.edu, a, SERIF)}
+${eduEntry(60, TXT.edu1_s, TXT.edu1_d, TXT.edu1_da, SERIF)}
+${skillsTags(69, [TXT.s1, TXT.s2, TXT.s3, TXT.s4])}
+${langsLine(85)}`,
+
+    // 2: Sharp — dark header block, white name/contact
+    () => `<rect width="150" height="200" fill="${bg}"/>
+${_r(0, 0, 150, 26, d)}
+${_tx(14, 8, 4, TXT.name, '#fff', true, SANS)}
+${_tx(14, 13, 1.4, TXT.contact, 'rgba(255,255,255,0.6)', false, SANS)}
+${sectionHd(_L, 32, TXT.exp, a, SANS)}
+${expEntry(36, TXT.e1_t, TXT.e1_c, TXT.e1_d, [TXT.e1_b, TXT.e1_b2], SANS)}
+${expEntry(48, TXT.e2_t, TXT.e2_c, TXT.e2_d, [TXT.e2_b], SANS)}
+${sectionHd(_L, 62, TXT.edu, a, SANS)}
+${eduEntry(66, TXT.edu1_s, TXT.edu1_d, TXT.edu1_da, SANS)}
+${skillsTags(75, [TXT.s1, TXT.s2, TXT.s3, TXT.s4])}`,
+
+    // 3: Classic — centered name, serif, small-caps headings
+    () => `<rect width="150" height="200" fill="${bg}"/>
+${_txC(75, 10, 4, TXT.name, d, true, SERIF)}
+${_txC(75, 15, 1.5, TXT.contact, m, false, SERIF)}
+${_ln(20, 20, 130, 20, d, 0.5)}
+${_txU(_L, 25, 2, TXT.exp, d, true, SERIF)}
+${expEntry(29, TXT.e1_t, TXT.e1_c, TXT.e1_d, [TXT.e1_b], SERIF)}
+${expEntry(41, TXT.e2_t, TXT.e2_c, TXT.e2_d, [TXT.e2_b], SERIF)}
+${_txU(_L, 55, 2, TXT.edu, d, true, SERIF)}
+${eduEntry(59, TXT.edu1_s, TXT.edu1_d, TXT.edu1_da, SERIF)}
+${_txU(_L, 68, 2, TXT.skills, d, true, SERIF)}
+${_tx(_L, 72, 1.5, TXT.s1, d, false, SERIF)}
+${_tx(_L, 74.5, 1.5, TXT.s2, d, false, SERIF)}`,
+
+    // 4: Elegant — left accent bars
+    () => `<rect width="150" height="200" fill="${bg}"/>
+${headerBlock(10, false, SANS)}
+${hdLeftBar(24)}
+${sectionHd(_L, 24, TXT.exp, a, SANS)}
+${expEntry(28, TXT.e1_t, TXT.e1_c, TXT.e1_d, [TXT.e1_b], SANS)}
+${expEntry(40, TXT.e2_t, TXT.e2_c, TXT.e2_d, [TXT.e2_b], SANS)}
+${hdLeftBar(54)}
+${sectionHd(_L, 54, TXT.edu, a, SANS)}
+${eduEntry(58, TXT.edu1_s, TXT.edu1_d, TXT.edu1_da, SANS)}
+${skillsTags(67, [TXT.s1, TXT.s2, TXT.s3, TXT.s4])}
+${langsLine(83)}`,
+
+    // 5: Academic — compact, indented body, serif
+    () => `<rect width="150" height="200" fill="${bg}"/>
+${_txC(75, 10, 4.5, TXT.name, d, true, SERIF)}
+${_txC(75, 15, 1.5, TXT.contact, m, false, SERIF)}
+${_ln(14, 20, 136, 20, l, 0.3)}
+${_txU(14, 24, 2, TXT.exp, d, true, SERIF)}
+${expTitleRow(28, TXT.e1_t, TXT.e1_d, SERIF)}
+${_tx(20, 30.5, 1.5, TXT.e1_c, m, false, SERIF)}
+${expBullet(33, TXT.e1_b)}
+${expTitleRow(37, TXT.e2_t, TXT.e2_d, SERIF)}
+${_tx(20, 39.5, 1.5, TXT.e2_c, m, false, SERIF)}
+${expBullet(42, TXT.e2_b)}
+${_txU(14, 47, 2, TXT.edu, d, true, SERIF)}
+${_tx(20, 51, 1.8, TXT.edu1_s, d, true, SERIF)}
+${_tx(20, 53.5, 1.5, TXT.edu1_d, d, false, SERIF)}
+${_txR(_R, 53.5, 1.4, TXT.edu1_da, a, true, SERIF)}
+${_txU(14, 59, 2, TXT.skills, d, true, SERIF)}
+${_tx(20, 63, 1.5, TXT.s1, d, false, SERIF)}
+${_tx(20, 65.5, 1.5, TXT.s2, d, false, SERIF)}`,
+
+    // 6: Corporate — top accent stripe, clean sans
+    () => `<rect width="150" height="200" fill="${bg}"/>
+${_r(0, 0, 150, 4, a)}
+${headerBlock(11, false, SANS)}
+${_ln(14, 22, 136, 22, l, 0.3)}
+${sectionHd(_L, 25, TXT.exp, a, SANS)}${hdUnderline(25)}
+${expEntry(29, TXT.e1_t, TXT.e1_c, TXT.e1_d, [TXT.e1_b], SANS)}
+${expEntry(41, TXT.e2_t, TXT.e2_c, TXT.e2_d, [TXT.e2_b], SANS)}
+${sectionHd(_L, 55, TXT.edu, a, SANS)}${hdUnderline(55)}
+${eduEntry(59, TXT.edu1_s, TXT.edu1_d, TXT.edu1_da, SANS)}
+${skillsTags(68, [TXT.s1, TXT.s2, TXT.s3, TXT.s4])}
+${langsLine(84)}`,
+
+    // 7: Journal — left accent bar on name, serif
+    () => `<rect width="150" height="200" fill="${bg}"/>
+${_r(8, 8, 3, 12, a)}
+${_tx(14, 9, 4, TXT.name, d, true, SERIF)}
+${_tx(14, 14, 1.5, TXT.contact, m, false, SERIF)}
+${sectionHd(_L, 22, TXT.exp, a, SERIF)}
+${expEntry(26, TXT.e1_t, TXT.e1_c, TXT.e1_d, [TXT.e1_b], SERIF)}
+${expEntry(38, TXT.e2_t, TXT.e2_c, TXT.e2_d, [TXT.e2_b], SERIF)}
+${sectionHd(_L, 52, TXT.edu, a, SERIF)}
+${eduEntry(56, TXT.edu1_s, TXT.edu1_d, TXT.edu1_da, SERIF)}
+${skillsTags(65, [TXT.s1, TXT.s2, TXT.s3, TXT.s4])}
+${langsLine(81)}`,
+
+    // 8: Minimalist — extra whitespace, thin elements
+    () => `<rect width="150" height="200" fill="${bg}"/>
+${_tx(_L, 14, 3.5, TXT.name, d, true, SANS)}
+${_tx(_L, 19, 1.5, TXT.contact, m, false, SANS)}
+${hdUnderline(25)}
+${expEntry(29, TXT.e1_t, TXT.e1_c, TXT.e1_d, [TXT.e1_b], SANS)}
+${expEntry(41, TXT.e2_t, TXT.e2_c, TXT.e2_d, [TXT.e2_b], SANS)}
+${hdUnderline(55)}
+${eduEntry(59, TXT.edu1_s, TXT.edu1_d, TXT.edu1_da, SANS)}
+${_tx(_L, 68, 1.5, TXT.s1, d, false, SANS)}
+${_tx(_L, 70.5, 1.5, TXT.s2, d, false, SANS)}
+${hdUnderline(75)}
+${langsLine(79)}`,
+
+    // 9: Bold — badge-style headings
+    () => `<rect width="150" height="200" fill="${bg}"/>
+${_r(0, 0, 150, 4, a)}
+${headerBlock(11, false, SANS)}
+${hdBadge(_L, 26, TXT.exp)}
+${expEntry(32, TXT.e1_t, TXT.e1_c, TXT.e1_d, [TXT.e1_b], SANS)}
+${expEntry(44, TXT.e2_t, TXT.e2_c, TXT.e2_d, [TXT.e2_b], SANS)}
+${hdBadge(_L, 58, TXT.edu)}
+${eduEntry(64, TXT.edu1_s, TXT.edu1_d, TXT.edu1_da, SANS)}
+${hdBadge(_L, 74, TXT.skills)}
+${_tx(_L, 80, 1.5, TXT.s1, d, false, SANS)}
+${_tx(_L, 82.5, 1.5, TXT.s2, d, false, SANS)}
+${hdBadge(_L, 88, TXT.langs)}
+${_tx(_L, 94, 1.5, TXT.l1, d)}`,
   ]
 
-  const fn = styles[i % styles.length]
+  const fn = variants[i % variants.length]
   return `<svg viewBox="0 0 150 200" xmlns="http://www.w3.org/2000/svg">${fn()}</svg>`
 }
 
+// Two-column previews — 6 layouts
 function twoColPreview(i: number): string {
-  const accent = 'currentColor'
-  const dark = '#1A1A2E'
-  const light = '#E0DDD7'
-  const muted = '#8E8E9A'
-  const sideBg = '#F5F2ED'
+  const a = _accent, d = _dk, m = _mut, bg = _bg
 
-  const styles = [
-    // 0: left sidebar
-    () => `${rect(0, 0, 50, 200, sideBg)}
-${rect(10, 12, 30, 2, accent, 1)}
-${contentLines(10, 18, 3, 25, 0.8, 3, muted)}
-${rect(10, 38, 30, 2, accent, 1)}
-${contentLines(10, 44, 4, 28, 0.8, 2, muted)}
-${rect(58, 12, 80, 3, dark, 1)}
-${rect(58, 19, 55, 1.5, muted, 0.5)}
-${sectionTitle(58, 32, 40, accent)}
-${contentLines(58, 39, 3, 75, 1.5, 4, light)}
-${sectionTitle(58, 62, 40, accent)}
-${contentLines(58, 69, 2, 70, 1.5, 4, light)}`,
-    // 1: even split
-    () => `${rect(0, 0, 72, 200, '#FAFAFA')}
-${rect(10, 12, 50, 2, dark, 1)}
-${contentLines(10, 18, 2, 45, 1, 4, light)}
-${sectionTitle(10, 35, 35, accent)}
-${contentLines(10, 42, 4, 50, 1, 3, light)}
-${rect(78, 12, 65, 2, dark, 1)}
-${rect(78, 18, 45, 1, muted, 0.5)}
-${sectionTitle(78, 32, 40, accent)}
-${contentLines(78, 39, 3, 55, 1.5, 4, light)}
-${sectionTitle(78, 62, 40, accent)}
-${contentLines(78, 69, 2, 50, 1.5, 4, light)}`,
-    // 2: accent sidebar
-    () => `${rect(0, 0, 48, 200, accent)}
-${rect(8, 10, 32, 2, '#FFFFFF', 1)}
-${contentLines(8, 16, 3, 28, 0.8, 3, 'rgba(255,255,255,0.4)')}
-${rect(8, 36, 32, 2, '#FFFFFF', 1)}
-${contentLines(8, 42, 3, 30, 0.8, 2.5, 'rgba(255,255,255,0.4)')}
-${rect(54, 12, 85, 3, dark, 1)}
-${rect(54, 19, 60, 1.5, muted, 0.5)}
-${sectionTitle(54, 32, 40, accent)}
-${contentLines(54, 39, 3, 80, 1.5, 4, light)}
-${sectionTitle(54, 62, 40, accent)}
-${contentLines(54, 69, 2, 70, 1.5, 4, light)}`,
-    // 3: right sidebar
-    () => `${rect(100, 0, 50, 200, sideBg)}
-${rect(108, 12, 35, 2, accent, 1)}
-${contentLines(108, 18, 3, 30, 0.8, 3, muted)}
-${rect(108, 38, 35, 2, accent, 1)}
-${contentLines(108, 44, 4, 32, 0.8, 2, muted)}
-${rect(15, 12, 75, 3, dark, 1)}
-${rect(15, 19, 55, 1.5, muted, 0.5)}
-${sectionTitle(15, 32, 40, accent)}
-${contentLines(15, 39, 3, 70, 1.5, 4, light)}
-${sectionTitle(15, 62, 40, accent)}
-${contentLines(15, 69, 2, 65, 1.5, 4, light)}`,
-    // 4: narrow sidebar
-    () => `${rect(0, 0, 38, 200, '#1A1A2E')}
-${rect(8, 10, 22, 1.5, '#FFFFFF', 1)}
-${contentLines(8, 15, 2, 20, 0.7, 3, 'rgba(255,255,255,0.3)')}
-${rect(8, 28, 22, 1.5, '#FFFFFF', 1)}
-${contentLines(8, 33, 3, 20, 0.7, 2.5, 'rgba(255,255,255,0.3)')}
-${rect(44, 12, 95, 3, dark, 1)}
-${rect(44, 19, 65, 1.5, muted, 0.5)}
-${sectionTitle(44, 32, 40, accent)}
-${contentLines(44, 39, 3, 85, 1.5, 4, light)}
-${sectionTitle(44, 62, 40, accent)}
-${contentLines(44, 69, 2, 75, 1.5, 4, light)}`,
-    // 5: thirds
-    () => `${rect(0, 0, 50, 200, sideBg)}
-${rect(58, 12, 80, 3, dark, 1)}
-${rect(58, 19, 55, 1.5, muted, 0.5)}
-${rect(8, 12, 34, 1.5, accent, 0.5)}
-${contentLines(8, 18, 2, 32, 1, 4, muted)}
-${sectionTitle(58, 34, 40, accent)}
-${contentLines(58, 41, 3, 75, 1.5, 4, light)}
-${sectionTitle(58, 64, 40, accent)}
-${contentLines(58, 71, 2, 70, 1.5, 4, light)}
-${rect(8, 34, 34, 1.5, accent, 0.5)}
-${contentLines(8, 40, 3, 30, 1, 3, muted)}`,
+  const variants: Array<() => string> = [
+    // 0: Left sidebar (~32%) — warm panel, centered header
+    () => `<rect width="150" height="200" fill="${bg}"/>
+${_r(0, 0, 48, 200, '#F4F1EB')}
+${_txC(75, 8, 4, TXT.name, d, true, SANS)}
+${_txC(75, 12, 1.4, TXT.contact, m, false, SANS)}
+${_txU(6, 20, 1.8, TXT.skills, a, true)}
+${_tx(6, 24, 1.4, TXT.s1, m)}${_tx(6, 26.5, 1.4, TXT.s2, m)}${_tx(6, 29, 1.4, TXT.s3, m)}
+${_txU(6, 34, 1.8, TXT.langs, a, true)}
+${_tx(6, 38, 1.4, TXT.l1, m)}
+${sectionHd(54, 20, TXT.exp, a, SANS)}
+${_eTR(54, 24, TXT.e1_t, TXT.e1_d, SANS)}
+${_eCO(54, 26.5, TXT.e1_c, SANS)}
+${_eBL(54, 29, TXT.e1_b)}${_eBL(54, 31, TXT.e1_b2)}
+${_eTR(54, 35, TXT.e2_t, TXT.e2_d, SANS)}
+${_eCO(54, 37.5, TXT.e2_c, SANS)}
+${_eBL(54, 40, TXT.e2_b)}
+${sectionHd(54, 45, TXT.edu, a, SANS)}
+${_eEN(54, 49, TXT.edu1_s, TXT.edu1_d, TXT.edu1_da, SANS)}`,
+
+    // 1: Even split (~49/49), centered header
+    () => `<rect width="150" height="200" fill="${bg}"/>
+${_r(0, 0, 73, 200, '#F8F8F6')}
+${_txC(75, 8, 4, TXT.name, d, true, SANS)}
+${_txC(75, 12, 1.4, TXT.contact, m, false, SANS)}
+${_txU(6, 20, 1.8, TXT.skills, a, true)}
+${_tx(6, 24, 1.4, TXT.s1, m)}${_tx(6, 26.5, 1.4, TXT.s2, m)}${_tx(6, 29, 1.4, TXT.s3, m)}
+${_txU(6, 34, 1.8, TXT.langs, a, true)}
+${_tx(6, 38, 1.4, TXT.l1, m)}
+${sectionHd(78, 20, TXT.exp, a, SANS)}
+${_eTR(78, 24, TXT.e1_t, TXT.e1_d, SANS)}
+${_eCO(78, 26.5, TXT.e1_c, SANS)}
+${_eBL(78, 29, TXT.e1_b)}
+${_eTR(78, 33, TXT.e2_t, TXT.e2_d, SANS)}
+${_eCO(78, 35.5, TXT.e2_c, SANS)}
+${_eBL(78, 38, TXT.e2_b)}
+${sectionHd(78, 43, TXT.edu, a, SANS)}
+${_eEN(78, 47, TXT.edu1_s, TXT.edu1_d, TXT.edu1_da, SANS)}`,
+
+    // 2: Accent colored left sidebar, name in sidebar
+    () => `<rect width="150" height="200" fill="${bg}"/>
+${_r(0, 0, 48, 200, a)}
+${_tx(6, 10, 3.5, TXT.name, '#fff', true, SANS)}
+${_tx(6, 14.5, 1.4, TXT.contact, 'rgba(255,255,255,0.7)', false, SANS)}
+${_txU(6, 22, 1.8, TXT.skills, '#fff', true)}
+${_tx(6, 26, 1.4, TXT.s1, 'rgba(255,255,255,0.8)')}${_tx(6, 28.5, 1.4, TXT.s2, 'rgba(255,255,255,0.8)')}
+${_txU(6, 36, 1.8, TXT.langs, '#fff', true)}
+${_tx(6, 40, 1.4, TXT.l1, 'rgba(255,255,255,0.8)')}
+${sectionHd(54, 20, TXT.exp, a, SANS)}
+${_eTR(54, 24, TXT.e1_t, TXT.e1_d, SANS)}
+${_eCO(54, 26.5, TXT.e1_c, SANS)}
+${_eBL(54, 29, TXT.e1_b)}
+${_eTR(54, 33, TXT.e2_t, TXT.e2_d, SANS)}
+${_eCO(54, 35.5, TXT.e2_c, SANS)}
+${_eBL(54, 38, TXT.e2_b)}
+${sectionHd(54, 43, TXT.edu, a, SANS)}
+${_eEN(54, 47, TXT.edu1_s, TXT.edu1_d, TXT.edu1_da, SANS)}`,
+
+    // 3: Right sidebar — reversed, centered header
+    () => `<rect width="150" height="200" fill="${bg}"/>
+${_r(100, 0, 50, 200, '#F4F1EB')}
+${_txC(75, 8, 4, TXT.name, d, true, SANS)}
+${_txC(75, 12, 1.4, TXT.contact, m, false, SANS)}
+${_txU(104, 20, 1.8, TXT.skills, a, true)}
+${_tx(104, 24, 1.4, TXT.s1, m)}${_tx(104, 26.5, 1.4, TXT.s2, m)}
+${_txU(104, 33, 1.8, TXT.langs, a, true)}
+${_tx(104, 37, 1.4, TXT.l1, m)}
+${sectionHd(12, 20, TXT.exp, a, SANS)}
+${_eTR(12, 24, TXT.e1_t, TXT.e1_d, SANS)}
+${_eCO(12, 26.5, TXT.e1_c, SANS)}
+${_eBL(12, 29, TXT.e1_b)}${_eBL(12, 31, TXT.e1_b2)}
+${_eTR(12, 35, TXT.e2_t, TXT.e2_d, SANS)}
+${_eCO(12, 37.5, TXT.e2_c, SANS)}
+${_eBL(12, 40, TXT.e2_b)}
+${sectionHd(12, 45, TXT.edu, a, SANS)}
+${_eEN(12, 49, TXT.edu1_s, TXT.edu1_d, TXT.edu1_da, SANS)}`,
+
+    // 4: Narrow dark sidebar (24%), name in sidebar
+    () => `<rect width="150" height="200" fill="${bg}"/>
+${_r(0, 0, 36, 200, d)}
+${_tx(4, 10, 3, TXT.name, '#fff', true, SANS)}
+${_tx(4, 14, 1.2, TXT.contact, 'rgba(255,255,255,0.5)', false, SANS)}
+${_txU(4, 21, 1.6, TXT.skills, '#fff', true)}
+${_tx(4, 24.5, 1.2, TXT.s1, 'rgba(255,255,255,0.6)')}${_tx(4, 26.5, 1.2, TXT.s2, 'rgba(255,255,255,0.6)')}
+${_txU(4, 32, 1.6, TXT.langs, '#fff', true)}
+${_tx(4, 35.5, 1.2, TXT.l1, 'rgba(255,255,255,0.6)')}
+${sectionHd(42, 20, TXT.exp, a, SANS)}
+${_eTR(42, 24, TXT.e1_t, TXT.e1_d, SANS)}
+${_eCO(42, 26.5, TXT.e1_c, SANS)}
+${_eBL(42, 29, TXT.e1_b)}
+${_eTR(42, 33, TXT.e2_t, TXT.e2_d, SANS)}
+${_eCO(42, 35.5, TXT.e2_c, SANS)}
+${_eBL(42, 38, TXT.e2_b)}`,
+
+    // 5: Thirds — balanced 1/3 + 2/3, centered header
+    () => `<rect width="150" height="200" fill="${bg}"/>
+${_r(0, 0, 50, 200, '#F8F8F6')}
+${_txC(75, 8, 4, TXT.name, d, true, SANS)}
+${_txC(75, 12, 1.4, TXT.contact, m, false, SANS)}
+${_txU(6, 20, 1.8, TXT.skills, a, true)}
+${_tx(6, 24, 1.4, TXT.s1, m)}${_tx(6, 26.5, 1.4, TXT.s2, m)}${_tx(6, 29, 1.4, TXT.s3, m)}
+${_txU(6, 34, 1.8, TXT.langs, a, true)}
+${_tx(6, 38, 1.4, TXT.l1, m)}
+${sectionHd(56, 20, TXT.exp, a, SANS)}
+${_eTR(56, 24, TXT.e1_t, TXT.e1_d, SANS)}
+${_eCO(56, 26.5, TXT.e1_c, SANS)}
+${_eBL(56, 29, TXT.e1_b)}`,
   ]
 
-  const fn = styles[i % styles.length]
+  const fn = variants[i % variants.length]
   return `<svg viewBox="0 0 150 200" xmlns="http://www.w3.org/2000/svg">${fn()}</svg>`
 }
 
+// Sidebar previews — 6 layouts
 function sidebarPreview(i: number): string {
-  const accent = 'currentColor'
-  const dark = '#1A1A2E'
-  const light = '#E0DDD7'
-  const muted = '#8E8E9A'
-  const sideBg = '#F5F2ED'
+  const a = _accent, d = _dk, l = _lt, m = _mut, bg = _bg
 
-  const styles = [
-    // 0: classic sidebar
-    () => `${rect(0, 0, 45, 200, sideBg)}
-${rect(8, 12, 28, 2, accent, 1)}
-${contentLines(8, 18, 4, 25, 0.8, 3, muted)}
-${rect(8, 40, 28, 2, accent, 1)}
-${contentLines(8, 46, 3, 28, 0.8, 2.5, muted)}
-${rect(52, 12, 85, 3, dark, 1)}
-${rect(52, 19, 60, 1.5, muted, 0.5)}
-${sectionTitle(52, 32, 40, accent)}
-${contentLines(52, 39, 3, 75, 1.5, 4, light)}
-${sectionTitle(52, 62, 40, accent)}
-${contentLines(52, 69, 2, 70, 1.5, 4, light)}`,
-    // 1: minimal sidebar
-    () => `${rect(0, 0, 42, 200, '#FFFFFF')}
-${line(42, 10, 42, 190, light)}
-${rect(10, 12, 22, 1.5, accent, 0.5)}
-${contentLines(10, 17, 3, 20, 0.7, 3, muted)}
-${rect(10, 34, 22, 1.5, accent, 0.5)}
-${contentLines(10, 39, 4, 22, 0.7, 2.5, muted)}
-${rect(50, 12, 88, 2.5, dark, 1)}
-${rect(50, 18, 60, 1.5, muted, 0.5)}
-${sectionTitle(50, 30, 40, accent)}
-${contentLines(50, 37, 3, 78, 1.5, 4, light)}
-${sectionTitle(50, 60, 40, accent)}
-${contentLines(50, 67, 2, 72, 1.5, 4, light)}`,
-    // 2: dark sidebar
-    () => `${rect(0, 0, 48, 200, dark)}
-${rect(10, 12, 28, 1.5, '#FFFFFF', 0.5)}
-${contentLines(10, 17, 3, 25, 0.7, 3, 'rgba(255,255,255,0.3)')}
-${rect(10, 36, 28, 1.5, '#FFFFFF', 0.5)}
-${contentLines(10, 41, 4, 25, 0.7, 2.5, 'rgba(255,255,255,0.3)')}
-${rect(54, 12, 85, 3, dark, 1)}
-${rect(54, 19, 60, 1.5, muted, 0.5)}
-${sectionTitle(54, 32, 40, accent)}
-${contentLines(54, 39, 3, 75, 1.5, 4, light)}
-${sectionTitle(54, 62, 40, accent)}
-${contentLines(54, 69, 2, 70, 1.5, 4, light)}`,
-    // 3: accent sidebar top
-    () => `${rect(0, 0, 150, 8, accent)}
-${rect(0, 8, 150, 3, dark)}
-${rect(8, 16, 30, 1.5, '#FFFFFF', 0.5)}
-${rect(8, 21, 22, 0.8, 'rgba(255,255,255,0.4)')}
-${rect(48, 16, 90, 2, '#FFFFFF', 1)}
-${rect(48, 22, 60, 1, 'rgba(255,255,255,0.4)')}
-${rect(8, 38, 32, 1.5, accent, 0.5)}
-${contentLines(8, 44, 4, 28, 0.8, 3, muted)}
-${rect(48, 38, 90, 1, light)}
-${sectionTitle(48, 46, 40, accent)}
-${contentLines(48, 53, 3, 78, 1.5, 4, light)}
-${sectionTitle(48, 76, 40, accent)}
-${contentLines(48, 83, 2, 70, 1.5, 4, light)}`,
-    // 4: colored side panel
-    () => `${rect(0, 0, 45, 200, accent)}
-${rect(8, 10, 28, 2, '#FFFFFF', 1)}
-${contentLines(8, 16, 5, 25, 0.7, 3, 'rgba(255,255,255,0.35)')}
-${rect(52, 12, 85, 3, dark, 1)}
-${rect(52, 19, 60, 1.5, muted, 0.5)}
-${sectionTitle(52, 34, 40, accent)}
-${contentLines(52, 41, 3, 75, 1.5, 4, light)}
-${sectionTitle(52, 64, 40, accent)}
-${contentLines(52, 71, 2, 68, 1.5, 4, light)}`,
+  const variants: Array<() => string> = [
+    // 0: Classic warm sidebar, centered header
+    () => `<rect width="150" height="200" fill="${bg}"/>
+${_r(0, 0, 44, 200, '#F4F1EB')}
+${_txC(75, 8, 4, TXT.name, d, true, SANS)}
+${_txC(75, 12, 1.4, TXT.contact, m, false, SANS)}
+${_txU(6, 20, 1.8, TXT.skills, a, true)}
+${_tx(6, 24, 1.4, TXT.s1, m)}${_tx(6, 26.5, 1.4, TXT.s2, m)}${_tx(6, 29, 1.4, TXT.s3, m)}
+${_txU(6, 34, 1.8, TXT.langs, a, true)}
+${_tx(6, 38, 1.4, TXT.l1, m)}
+${sectionHd(50, 20, TXT.exp, a, SANS)}
+${_eTR(50, 24, TXT.e1_t, TXT.e1_d, SANS)}
+${_eCO(50, 26.5, TXT.e1_c, SANS)}
+${_eBL(50, 29, TXT.e1_b)}${_eBL(50, 31, TXT.e1_b2)}
+${_eTR(50, 35, TXT.e2_t, TXT.e2_d, SANS)}
+${_eCO(50, 37.5, TXT.e2_c, SANS)}
+${_eBL(50, 40, TXT.e2_b)}
+${sectionHd(50, 45, TXT.edu, a, SANS)}
+${_eEN(50, 49, TXT.edu1_s, TXT.edu1_d, TXT.edu1_da, SANS)}`,
+
+    // 1: Minimal — thin divider line, centered header
+    () => `<rect width="150" height="200" fill="${bg}"/>
+${_r(0, 0, 42, 200, '#fff')}
+${_ln(42, 4, 42, 196, l)}
+${_txC(75, 8, 4, TXT.name, d, true, SANS)}
+${_txC(75, 12, 1.4, TXT.contact, m, false, SANS)}
+${_txU(5, 20, 1.8, TXT.skills, a, true)}
+${_tx(5, 24, 1.4, TXT.s1, m)}${_tx(5, 26.5, 1.4, TXT.s2, m)}
+${_txU(5, 34, 1.8, TXT.langs, a, true)}
+${_tx(5, 38, 1.4, TXT.l1, m)}
+${sectionHd(48, 20, TXT.exp, a, SANS)}
+${_eTR(48, 24, TXT.e1_t, TXT.e1_d, SANS)}
+${_eCO(48, 26.5, TXT.e1_c, SANS)}
+${_eBL(48, 29, TXT.e1_b)}
+${_eTR(48, 33, TXT.e2_t, TXT.e2_d, SANS)}
+${_eCO(48, 35.5, TXT.e2_c, SANS)}
+${_eBL(48, 38, TXT.e2_b)}
+${sectionHd(48, 43, TXT.edu, a, SANS)}
+${_eEN(48, 47, TXT.edu1_s, TXT.edu1_d, TXT.edu1_da, SANS)}`,
+
+    // 2: Dark sidebar — black panel, name in sidebar
+    () => `<rect width="150" height="200" fill="${bg}"/>
+${_r(0, 0, 48, 200, d)}
+${_tx(6, 10, 3.5, TXT.name, '#fff', true, SANS)}
+${_tx(6, 14.5, 1.4, TXT.contact, 'rgba(255,255,255,0.5)', false, SANS)}
+${_txU(6, 22, 1.8, TXT.skills, '#fff', true)}
+${_tx(6, 26, 1.4, TXT.s1, 'rgba(255,255,255,0.6)')}${_tx(6, 28.5, 1.4, TXT.s2, 'rgba(255,255,255,0.6)')}
+${_txU(6, 36, 1.8, TXT.langs, '#fff', true)}
+${_tx(6, 40, 1.4, TXT.l1, 'rgba(255,255,255,0.6)')}
+${sectionHd(54, 20, TXT.exp, a, SANS)}
+${_eTR(54, 24, TXT.e1_t, TXT.e1_d, SANS)}
+${_eCO(54, 26.5, TXT.e1_c, SANS)}
+${_eBL(54, 29, TXT.e1_b)}${_eBL(54, 31, TXT.e1_b2)}
+${_eTR(54, 35, TXT.e2_t, TXT.e2_d, SANS)}
+${_eCO(54, 37.5, TXT.e2_c, SANS)}
+${_eBL(54, 40, TXT.e2_b)}
+${sectionHd(54, 45, TXT.edu, a, SANS)}
+${_eEN(54, 49, TXT.edu1_s, TXT.edu1_d, TXT.edu1_da, SANS)}`,
+
+    // 3: Top accent bar + sidebar, name in top bar
+    () => `<rect width="150" height="200" fill="${bg}"/>
+${_r(0, 0, 150, 8, a)}
+${_r(0, 8, 150, 3, d)}
+${_tx(6, 14, 3.5, TXT.name, '#fff', true, SANS)}
+${_tx(6, 18.5, 1.4, TXT.contact, 'rgba(255,255,255,0.6)', false, SANS)}
+${_txU(6, 26, 1.8, TXT.skills, '#fff', true)}
+${_tx(6, 30, 1.4, TXT.s1, d)}${_tx(6, 32.5, 1.4, TXT.s2, d)}
+${_txU(6, 39, 1.8, TXT.langs, '#fff', true)}
+${_tx(6, 43, 1.4, TXT.l1, d)}
+${sectionHd(54, 24, TXT.exp, a, SANS)}
+${_eTR(54, 28, TXT.e1_t, TXT.e1_d, SANS)}
+${_eCO(54, 30.5, TXT.e1_c, SANS)}
+${_eBL(54, 33, TXT.e1_b)}
+${_eTR(54, 37, TXT.e2_t, TXT.e2_d, SANS)}
+${_eCO(54, 39.5, TXT.e2_c, SANS)}
+${_eBL(54, 42, TXT.e2_b)}`,
+
+    // 4: Colored accent sidebar, name in sidebar
+    () => `<rect width="150" height="200" fill="${bg}"/>
+${_r(0, 0, 46, 200, a)}
+${_tx(6, 10, 3.5, TXT.name, '#fff', true, SANS)}
+${_tx(6, 14.5, 1.4, TXT.contact, 'rgba(255,255,255,0.7)', false, SANS)}
+${_txU(6, 22, 1.8, TXT.skills, '#fff', true)}
+${_tx(6, 26, 1.4, TXT.s1, 'rgba(255,255,255,0.8)')}${_tx(6, 28.5, 1.4, TXT.s2, 'rgba(255,255,255,0.8)')}
+${_txU(6, 36, 1.8, TXT.langs, '#fff', true)}
+${_tx(6, 40, 1.4, TXT.l1, 'rgba(255,255,255,0.8)')}
+${sectionHd(52, 20, TXT.exp, a, SANS)}
+${_eTR(52, 24, TXT.e1_t, TXT.e1_d, SANS)}
+${_eCO(52, 26.5, TXT.e1_c, SANS)}
+${_eBL(52, 29, TXT.e1_b)}${_eBL(52, 31, TXT.e1_b2)}
+${_eTR(52, 35, TXT.e2_t, TXT.e2_d, SANS)}
+${_eCO(52, 37.5, TXT.e2_c, SANS)}
+${_eBL(52, 40, TXT.e2_b)}
+${sectionHd(52, 45, TXT.edu, a, SANS)}
+${_eEN(52, 49, TXT.edu1_s, TXT.edu1_d, TXT.edu1_da, SANS)}`,
+
+    // 5: Bottom-heavy — contact/skills at bottom
+    () => `<rect width="150" height="200" fill="${bg}"/>
+${_tx(_L, 10, 4, TXT.name, d, true, SANS)}
+${_tx(_L, 15, 1.5, TXT.contact, m, false, SANS)}
+${sectionHd(_L, 20, TXT.exp, a, SANS)}
+${_eTR(_L, 24, TXT.e1_t, TXT.e1_d, SANS)}
+${_eCO(_L, 26.5, TXT.e1_c, SANS)}
+${_eBL(_L, 29, TXT.e1_b)}${_eBL(_L, 31, TXT.e1_b2)}
+${_eTR(_L, 35, TXT.e2_t, TXT.e2_d, SANS)}
+${_eCO(_L, 37.5, TXT.e2_c, SANS)}
+${_eBL(_L, 40, TXT.e2_b)}
+${sectionHd(_L, 45, TXT.edu, a, SANS)}
+${_eEN(_L, 49, TXT.edu1_s, TXT.edu1_d, TXT.edu1_da, SANS)}
+${_r(0, 116, 150, 84, '#F4F1EB')}
+${_txU(_L, 136, 1.8, TXT.skills, a, true)}
+${_tx(_L, 140, 1.5, TXT.s1, d)}${_tx(_L, 142.5, 1.5, TXT.s2, d)}
+${_tx(_L, 145, 1.5, TXT.s3, d)}
+${_txU(_L, 152, 1.8, TXT.langs, a, true)}
+${_tx(_L, 156, 1.5, TXT.l1, d)}`,
   ]
 
-  const fn = styles[i % styles.length]
+  const fn = variants[i % variants.length]
   return `<svg viewBox="0 0 150 200" xmlns="http://www.w3.org/2000/svg">${fn()}</svg>`
 }
 
@@ -323,6 +584,11 @@ const STYLE_PRESETS: Record<string, TemplateStyle> = {
   journal:   { header: 'paper',        heading: 'dot-accent', bullet: 'hyphen',font: 'serif',   spacing: 'normal' },
   minimal:   { header: 'minimal',      heading: 'uppercase',  bullet: 'dot',   font: 'sans',    spacing: 'airy' },
   accent:    { header: 'top-stripe',   heading: 'underline',  bullet: 'dot',   font: 'display', spacing: 'normal' },
+  charter:   { header: 'dark-block',   heading: 'small-caps', bullet: 'arrow', font: 'serif',   spacing: 'normal' },
+  prestige:  { header: 'centered-line',heading: 'dot-accent', bullet: 'check', font: 'sans',    spacing: 'airy' },
+  engineer:  { header: 'minimal',      heading: 'badge',      bullet: 'hyphen',font: 'mono',    spacing: 'compact' },
+  contemporary: { header: 'top-stripe',heading: 'left-bar',   bullet: 'dash',  font: 'sans',    spacing: 'airy' },
+  folio:     { header: 'left-accent',  heading: 'small-caps', bullet: 'hyphen',font: 'display', spacing: 'normal' },
 }
 
 // ---- Templates ----
@@ -380,6 +646,18 @@ const TEMPLATE_DEFS: Array<Omit<ResumeTemplate, 'preview' | 'style'> & { _idx: n
   { id: 'marginalia', name: 'Marginalia', description: 'Notes in the margin style for creative roles.', layout: 'sidebar', _idx: 3, _preset: 'journal' },
   { id: 'portfolio', name: 'Portfolio', description: 'Visual portfolio layout with project grid.', layout: 'two-column', _idx: 2, _preset: 'accent' },
   { id: 'leadership', name: 'Leadership', description: 'Leadership-focused with team impact metrics.', layout: 'single-column', _idx: 6, _preset: 'executive' },
+
+  // Renderer template entries (must match IDs in features/resume-editor/templates/types.ts)
+  { id: 'sidebar', name: 'Sidebar', description: 'Left sidebar with contact and skills. Clean main area.', layout: 'sidebar', _idx: 0, _preset: 'editorial' },
+  { id: 'bold', name: 'Bold', description: 'Top accent stripe with badge headings. Creative and impactful.', layout: 'single-column', _idx: 4, _preset: 'bold' },
+  { id: 'tech', name: 'Tech', description: 'Clean two-column for engineering roles.', layout: 'two-column', _idx: 4, _preset: 'sharp' },
+
+  // New unique templates
+  { id: 'charter', name: 'Charter', description: 'Dark header block, serif, small-caps headings.', layout: 'single-column', _idx: 1, _preset: 'charter' },
+  { id: 'prestige', name: 'Prestige', description: 'Centered-line header with check bullets, airy sidebar.', layout: 'sidebar', _idx: 3, _preset: 'prestige' },
+  { id: 'engineer', name: 'Engineer', description: 'Monospace two-column with badge headings.', layout: 'two-column', _idx: 4, _preset: 'engineer' },
+  { id: 'contemporary', name: 'Contemporary', description: 'Top-stripe header, left-bar sections, airy.', layout: 'two-column', _idx: 2, _preset: 'contemporary' },
+  { id: 'folio', name: 'Folio', description: 'Left-accent headings, display font, clean.', layout: 'single-column', _idx: 7, _preset: 'folio' },
 ]
 
 export const TEMPLATES: ResumeTemplate[] = TEMPLATE_DEFS.map((def) => ({

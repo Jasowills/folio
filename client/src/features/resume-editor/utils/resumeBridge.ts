@@ -4,6 +4,43 @@ import { DEFAULT_DESIGN } from '../../../pages/editor/types'
 
 export const DEFAULT_SECTION_ORDER = ['summary', 'experience', 'education', 'skills', 'certifications', 'languages', 'links']
 
+export function getSampleLocalData(): LocalData {
+  return {
+    title: 'Software Engineer',
+    name: 'Your Name',
+    summary: 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit, sed diam nonummy nibh euismod tincidunt ut laoreet dolore magna aliquam erat volutpat. Ut wisi enim ad minim veniam, quis nostrud exerci tation ullamcorper suscipit lobortis nisl ut aliquip ex ea commodo consequat.',
+    contact: { email: 'no_reply@example.com', phone: '(123) 456-7890', location: 'Your City, ST 12345' },
+    experience: [
+      { company: 'Company, Location', title: 'Job Title', startDate: 'MONTH 20XX', endDate: 'Present', current: true, bullets: ['Lorem ipsum dolor sit amet, consectetuer adipiscing elit, sed diam nonummy nibh.', 'Sed diam nonummy nibh euismod tincidunt ut laoreet dolore magna.'] },
+      { company: 'Company, Location', title: 'Job Title', startDate: 'MONTH 20XX', endDate: 'MONTH 20XX', current: false, bullets: ['Lorem ipsum dolor sit amet, consectetuer adipiscing elit, sed diam nonummy nibh.'] },
+      { company: 'Company, Location', title: 'Job Title', startDate: 'MONTH 20XX', endDate: 'MONTH 20XX', current: false, bullets: ['Lorem ipsum dolor sit amet, consectetuer adipiscing elit.'] },
+    ],
+    education: [
+      { institution: 'School Name, Location', degree: 'Degree', field: 'Field of Study', startDate: 'MONTH 20XX', endDate: 'MONTH 20XX' },
+      { institution: 'School Name, Location', degree: 'Degree', field: 'Field of Study', startDate: 'MONTH 20XX', endDate: 'MONTH 20XX' },
+    ],
+    skills: [
+      { name: 'Lorem ipsum dolor sit amet' },
+      { name: 'Consectetuer adipiscing elit' },
+      { name: 'Sed diam nonummy nibh euismod' },
+      { name: 'Laoreet dolore magna aliquam' },
+    ],
+    certifications: [
+      { name: 'Lorem ipsum dolor sit amet', issuer: 'Consectetuer adipiscing', date: '20XX' },
+      { name: 'Sed diam nonummy nibh', issuer: 'Euismod tincidunt', date: '20XX' },
+    ],
+    languages: ['Lorem ipsum', 'Dolor sit amet', 'Consectetuer adipiscing elit'],
+    links: [
+      { title: 'LinkedIn', url: 'linkedin.com/in/yourname' },
+      { title: 'Portfolio', url: 'yourname.dev' },
+    ],
+    customSections: [],
+    sectionOrder: [...DEFAULT_SECTION_ORDER],
+    design: { ...DEFAULT_DESIGN },
+    editMode: 'guided',
+  }
+}
+
 export function getDefaultLocalData(): LocalData {
   return {
     title: '',

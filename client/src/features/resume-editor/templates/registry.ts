@@ -15,6 +15,11 @@ const STYLE_PRESETS: Record<string, TemplateStyle> = {
   creative: { header: 'thin-line',    heading: 'dot-accent', bullet: 'hyphen',font: 'display', spacing: 'normal' },
   tech:     { header: 'minimal',      heading: 'small-caps', bullet: 'dash',  font: 'mono',    spacing: 'compact' },
   academic: { header: 'center',       heading: 'left-bar',   bullet: 'dot',   font: 'serif',   spacing: 'airy' },
+  charter:  { header: 'dark-block',   heading: 'small-caps', bullet: 'arrow', font: 'serif',   spacing: 'normal' },
+  prestige: { header: 'centered-line',heading: 'dot-accent', bullet: 'check', font: 'sans',    spacing: 'airy' },
+  engineer: { header: 'minimal',      heading: 'badge',      bullet: 'hyphen',font: 'mono',    spacing: 'compact' },
+  contemporary: { header: 'top-stripe',heading: 'left-bar',  bullet: 'dash',  font: 'sans',    spacing: 'airy' },
+  folio:    { header: 'left-accent',  heading: 'small-caps', bullet: 'hyphen',font: 'display', spacing: 'normal' },
 }
 
 const LAYOUT_MAP: Record<TemplateId, ResumeLayout> = {
@@ -28,6 +33,11 @@ const LAYOUT_MAP: Record<TemplateId, ResumeLayout> = {
   creative: TwoColumn,
   tech: TwoColumn,
   academic: SingleColumn,
+  charter: SingleColumn,
+  prestige: Sidebar,
+  engineer: TwoColumn,
+  contemporary: TwoColumn,
+  folio: SingleColumn,
 }
 
 export function getTemplateStyle(id: TemplateId): TemplateStyle {

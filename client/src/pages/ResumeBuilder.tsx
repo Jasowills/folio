@@ -866,7 +866,7 @@ export default function ResumeBuilder() {
             Upload your resume or build one from scratch to get started.
           </p>
           <button
-            onClick={() => createResume.mutateAsync().then((r) => navigate(`/resume/${r._id}`))}
+            onClick={() => navigate('/resumes/builder')}
             className="flex items-center gap-2 px-4 py-2 text-xs font-medium text-muted bg-transparent border border-border rounded-md hover:border-teal hover:text-teal transition-colors cursor-pointer"
           >
             <IconFilePlus className="h-3.5 w-3.5" />

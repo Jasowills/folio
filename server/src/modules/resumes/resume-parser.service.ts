@@ -469,10 +469,22 @@ export class ResumeParserService {
     const firstLine = lines[0];
     if (!firstLine) return null;
 
-    const name = firstLine.replace(/[,;].*$/, '').trim();
+    let name = firstLine.replace(/[,;].*$/, '').trim();
     if (name.length < 3 || name.length > 60) return null;
 
-    const wordCount = name.split(/\s+/).length;
+    let wordCount = name.split(/\s+/).length;
+
+    // CamelCase/PascalCase recovery: if PDF extraction merged words like "AmadiJason",
+    // split on uppercase boundaries and check if that produces a valid name
+    if (wordCount === 1) {
+      const split = name.replace(/([a-z])([A-Z])/g, '$1 $2').replace(/([A-Z])([A-Z][a-z])/g, '$1 $2');
+      const splitCount = split.split(/\s+/).length;
+      if (splitCount >= 2 && splitCount <= 5) {
+        name = split;
+        wordCount = splitCount;
+      }
+    }
+
     if (wordCount < 2 || wordCount > 5) return null;
 
     if (name.includes('@') || /http/i.test(name) || /\d/.test(name)) return null;

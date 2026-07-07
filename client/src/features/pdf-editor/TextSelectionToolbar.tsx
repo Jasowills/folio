@@ -71,6 +71,7 @@ export default function TextSelectionToolbar({ canvasRef, onRewrite, onImprove }
         left: position.left,
         transform: 'translate(-50%, -100%)',
       }}
+      onMouseDown={(e) => e.stopPropagation()}
     >
       <button
         onClick={() => { setVisible(false); onRewrite(selectedText) }}

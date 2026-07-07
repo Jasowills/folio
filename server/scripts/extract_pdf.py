@@ -700,6 +700,7 @@ def mode_layout(path: str) -> dict:
                     "fontWeight": font_weight,
                     "fontStyle": font_style,
                     "fontFamily": font_family,
+                    "originalFontFamily": dominant_font,
                     "color": css_color,
                     "isAllCaps": is_all_caps,
                     "isLikelyHeading": is_heading or is_caps_short,

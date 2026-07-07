@@ -61,7 +61,7 @@ export default function StylesPanel({ templateId, design, onTemplateChange, onDe
         {tab === 'templates' && (
           <div className="p-3">
             <div className="grid grid-cols-2 gap-2">
-              {TEMPLATES.filter(t => ['minimal', 'modern', 'executive', 'compact', 'classic', 'sidebar', 'bold', 'creative', 'tech', 'academic'].includes(t.id)).map(tpl => {
+              {TEMPLATES.filter(t => ['minimal', 'modern', 'executive', 'compact', 'classic', 'sidebar', 'bold', 'creative', 'tech', 'academic', 'charter', 'prestige', 'engineer', 'contemporary', 'folio'].includes(t.id)).map(tpl => {
                 const isActive = templateId === tpl.id
                 const svg = TEMPLATE_PREVIEWS[tpl.id]
                 return (

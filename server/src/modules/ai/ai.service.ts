@@ -234,6 +234,11 @@ export class AiService {
       { role: 'user', content: user },
     ];
 
+    if (this.groqConfigured) {
+      const groqModel = model || this.groqDefaultModel;
+      return this.streamFromProvider('groq', this.groqBaseUrl, groqModel, messages);
+    }
+
     const selectedModel = model || (this.ollamaConfigured ? this.ollamaDefaultModel : this.openrouterDefaultModel);
 
     if (this.ollamaConfigured) {
@@ -508,6 +513,39 @@ export class AiService {
       finish();
       throw e;
     }
+  }
+
+  async chatForBuilder(
+    system: string,
+    user: string,
+  ): Promise<string> {
+    const messages: ChatMessage[] = [
+      { role: 'system', content: system },
+      { role: 'user', content: user },
+    ];
+
+    const builderProviders: Array<{ provider: 'groq' | 'openrouter'; model: string }> = [
+      { provider: 'groq', model: this.groqDefaultModel },
+      { provider: 'groq', model: this.groqFallbackModel },
+      { provider: 'openrouter', model: this.groqDefaultModel },
+      { provider: 'openrouter', model: this.openrouterFallbackModel },
+    ];
+
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      for (const { provider, model } of builderProviders) {
+        if (provider === 'groq' && !this.groqConfigured) continue;
+        const result = await this.tryProvider(provider, model, messages, 2048);
+        if (result !== null) return result;
+      }
+
+      if (attempt < 3) {
+        const delay = 3000 + Math.random() * 2000;
+        this.logger.debug(`[chatForBuilder] Retry ${attempt + 1}/3 after ${Math.round(delay)}ms`);
+        await new Promise((r) => setTimeout(r, delay));
+      }
+    }
+
+    throw new Error('AI service is currently unavailable. All providers exhausted. Please try again later.');
   }
 
   async chatForInterview(

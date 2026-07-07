@@ -6,6 +6,7 @@ interface FloatingPanelProps {
   children: ReactNode
   tab: string
   onClose: () => void
+  side?: 'left' | 'right'
 }
 
 const tabLabels: Record<string, string> = {
@@ -14,14 +15,18 @@ const tabLabels: Record<string, string> = {
   ai: 'AI Assistant',
 }
 
-export default function FloatingPanel({ children, tab, onClose }: FloatingPanelProps) {
+export default function FloatingPanel({ children, tab, onClose, side = 'right' }: FloatingPanelProps) {
+  const isLeft = side === 'left'
+
   return (
     <motion.aside
-      initial={{ x: 320 }}
+      initial={{ x: isLeft ? -320 : 320 }}
       animate={{ x: 0 }}
-      exit={{ x: 320 }}
+      exit={{ x: isLeft ? -320 : 320 }}
       transition={{ type: 'spring', damping: 25, stiffness: 250 }}
-      className="absolute right-0 top-0 bottom-0 w-[320px] bg-white border-l border-border shadow-xl z-10 flex flex-col"
+      className={`absolute top-0 bottom-0 w-[320px] bg-white shadow-xl z-10 flex flex-col ${
+        isLeft ? 'left-0 border-r border-border' : 'right-0 border-l border-border'
+      }`}
     >
       <div className="flex items-center justify-between px-4 h-12 border-b border-border shrink-0">
         <h2 className="text-[13px] font-semibold text-ink">{tabLabels[tab] || tab}</h2>

@@ -17,7 +17,7 @@ import AiDrawer from './components/AiDrawer'
 import CommandPalette from './components/CommandPalette'
 import ExportPopover from './components/ExportPopover'
 import ExtractionNotification from './components/ExtractionNotification'
-import AiPanel from './components/AiPanel'
+import AiChatPanel from './components/AiChatPanel'
 import StylesPanel from './components/StylesPanel'
 import SectionsPanel from './components/SectionsPanel'
 import useEditorKeyboard from './hooks/useEditorKeyboard'
@@ -149,11 +149,15 @@ export default function EditorPage() {
     return () => window.removeEventListener('beforeunload', handleBeforeUnload)
   }, [saved])
 
-  function forceSave() {
+  async function forceSave() {
     if (!id || !localData) return
     const updates = localDataToResumeUpdates(localData)
-    updateResume.mutate({ id, data: { ...updates, templateId, design } })
-    setSaved(true)
+    try {
+      await updateResume.mutateAsync({ id, data: { ...updates, templateId, design } })
+      setSaved(true)
+    } catch {
+      setSaved(false)
+    }
   }
 
   function openPanel(tab: 'styles' | 'sections' | 'ai') {
@@ -277,24 +281,57 @@ export default function EditorPage() {
           </div>
         )}
 
-        {layoutDoc && (
-          <PdfDocumentEditor
-            layoutDocument={layoutDoc}
-            onSave={handleLayoutDocSave}
-            onAiRewrite={handleAiRewrite}
-            onAiImprove={handleAiImprove}
-            zoom={pdfZoom}
-            onZoomChange={setPdfZoom}
-            fileUrl={resume?.fileUrl}
-            debugMode={debugMode}
-          />
-        )}
+        <div className="flex-1 flex overflow-hidden relative">
+          {layoutDoc && (
+            <PdfDocumentEditor
+              layoutDocument={layoutDoc}
+              onSave={handleLayoutDocSave}
+              onAiRewrite={handleAiRewrite}
+              onAiImprove={handleAiImprove}
+              zoom={pdfZoom}
+              onZoomChange={setPdfZoom}
+              fileUrl={resume?.fileUrl}
+              debugMode={debugMode}
+            />
+          )}
 
-        {!layoutDoc && !extractingLayout && (
-          <div className="flex-1 flex items-center justify-center text-sm text-muted">
-            <p>No layout data available. This PDF may be a scanned image.</p>
-          </div>
-        )}
+          {!layoutDoc && !extractingLayout && (
+            <div className="flex-1 flex items-center justify-center text-sm text-muted">
+              <p>No layout data available. This PDF may be a scanned image.</p>
+            </div>
+          )}
+
+          <AnimatePresence>
+            {panelOpen && (
+              <FloatingPanel
+                tab={panelTab}
+                onClose={() => setPanelOpen(false)}
+                side={panelTab === 'ai' ? 'left' : 'right'}
+              >
+                {panelTab === 'styles' && (
+                  <StylesPanel
+                    templateId={templateId}
+                    design={design}
+                    onTemplateChange={setTemplateId}
+                    onDesignChange={d => { setDesign(d); setSaved(false) }}
+                  />
+                )}
+                {panelTab === 'sections' && (
+                  <SectionsPanel
+                    data={currentData}
+                    onUpdate={handleLocalDataChange}
+                  />
+                )}
+                {panelTab === 'ai' && (
+                  <AiChatPanel
+                    data={currentData}
+                    onUpdate={handleLocalDataChange}
+                  />
+                )}
+              </FloatingPanel>
+            )}
+          </AnimatePresence>
+        </div>
 
         <AiDrawer
           open={aiDrawerOpen}
@@ -308,7 +345,7 @@ export default function EditorPage() {
         <ExportPopover
           open={exportPopoverOpen}
           onClose={() => setExportPopoverOpen(false)}
-          onExportPdf={() => window.open(`/export/${id}`, '_blank')}
+          onExportPdf={() => window.open(`/api/export/${id}`, '_blank')}
           onExportDocx={async () => {}}
           onExportDrive={async () => {}}
         />
@@ -351,7 +388,7 @@ export default function EditorPage() {
         </div>
       )}
 
-      <div className="flex-1 flex overflow-hidden">
+      <div className="flex-1 flex overflow-hidden relative">
         <div className="flex-1 flex overflow-hidden">
           <div className="w-[480px] min-w-[320px] overflow-y-auto border-r border-border bg-white">
             <div className="px-6 py-8">
@@ -386,6 +423,7 @@ export default function EditorPage() {
             <FloatingPanel
               tab={panelTab}
               onClose={() => setPanelOpen(false)}
+              side={panelTab === 'ai' ? 'left' : 'right'}
             >
               {panelTab === 'styles' && (
                 <StylesPanel
@@ -402,11 +440,9 @@ export default function EditorPage() {
                 />
               )}
               {panelTab === 'ai' && (
-                <AiPanel
-                  score={resume?.overallScore}
-                  strengths={resume?.strengths}
-                  issues={resume?.redFlags?.map((f: any) => f.message)}
-                  onQuickAction={handleQuickAction}
+                <AiChatPanel
+                  data={currentData}
+                  onUpdate={handleLocalDataChange}
                 />
               )}
             </FloatingPanel>
@@ -417,7 +453,7 @@ export default function EditorPage() {
       <ExportPopover
         open={exportPopoverOpen}
         onClose={() => setExportPopoverOpen(false)}
-        onExportPdf={() => window.open(`/export/${id}`, '_blank')}
+        onExportPdf={() => window.open(`/api/export/${id}`, '_blank')}
         onExportDocx={async () => {}}
         onExportDrive={async () => {}}
       />
@@ -431,7 +467,7 @@ export default function EditorPage() {
   )
 }
 
-const TEMPLATE_IDS: TemplateId[] = ['minimal', 'modern', 'executive', 'compact', 'classic', 'sidebar', 'bold', 'creative', 'tech', 'academic']
+const TEMPLATE_IDS: TemplateId[] = ['minimal', 'modern', 'executive', 'compact', 'classic', 'sidebar', 'bold', 'creative', 'tech', 'academic', 'charter', 'prestige', 'engineer', 'contemporary', 'folio']
 
 function isTemplateId(v: string): v is TemplateId {
   return (TEMPLATE_IDS as string[]).includes(v)

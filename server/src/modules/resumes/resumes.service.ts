@@ -503,11 +503,18 @@ Raw Text:\n${rawText.slice(0, 10000)}\n\nStructured Data:\n${JSON.stringify(stru
       const blocksHtml = (page.blocks || [])
         .filter((b: any) => b.text.trim())
         .map((b: any) => {
-          const fontFamily = b.fontFamily === 'serif'
-            ? '"DM Serif Display", Georgia, serif'
-            : b.fontFamily === 'monospace'
-              ? '"Roboto Mono", "Courier New", monospace'
-              : '"Plus Jakarta Sans", "Helvetica Neue", Arial, sans-serif';
+          const originalFont = b.originalFontFamily || b.fontFamily;
+          const fontName = originalFont?.toLowerCase() || '';
+          const fontFamily =
+            fontName.includes('helvetica') || fontName.includes('arial') ? '"Helvetica Neue", Helvetica, Arial, sans-serif' :
+            fontName.includes('calibri') ? 'Calibri, "Helvetica Neue", Arial, sans-serif' :
+            fontName.includes('verdana') ? 'Verdana, Geneva, sans-serif' :
+            fontName.includes('tahoma') ? 'Tahoma, Geneva, sans-serif' :
+            fontName.includes('times') || fontName.includes('georgia') || fontName.includes('garamond') || fontName.includes('palatino') || fontName.includes('baskerville') || fontName.includes('serif') ? 'Georgia, "Times New Roman", serif' :
+            fontName.includes('courier') || fontName.includes('mono') || fontName.includes('consolas') || fontName.includes('monospace') ? '"Courier New", monospace' :
+            b.fontFamily === 'serif' ? 'Georgia, "Times New Roman", serif' :
+            b.fontFamily === 'monospace' ? '"Courier New", monospace' :
+            '"Helvetica Neue", Helvetica, Arial, sans-serif';
 
           return `<div style="
             position:absolute;
@@ -515,17 +522,18 @@ Raw Text:\n${rawText.slice(0, 10000)}\n\nStructured Data:\n${JSON.stringify(stru
             top:${b.y}pt;
             width:${b.width}pt;
             min-height:${b.height}pt;
+          "><div style="height:${b.height}pt;overflow:hidden;"><div style="
             font-size:${b.fontSize}pt;
             font-weight:${b.fontWeight};
             font-style:${b.fontStyle};
             font-family:${fontFamily};
             color:${cssColor(b)};
-            line-height:1;
-            white-space:pre-wrap;
-            word-break:break-word;
+            line-height:${b.height / b.fontSize};
+            white-space:pre;
+            word-break:normal;
             padding:0;
             margin:0;
-          ">${this.esc(b.text)}</div>`;
+          ">${this.esc(b.text)}</div></div></div>`;
         }).join('\n');
 
       return `<div style="

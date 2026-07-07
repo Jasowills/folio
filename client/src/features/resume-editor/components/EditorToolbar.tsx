@@ -1,11 +1,18 @@
 import { cn } from '../../../lib/utils'
-import { IconChevronLeft, IconLayoutGrid, IconList, IconWand, IconDownload, IconZoomIn, IconZoomOut, IconCode } from '@tabler/icons-react'
+import { IconChevronLeft, IconLayoutGrid, IconList, IconWand, IconDownload, IconZoomIn, IconZoomOut, IconCode, IconArrowBackUp, IconArrowForwardUp } from '@tabler/icons-react'
 
 interface ZoomProps {
   zoom: number
   onZoomIn: () => void
   onZoomOut: () => void
   onZoomReset: () => void
+}
+
+interface UndoRedoProps {
+  onUndo: () => void
+  onRedo: () => void
+  canUndo: boolean
+  canRedo: boolean
 }
 
 interface EditorToolbarProps {
@@ -17,6 +24,7 @@ interface EditorToolbarProps {
   onExport: () => void
   onBack: () => void
   zoom?: ZoomProps
+  undoRedo?: UndoRedoProps
   debugMode?: boolean
   onDebugToggle?: () => void
 }
@@ -29,11 +37,12 @@ export default function EditorToolbar({
   activePanel,
   onExport,
   zoom,
+  undoRedo,
   debugMode,
   onDebugToggle,
 }: EditorToolbarProps) {
   return (
-    <header className="h-12 bg-white border-b border-border flex items-center justify-between px-3 shrink-0 z-20">
+    <header className="h-12 bg-white border-b border-border flex items-center justify-between px-3 shrink-0 relative z-20">
       <div className="flex items-center gap-2 min-w-0">
         <button
           onClick={onBack}
@@ -60,6 +69,13 @@ export default function EditorToolbar({
       </div>
 
       <div className="flex items-center gap-0.5">
+        {undoRedo && (
+          <>
+            <ToolbarButton icon={IconArrowBackUp} label="Undo" disabled={!undoRedo.canUndo} onClick={undoRedo.onUndo} />
+            <ToolbarButton icon={IconArrowForwardUp} label="Redo" disabled={!undoRedo.canRedo} onClick={undoRedo.onRedo} />
+            <div className="w-px h-5 bg-border mx-1" />
+          </>
+        )}
         {zoom && (
           <>
             <ToolbarButton icon={IconZoomOut} label="" onClick={zoom.onZoomOut} />
@@ -121,18 +137,22 @@ function ToolbarButton({
   icon: Icon,
   label,
   active,
+  disabled,
   onClick,
 }: {
   icon: React.ComponentType<{ className?: string }>
   label: string
   active?: boolean
+  disabled?: boolean
   onClick: () => void
 }) {
   return (
     <button
       onClick={onClick}
+      disabled={disabled}
       className={cn(
-        'flex items-center gap-1.5 px-2.5 h-8 rounded-lg text-[11px] font-medium transition-colors cursor-pointer',
+        'flex items-center gap-1.5 px-2.5 h-8 rounded-lg text-[11px] font-medium transition-colors',
+        disabled ? 'opacity-30 cursor-not-allowed' : 'cursor-pointer',
         active
           ? 'bg-teal-light text-teal'
           : 'text-muted hover:text-ink hover:bg-paper-dark',

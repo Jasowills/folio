@@ -18,11 +18,11 @@ export function usePdfReflow() {
       const el = blockRefs.current.get(block.id)
       if (!el) continue
 
-      const actualHeight = el.scrollHeight
-      const heightDiff = actualHeight - block.height
+      const actualHeightPt = el.scrollHeight * (72 / 96)
+      const heightDiff = actualHeightPt - block.height
 
       if (Math.abs(heightDiff) > 1) {
-        updated[i] = { ...updated[i], height: actualHeight }
+        updated[i] = { ...updated[i], height: actualHeightPt }
         for (let j = i + 1; j < updated.length; j++) {
           updated[j] = { ...updated[j], y: updated[j].y + heightDiff }
         }

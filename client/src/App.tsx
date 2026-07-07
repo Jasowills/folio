@@ -22,6 +22,7 @@ import InterviewNew from './pages/InterviewNew'
 import InterviewPrep from './pages/InterviewPrep'
 import InterviewLive from './pages/InterviewLive'
 import InterviewResults from './pages/InterviewResults'
+import BuilderPage from './features/builder/BuilderPage'
 
 class ErrorBoundary extends Component<
   { children: React.ReactNode },
@@ -64,6 +65,13 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
   return <AppShell>{children}</AppShell>
 }
 
+function FullScreenRoute({ children }: { children: React.ReactNode }) {
+  const { user, loading } = useAuth()
+  if (loading) return <LoadingFallback />
+  if (!user) return <Navigate to="/login" replace />
+  return <>{children}</>
+}
+
 function AppRoutes() {
   const { fetchUser } = useAuth()
 
@@ -83,6 +91,8 @@ function AppRoutes() {
         <Route path="/terms" element={<Legal />} />
         <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
         <Route path="/resumes" element={<ProtectedRoute><ResumeBuilder /></ProtectedRoute>} />
+        <Route path="/resumes/builder" element={<FullScreenRoute><BuilderPage /></FullScreenRoute>} />
+        <Route path="/resumes/builder/:resumeId" element={<FullScreenRoute><BuilderPage /></FullScreenRoute>} />
         <Route path="/resume/:id" element={<ProtectedRoute><EditorPage /></ProtectedRoute>} />
         <Route path="/resume/:id/review" element={<ProtectedRoute><ResumeReview /></ProtectedRoute>} />
         <Route path="/ats" element={<ProtectedRoute><AtsScorer /></ProtectedRoute>} />

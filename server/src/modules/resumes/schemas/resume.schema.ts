@@ -146,6 +146,15 @@ export class Resume {
 
   @Prop({ type: [String] })
   sectionOrder?: string[];
+
+  @Prop({ type: Object })
+  wizardState?: {
+    currentStep: number;
+    completedSteps: number[];
+    stepData: Record<string, unknown>;
+    isComplete: boolean;
+    selectedTemplate?: string;
+  };
 }
 
 export const ResumeSchema = SchemaFactory.createForClass(Resume);

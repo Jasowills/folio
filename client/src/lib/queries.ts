@@ -62,6 +62,7 @@ export interface PdfLayoutBlock {
   fontWeight: number
   fontStyle: string
   fontFamily: string
+  originalFontFamily?: string
   color: string
   isAllCaps: boolean
   isLikelyHeading: boolean
