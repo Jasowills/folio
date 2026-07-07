@@ -157,6 +157,7 @@ export default function PdfDocumentEditor({ layoutDocument, onSave, onAiRewrite,
         isAllCaps: false,
         isLikelyHeading: false,
         lineCount: 1,
+        lineHeight: null,
       }
       const updated = prev.map(p =>
         p.pageNumber === pageNumber

@@ -15,7 +15,7 @@ export default function LanguagesRenderer({ data, design, style, className = '' 
   return (
     <div className={`mb-4 ${className}`}>
       <SectionHeading label="Languages" style={style} design={design} />
-      <p className="text-[11px] text-muted mt-1">
+      <p className="text-[11px] text-muted mt-1" style={{ lineHeight: design.lineSpacing }}>
         {data.languages.join(' \u00B7 ')}
       </p>
     </div>

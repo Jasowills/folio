@@ -22,16 +22,16 @@ export default function ExperienceRenderer({ data, design, style }: Props) {
       {data.experience.map((exp, i) => (
         <div key={i}>
           <div className="flex items-center justify-between gap-2">
-            <strong className={compact ? 'text-[11px]' : 'text-[12px]'}>{exp.title}</strong>
-            <span className="text-[9px] text-muted whitespace-nowrap">{formatDate(exp.startDate, exp.endDate, exp.current)}</span>
+            <strong className={compact ? 'text-[11px]' : 'text-[12px]'} style={{ lineHeight: design.lineSpacing }}>{exp.title}</strong>
+            <span className="text-[9px] text-muted whitespace-nowrap" style={{ lineHeight: design.lineSpacing }}>{formatDate(exp.startDate, exp.endDate, exp.current)}</span>
           </div>
-          <p className="text-[10px] text-muted mb-1">{exp.company}</p>
+          <p className="text-[10px] text-muted mb-1" style={{ lineHeight: design.lineSpacing }}>{exp.company}</p>
           {exp.bullets.filter(Boolean).length > 0 && (
             <ul className={`list-none ${compact ? 'space-y-0.5' : 'space-y-1'}`}>
               {exp.bullets.filter(Boolean).map((b, j) => (
                 <li key={j} className="text-muted flex gap-1.5">
                   <span className="shrink-0" style={{ color: design.primaryColor }}>{bullet}</span>
-                  <span className={compact ? 'text-[10px]' : 'text-[11px]'}>{b}</span>
+                  <span className={compact ? 'text-[10px]' : 'text-[11px]'} style={{ lineHeight: design.lineSpacing }}>{b}</span>
                 </li>
               ))}
             </ul>

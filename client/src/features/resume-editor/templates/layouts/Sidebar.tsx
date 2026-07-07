@@ -16,10 +16,10 @@ export default function Sidebar({ data, design, style }: ResumeRenderProps) {
       >
         <div className="text-white space-y-5">
           <div className="text-center">
-            <h1 className="text-[16px] font-bold mb-2 text-white">{data.name}</h1>
-            {data.contact.email && <p className="text-[9px] text-white/80">{data.contact.email}</p>}
-            {data.contact.phone && <p className="text-[9px] text-white/80">{data.contact.phone}</p>}
-            {data.contact.location && <p className="text-[9px] text-white/80">{data.contact.location}</p>}
+            <h1 className="text-[16px] font-bold mb-2 text-white" style={{ lineHeight: design.lineSpacing }}>{data.name}</h1>
+            {data.contact.email && <p className="text-[9px] text-white/80" style={{ lineHeight: design.lineSpacing }}>{data.contact.email}</p>}
+            {data.contact.phone && <p className="text-[9px] text-white/80" style={{ lineHeight: design.lineSpacing }}>{data.contact.phone}</p>}
+            {data.contact.location && <p className="text-[9px] text-white/80" style={{ lineHeight: design.lineSpacing }}>{data.contact.location}</p>}
           </div>
 
           <SkillsRenderer data={data} design={design} style={{ ...style, heading: 'uppercase' }} />
@@ -29,14 +29,14 @@ export default function Sidebar({ data, design, style }: ResumeRenderProps) {
 
           {data.contact.linkedin && (
             <div>
-              <h3 className="text-[9px] font-semibold uppercase tracking-wider text-white/60 mb-1">LinkedIn</h3>
-              <p className="text-[8px] text-white/80">{data.contact.linkedin}</p>
+              <h3 className="text-[9px] font-semibold uppercase tracking-wider text-white/60 mb-1" style={{ lineHeight: design.lineSpacing }}>LinkedIn</h3>
+              <p className="text-[8px] text-white/80" style={{ lineHeight: design.lineSpacing }}>{data.contact.linkedin}</p>
             </div>
           )}
           {data.contact.github && (
             <div>
-              <h3 className="text-[9px] font-semibold uppercase tracking-wider text-white/60 mb-1">GitHub</h3>
-              <p className="text-[8px] text-white/80">{data.contact.github}</p>
+              <h3 className="text-[9px] font-semibold uppercase tracking-wider text-white/60 mb-1" style={{ lineHeight: design.lineSpacing }}>GitHub</h3>
+              <p className="text-[8px] text-white/80" style={{ lineHeight: design.lineSpacing }}>{data.contact.github}</p>
             </div>
           )}
         </div>

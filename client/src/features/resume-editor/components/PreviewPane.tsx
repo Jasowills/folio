@@ -50,8 +50,6 @@ export default function PreviewPane({ data, design, templateId }: PreviewPanePro
           className="px-[8mm] py-[6mm]"
           style={{
             fontFamily: design.bodyFont,
-            fontSize: `${design.bodyFontSize}px`,
-            lineHeight: design.lineSpacing,
             color: design.secondaryColor,
           }}
         >

@@ -14,7 +14,7 @@ export default function SummaryRenderer({ data, design, style }: Props) {
   return (
     <div className="mb-4">
       <SectionHeading label="Summary" style={style} design={design} />
-      <p className="text-muted leading-relaxed mt-1">{data.summary}</p>
+      <p className="text-muted mt-1" style={{ fontSize: `${design.bodyFontSize}px`, lineHeight: design.lineSpacing }}>{data.summary}</p>
     </div>
   )
 }

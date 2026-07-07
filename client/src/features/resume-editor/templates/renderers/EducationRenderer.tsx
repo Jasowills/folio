@@ -17,8 +17,8 @@ export default function EducationRenderer({ data, design, style }: Props) {
       <SectionHeading label="Education" style={style} design={design} />
       {data.education.map((edu, i) => (
         <div key={i} className="mb-2 last:mb-0">
-          <strong className="text-[12px]">{edu.institution}</strong>
-          <p className="text-[10px] text-muted">
+          <strong className="text-[12px]" style={{ lineHeight: design.lineSpacing }}>{edu.institution}</strong>
+          <p className="text-[10px] text-muted" style={{ lineHeight: design.lineSpacing }}>
             {edu.degree}{edu.field ? ` \u2014 ${edu.field}` : ''}
             {(edu.startDate || edu.endDate) && (
               <span className="ml-2 text-[9px]">{formatDate(edu.startDate, edu.endDate)}</span>

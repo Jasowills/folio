@@ -61,8 +61,6 @@ export function designPreviewStyle(design: DesignSettings): React.CSSProperties 
   const marginVal = 6 + design.margins * 3
   return {
     fontFamily: fontFamilyFor(design.bodyFont),
-    fontSize: `${design.bodyFontSize}px`,
-    lineHeight: design.lineSpacing,
     '--folio-heading-font': fontFamilyFor(design.headingFont),
     '--folio-primary': design.primaryColor,
     '--folio-secondary': design.secondaryColor,

@@ -161,7 +161,7 @@ export default function Settings() {
             {user?.googleId ? (
               <IconCircleCheck className="h-5 w-5 text-teal shrink-0" />
             ) : (
-              <Button size="sm" variant="outline" onClick={handleGoogleLink}>
+              <Button size="sm" variant="ghost" onClick={handleGoogleLink}>
                 Connect
               </Button>
             )}

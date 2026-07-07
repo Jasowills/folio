@@ -17,7 +17,7 @@ export default function CertificationsRenderer({ data, design, style, className 
       <SectionHeading label="Certifications" style={style} design={design} />
       <div className="space-y-1 mt-1">
         {data.certifications.map((c, i) => (
-          <p key={i} className="text-[11px] text-muted">
+          <p key={i} className="text-[11px] text-muted" style={{ lineHeight: design.lineSpacing }}>
             {c.name}{c.issuer ? ` \u2014 ${c.issuer}` : ''}
           </p>
         ))}

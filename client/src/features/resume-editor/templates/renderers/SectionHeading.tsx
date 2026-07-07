@@ -10,16 +10,8 @@ interface Props {
 }
 
 export default function SectionHeading({ label, style, design, className = '' }: Props) {
-  const hStyle = headingStyle(style, design.primaryColor)
+  const hStyle = { ...headingStyle(style, design.primaryColor), lineHeight: design.lineSpacing }
   const hClasses = headingClasses(style)
-
-  if (style.heading === 'badge') {
-    return (
-      <h2 className={`${hClasses} ${className}`} style={hStyle}>
-        {label}
-      </h2>
-    )
-  }
 
   return (
     <h2 className={`${hClasses} ${className}`} style={hStyle}>

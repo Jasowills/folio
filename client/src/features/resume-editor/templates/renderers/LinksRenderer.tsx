@@ -18,7 +18,7 @@ export default function LinksRenderer({ data, design, style, className = '' }: P
       <SectionHeading label="Links" style={style} design={design} />
       <div className="space-y-0.5 mt-1">
         {links.map((l, i) => (
-          <p key={i} className="text-[11px] text-muted">
+          <p key={i} className="text-[11px] text-muted" style={{ lineHeight: design.lineSpacing }}>
             <span style={{ color: design.primaryColor }} className="font-medium underline">{l.title || l.url}</span>
             {l.title && l.url ? ` \u2014 ${l.url}` : ''}
           </p>

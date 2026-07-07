@@ -34,7 +34,7 @@ export default function ComparisonTable() {
   const isInView = useInView(ref, { once: true, amount: 0.15 })
 
   return (
-    <SectionWrapper className="bg-paper" innerClassName="max-w-[800px]">
+    <SectionWrapper className="bg-paper">
       <div className="relative">
       <Drift duration={6} delay={1.2} className="top-[5%] left-[4%]">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#C8C4BC" strokeWidth="1" opacity="0.15">

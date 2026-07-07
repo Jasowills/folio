@@ -1,7 +1,6 @@
 import { useState, useCallback, useEffect, useRef } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
-import { IconShieldLock, IconFileDescription } from '@tabler/icons-react'
 import { UploadZone } from '../components/UploadZone'
 import ThreeBackground from '../components/ThreeBackground'
 import FloatingElements from '../components/FloatingElements'
