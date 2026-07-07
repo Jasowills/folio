@@ -9,6 +9,8 @@ import {
   HttpCode,
   HttpStatus,
   UnauthorizedException,
+  NotFoundException,
+  ConflictException,
 } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 import * as jwt from 'jsonwebtoken';
@@ -62,6 +64,19 @@ export class AuthController {
     return { accessToken: tokens.accessToken, user: tokens.user };
   }
 
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: 'Link Google account to existing user' })
+  @Post('google/link')
+  @HttpCode(HttpStatus.OK)
+  async linkGoogle(
+    @CurrentUser() user: UserDocument,
+    @Body() dto: GoogleLoginDto,
+  ) {
+    const profile = await this.verifyGoogleToken(dto.credential);
+    return this.authService.linkGoogle(user._id.toString(), profile);
+  }
+
   @ApiOperation({ summary: 'Login with email and password' })
   @Post('login')
   @HttpCode(HttpStatus.OK)
@@ -105,7 +120,7 @@ export class AuthController {
   @ApiOperation({ summary: 'Get current user profile' })
   @Get('me')
   getMe(@CurrentUser() user: UserDocument) {
-    return { _id: user._id, email: user.email, name: user.name, picture: user.avatar };
+    return { _id: user._id, email: user.email, name: user.name, picture: user.avatar, googleId: user.googleId || null, hasPassword: !!user.password };
   }
 
   @ApiBearerAuth()

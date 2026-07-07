@@ -10,6 +10,7 @@ export interface TranscriptTurn {
   audioUrl?: string
   timestamp: number
   duration: number
+  satisfaction?: 'satisfied' | 'partial' | 'unsatisfied'
 }
 
 export interface CodeSubmission {

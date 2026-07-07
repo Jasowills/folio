@@ -7,6 +7,8 @@ export interface User {
   name: string
   picture?: string
   plan?: string
+  googleId?: string | null
+  hasPassword?: boolean
 }
 
 interface AuthState {

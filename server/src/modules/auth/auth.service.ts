@@ -2,6 +2,7 @@ import {
   Injectable,
   UnauthorizedException,
   ConflictException,
+  NotFoundException,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
@@ -21,21 +22,35 @@ export class AuthService {
     googleId: string;
     avatar?: string;
   }) {
-    console.log('[auth.service] googleLogin start:', profile.email);
-    try {
-      let user = await this.usersService.findByEmail(profile.email);
-      console.log('[auth.service] findByEmail result:', !!user);
-      if (!user) {
-        user = await this.usersService.create(profile);
-        console.log('[auth.service] created user:', !!user);
-      }
-      const result = await this.generateTokens(user);
-      console.log('[auth.service] generateTokens success');
-      return result;
-    } catch (err) {
-      console.error('[auth.service] googleLogin error:', err);
-      throw err;
+    let user = await this.usersService.findByEmail(profile.email);
+    if (!user) {
+      user = await this.usersService.create(profile);
+    } else {
+      user = await this.usersService.updateUser(user._id.toString(), {
+        googleId: profile.googleId,
+        avatar: profile.avatar || user.avatar,
+      });
     }
+    return this.generateTokens(user);
+  }
+
+  async linkGoogle(
+    userId: string,
+    profile: { email: string; googleId: string; avatar?: string },
+  ) {
+    const user = await this.usersService.findById(userId);
+    if (!user) throw new NotFoundException('User not found');
+    if (user.email !== profile.email) {
+      throw new ConflictException('Google account email must match your Folio account email');
+    }
+    if (user.googleId) {
+      return { googleId: user.googleId, linked: true };
+    }
+    const updated = await this.usersService.updateUser(userId, {
+      googleId: profile.googleId,
+      avatar: profile.avatar || user.avatar,
+    });
+    return { googleId: updated.googleId, linked: true };
   }
 
   async signup(dto: { email: string; password: string; name: string }) {

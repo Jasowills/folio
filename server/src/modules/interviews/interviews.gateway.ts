@@ -27,6 +27,7 @@ interface SessionState {
   greetingSent: boolean
   lastAiResponseAt: number | null
   lastAiResponseText: string
+  followUpsForCurrentQuestion: number
 }
 
 @WebSocketGateway({
@@ -118,6 +119,7 @@ export class InterviewsGateway implements OnGatewayConnection, OnGatewayDisconne
         greetingSent: false,
         lastAiResponseAt: null,
         lastAiResponseText: '',
+        followUpsForCurrentQuestion: 0,
       })
     }
 
@@ -342,11 +344,57 @@ export class InterviewsGateway implements OnGatewayConnection, OnGatewayDisconne
       const hasFiller = /\b(basically|kind of|sort of|I guess|you know|like)\b/i.test(text)
 
       if (wordCount < 100 || hasFiller) {
-        return `Their last answer was vague. Ask a follow-up that pushes for a specific example or a measurable result before moving on. Do not proceed to the next question yet. Naturally reference the role ${companyRef} where appropriate.`
+        return `Their last answer was vague. Ask a follow-up that pushes for a specific example or a measurable result. Then use the satisfaction rules to decide if a follow-up is needed.`
       }
     }
 
-    return `Acknowledge their answer briefly in one sentence then transition to the next question. Naturally reference the role ${companyRef} where appropriate.`
+    return `Acknowledge their answer and respond naturally. Use the satisfaction rules to decide if a follow-up is needed or if you should move to the next question.`
+  }
+
+  private buildQuestionCoverage(
+    turns: Array<{ speaker: string; questionPlanRef: number | null; satisfaction?: string }>,
+    questionPlan: InterviewQuestionPlan[] | undefined,
+  ): string {
+    if (!questionPlan || questionPlan.length === 0) return 'No question plan available.'
+
+    const asked = new Set<number>()
+    const answered = new Set<number>()
+    const satisfied = new Map<number, string>()
+
+    for (const turn of turns) {
+      if (turn.questionPlanRef !== null) {
+        if (turn.speaker === 'interviewer') {
+          asked.add(turn.questionPlanRef)
+        } else if (turn.speaker === 'candidate') {
+          answered.add(turn.questionPlanRef)
+          if (turn.satisfaction) {
+            satisfied.set(turn.questionPlanRef, turn.satisfaction)
+          }
+        }
+      }
+    }
+
+    const lines: string[] = []
+    for (let i = 0; i < questionPlan.length; i++) {
+      const q = questionPlan[i]
+      let status: string
+      if (satisfied.has(i)) {
+        const s = satisfied.get(i)!
+        status = s === 'satisfied' ? 'ANSWERED (satisfactory)'
+          : s === 'partial' ? 'ANSWERED (partial)'
+          : 'ANSWERED (unsatisfactory — move on)'
+      } else if (answered.has(i)) {
+        status = 'ANSWERED (pending evaluation)'
+      } else if (asked.has(i)) {
+        status = 'ASKED (waiting for answer)'
+      } else {
+        status = 'NOT ASKED'
+      }
+      const preview = q.primaryQuestion.slice(0, 80).replace(/\n/g, ' ')
+      lines.push(`[${i + 1}] "${preview}..." — ${status}`)
+    }
+
+    return lines.join('\n')
   }
 
   private async generateAiResponse(
@@ -409,6 +457,7 @@ export class InterviewsGateway implements OnGatewayConnection, OnGatewayDisconne
         ? currentQuestion.followUpTriggers.map(t => `If candidate says "${t.condition}", ask: "${t.followUp}"`).join('\n')
         : 'None specified'
 
+      const questionCoverage = this.buildQuestionCoverage(turns, questionPlan)
       const turnInstructions = this.buildTurnInstructions(state, turns, questionPlan, remainingTimeInMinutes, currentQuestionBudget, company)
 
       const systemPrompt = INTERVIEW_RESPONSE_SYSTEM
@@ -424,6 +473,7 @@ export class InterviewsGateway implements OnGatewayConnection, OnGatewayDisconne
         .replace(/\{totalQuestions\}/g, String(questionPlan?.length || 0))
         .replace(/\{resumeSummary\}/g, this.buildResumeSummary(state.resumeContext))
         .replace(/\{conversationHistory\}/g, historyLines.join('\n') || 'No conversation yet.')
+        .replace(/\{questionCoverage\}/g, questionCoverage)
         .replace(/\{currentQuestion\}/g, currentQuestion?.primaryQuestion || 'Continue the conversation naturally.')
         .replace(/\{followUpTriggers\}/g, followUpText)
         .replace(/\{remainingTimeInMinutes\}/g, String(remainingTimeInMinutes))
@@ -434,15 +484,42 @@ export class InterviewsGateway implements OnGatewayConnection, OnGatewayDisconne
       await new Promise(r => setTimeout(r, thinkMs))
       if (responseSent) return
 
-      const responseText = await this.aiService.chatForInterview(
+      const rawResponse = await this.aiService.chatForInterview(
         systemPrompt,
         state.lastCandidateTranscript || '',
       )
       if (responseSent) return
 
+      const { text: responseText, satisfied } = this.parseInterviewResponse(rawResponse)
+      if (responseSent) return
+
+      state.lastAiResponseText = responseText
+
+      if (!state.isPaused) {
+        // Store satisfaction on the candidate's last turn
+        const satisfactionLabel = satisfied ? 'satisfied' as const : 'partial' as const
+        await this.interviewsService.updateLastCandidateTurnSatisfaction(sessionId, satisfactionLabel)
+      }
+
+      // Determine if we should advance the question
+      const isClosing = questionPlan && state.questionIndex >= questionPlan.length - 1
+      const oldIndex = state.questionIndex
+
+      if (!isClosing) {
+        const shouldAdvance = satisfied || state.followUpsForCurrentQuestion >= 2
+        if (shouldAdvance && questionPlan && state.questionIndex < questionPlan.length - 1) {
+          state.followUpsForCurrentQuestion = 0
+          state.questionIndex++
+          state.lastCandidateTranscript = ''
+        } else if (!shouldAdvance) {
+          state.followUpsForCurrentQuestion++
+        }
+      }
+
+      // Store interviewer turn associated with the question being discussed
       await this.interviewsService.addTurn(sessionId, {
         speaker: 'interviewer',
-        questionPlanRef: state.questionIndex,
+        questionPlanRef: oldIndex,
         text: responseText,
         timestamp: Date.now(),
         duration: 0,
@@ -458,7 +535,7 @@ export class InterviewsGateway implements OnGatewayConnection, OnGatewayDisconne
       clearTimeout(timeout)
       responseSent = true
       state.lastAiResponseAt = Date.now()
-      state.lastAiResponseText = responseText
+
       this.server.to(sessionId).emit('interviewer_response', {
         text: responseText,
         audio: audioBase64,
@@ -481,6 +558,27 @@ export class InterviewsGateway implements OnGatewayConnection, OnGatewayDisconne
       }
       clearTimeout(timeout)
     }
+  }
+
+  private parseInterviewResponse(raw: string): { text: string; satisfied: boolean } {
+    let text = raw.trim()
+    let satisfied = false
+
+    if (text.startsWith('{')) {
+      try {
+        const parsed = JSON.parse(text)
+        if (typeof parsed.text === 'string' && parsed.text.length > 0) {
+          text = parsed.text.trim()
+          satisfied = Boolean(parsed.satisfied)
+          return { text, satisfied }
+        }
+      } catch {
+        // Fall through to stripJsonFromResponse
+      }
+    }
+
+    text = this.stripJsonFromResponse(raw)
+    return { text, satisfied: false }
   }
 
   private handleSttError(client: Socket, sessionId: string, error: Error) {

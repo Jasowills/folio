@@ -31,7 +31,7 @@ export class UsersService {
 
   async updateUser(
     userId: string,
-    data: Partial<Pick<User, 'name' | 'email' | 'avatar'>>,
+    data: Partial<Pick<User, 'name' | 'email' | 'avatar' | 'googleId'>>,
   ): Promise<UserDocument> {
     const user = await this.userModel.findByIdAndUpdate(userId, data, {
       new: true,

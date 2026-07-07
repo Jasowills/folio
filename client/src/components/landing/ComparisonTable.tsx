@@ -36,9 +36,9 @@ export default function ComparisonTable() {
   return (
     <SectionWrapper className="bg-paper" innerClassName="max-w-[800px]">
       <div className="relative">
-      <Drift duration={4.5} delay={0.7} className="top-[5%] left-[4%]">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#0F6E56" strokeWidth="1.5" opacity="0.1">
-          <path d="M12 20V10" /><path d="M18 20V4" /><path d="M6 20v-4" />
+      <Drift duration={6} delay={1.2} className="top-[5%] left-[4%]">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#C8C4BC" strokeWidth="1" opacity="0.15">
+          <circle cx="12" cy="12" r="8" />
         </svg>
       </Drift>
       <div className="text-center mb-12">

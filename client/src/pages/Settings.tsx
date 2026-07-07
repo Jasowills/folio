@@ -1,24 +1,58 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { IconUser, IconKey, IconAlertTriangle } from '@tabler/icons-react'
+import { IconUser, IconKey, IconBrandGoogle, IconAlertTriangle, IconCircleCheck } from '@tabler/icons-react'
 import { useAuth } from '../hooks/useAuth'
 import { useUpdateProfile, useChangePassword, useDeleteAccount } from '../lib/queries'
 import { Button } from '../components/ui/button'
 import { Input } from '../components/ui/input'
 import { showToast } from '../components/ui/toast'
+import api from '../lib/api'
 
 export default function Settings() {
   const { user, setUser } = useAuth()
   const updateProfile = useUpdateProfile()
   const changePassword = useChangePassword()
   const deleteAccount = useDeleteAccount()
+  const [searchParams] = useSearchParams()
 
+  const [googleClientId, setGoogleClientId] = useState<string | null>(null)
   const [name, setName] = useState(user?.name || '')
   const [email, setEmail] = useState(user?.email || '')
   const [currentPassword, setCurrentPassword] = useState('')
   const [newPassword, setNewPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
   const [confirmDelete, setConfirmDelete] = useState('')
+
+  useEffect(() => {
+    api.get('/auth/google-client-id').then(({ data }) => {
+      setGoogleClientId(data.clientId || data.data?.clientId)
+    }).catch(() => {})
+  }, [])
+
+  useEffect(() => {
+    if (searchParams.get('linked') === 'success') {
+      showToast('success', 'Google account linked')
+      window.history.replaceState({}, '', '/settings')
+    } else if (searchParams.get('linked') === 'failed') {
+      showToast('error', 'Failed to link Google account')
+      window.history.replaceState({}, '', '/settings')
+    }
+  }, [searchParams])
+
+  const handleGoogleLink = () => {
+    if (!googleClientId) return
+    const redirectUri = `${window.location.origin}/auth/callback`
+    const params = new URLSearchParams({
+      response_type: 'id_token',
+      client_id: googleClientId,
+      redirect_uri: redirectUri,
+      scope: 'openid email profile',
+      state: 'link',
+      nonce: Math.random().toString(36),
+    })
+    window.location.href = `https://accounts.google.com/o/oauth2/v2/auth?${params}`
+  }
 
   const handleUpdateProfile = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -106,6 +140,32 @@ export default function Settings() {
               </Button>
             </div>
           </form>
+        </div>
+
+        {/* Connected Accounts */}
+        <div className={sectionClasses}>
+          <div className={sectionTitleClasses}>
+            <IconBrandGoogle className="h-4 w-4 text-teal" />
+            Connected Accounts
+          </div>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <IconBrandGoogle className="h-5 w-5 text-muted" />
+              <div>
+                <p className="text-sm font-medium text-ink">Google</p>
+                <p className="text-[11px] text-muted">
+                  {user?.googleId ? 'Connected' : 'Not connected'}
+                </p>
+              </div>
+            </div>
+            {user?.googleId ? (
+              <IconCircleCheck className="h-5 w-5 text-teal shrink-0" />
+            ) : (
+              <Button size="sm" variant="outline" onClick={handleGoogleLink}>
+                Connect
+              </Button>
+            )}
+          </div>
         </div>
 
         {/* Password */}

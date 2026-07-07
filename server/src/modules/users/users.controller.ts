@@ -35,6 +35,8 @@ export class UsersController {
       email: user.email,
       name: user.name,
       picture: user.avatar,
+      googleId: user.googleId || null,
+      hasPassword: !!user.password,
     };
   }
 
@@ -59,6 +61,8 @@ export class UsersController {
       email: updated.email,
       name: updated.name,
       picture: updated.avatar,
+      googleId: updated.googleId || null,
+      hasPassword: !!updated.password,
     };
   }
 

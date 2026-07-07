@@ -1,6 +1,7 @@
 import { useEffect } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth'
+import api from '../lib/api'
 
 export default function AuthCallback() {
   const navigate = useNavigate()
@@ -11,11 +12,18 @@ export default function AuthCallback() {
     const hash = window.location.hash
     const params = new URLSearchParams(hash.replace('#', ''))
     const idToken = params.get('id_token')
+    const state = params.get('state')
 
     if (idToken) {
-      googleLogin(idToken)
-        .then(() => navigate('/dashboard', { replace: true }))
-        .catch(() => navigate('/login?error=auth_failed', { replace: true }))
+      if (state === 'link') {
+        api.post('/auth/google/link', { credential: idToken })
+          .then(() => navigate('/settings?linked=success', { replace: true }))
+          .catch(() => navigate('/settings?linked=failed', { replace: true }))
+      } else {
+        googleLogin(idToken)
+          .then(() => navigate('/dashboard', { replace: true }))
+          .catch(() => navigate('/login?error=auth_failed', { replace: true }))
+      }
     } else {
       const error = searchParams.get('error')
       navigate(error ? `/login?error=${error}` : '/login', { replace: true })

@@ -504,6 +504,19 @@ export class InterviewsService {
     await transcript.save()
   }
 
+  async updateLastCandidateTurnSatisfaction(sessionId: string, satisfaction: 'satisfied' | 'partial' | 'unsatisfied'): Promise<void> {
+    const transcript = await this.transcriptModel.findOne({ sessionId }).exec()
+    if (!transcript) return
+
+    for (let i = transcript.turns.length - 1; i >= 0; i--) {
+      if (transcript.turns[i].speaker === 'candidate') {
+        transcript.turns[i].satisfaction = satisfaction
+        break
+      }
+    }
+    await transcript.save()
+  }
+
   async hasTranscriptTurns(sessionId: string): Promise<boolean> {
     const transcript = await this.transcriptModel.findOne({ sessionId }).exec()
     return transcript ? transcript.turns.length > 0 : false
@@ -581,6 +594,14 @@ export class InterviewsService {
     const transcript = await this.transcriptModel.findOne({ sessionId }).exec()
     const proctoring = await this.proctoringModel.findOne({ sessionId }).exec()
 
+    const satisfactionByQuestion = new Map<number, string>()
+    for (const turn of transcript?.turns || []) {
+      if (turn.speaker === 'candidate' && turn.questionPlanRef !== null && turn.satisfaction) {
+        satisfactionByQuestion.set(turn.questionPlanRef, turn.satisfaction)
+      }
+    }
+    const perQuestionSatisfaction = Object.fromEntries(satisfactionByQuestion)
+
     const scoringInput = {
       role: session.role,
       level: session.level,
@@ -588,6 +609,7 @@ export class InterviewsService {
       persona: session.interviewerPersona,
       questionPlan: session.questionPlan,
       transcript: transcript?.turns || [],
+      perQuestionSatisfaction,
       proctoring: {
         events: proctoring?.events || [],
         integrityScore: proctoring?.integrityScore,
