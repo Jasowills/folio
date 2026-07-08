@@ -4,9 +4,10 @@ import type { OptionalData } from '../types'
 interface Props {
   data: OptionalData | null
   onSave: (data: OptionalData) => void
+  onChange?: (data: OptionalData) => void
 }
 
-export default function Step7Optional({ data, onSave }: Props) {
+export default function Step7Optional({ data, onSave, onChange }: Props) {
   const [certOn, setCertOn] = useState(data?.certifications || false)
   const [langOn, setLangOn] = useState(data?.languages || false)
   const [projOn, setProjOn] = useState(data?.projects || false)
@@ -19,14 +20,18 @@ export default function Step7Optional({ data, onSave }: Props) {
   const [volData, setVolData] = useState(data?.volunteerData || [{ organization: '', role: '', description: '' }])
   const [awdData, setAwdData] = useState(data?.awardsData || [{ title: '', issuer: '', date: '' }])
 
+  const buildData = () => ({
+    certifications: certOn, certificationsData: certOn ? certData : [],
+    languages: langOn, languagesData: langOn ? langData : [],
+    projects: projOn, projectsData: projOn ? projData : [],
+    volunteer: volOn, volunteerData: volOn ? volData : [],
+    awards: awdOn, awardsData: awdOn ? awdData : [],
+  })
+
+  const fireOnChange = () => onChange?.(buildData())
+
   const handleSave = () => {
-    onSave({
-      certifications: certOn, certificationsData: certOn ? certData : [],
-      languages: langOn, languagesData: langOn ? langData : [],
-      projects: projOn, projectsData: projOn ? projData : [],
-      volunteer: volOn, volunteerData: volOn ? volData : [],
-      awards: awdOn, awardsData: awdOn ? awdData : [],
-    })
+    onSave(buildData())
   }
 
   const toggleSection = (
@@ -34,6 +39,7 @@ export default function Step7Optional({ data, onSave }: Props) {
     current: boolean,
   ) => {
     setter(!current)
+    setTimeout(fireOnChange, 0)
   }
 
   return (

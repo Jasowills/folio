@@ -4,6 +4,7 @@ import type { BasicsData } from '../types'
 interface Props {
   data: BasicsData | null
   onSave: (data: BasicsData) => void
+  onChange?: (partial: Partial<BasicsData>) => void
 }
 
 const COMMON_TITLES = [
@@ -22,7 +23,7 @@ const COMMON_TITLES = [
   'HR Manager', 'Recruiter', 'Operations Manager',
 ]
 
-export default function Step1Basics({ data, onSave }: Props) {
+export default function Step1Basics({ data, onSave, onChange }: Props) {
   const [name, setName] = useState(data?.name || '')
   const [headline, setHeadline] = useState(data?.headline || '')
   const [email, setEmail] = useState(data?.email || '')
@@ -53,7 +54,7 @@ export default function Step1Basics({ data, onSave }: Props) {
         <label className="text-[12px] text-muted mb-1.5 block">What&apos;s your name?</label>
         <input
           value={name}
-          onChange={e => setName(e.target.value)}
+          onChange={e => { const v = e.target.value; setName(v); onChange?.({ name: v }) }}
           onKeyDown={handleKeyDown}
           placeholder="James Okafor"
           className="w-full px-3 py-2 text-[13px] bg-paper border border-border rounded-lg focus:outline-none focus:border-teal focus:ring-1 focus:ring-teal/20 transition-colors"
@@ -64,7 +65,7 @@ export default function Step1Basics({ data, onSave }: Props) {
         <label className="text-[12px] text-muted mb-1.5 block">What&apos;s your current or target job title?</label>
         <input
           value={headline}
-          onChange={e => { setHeadline(e.target.value); setShowSuggestions(true) }}
+          onChange={e => { const v = e.target.value; setHeadline(v); setShowSuggestions(true); onChange?.({ headline: v }) }}
           onFocus={() => setShowSuggestions(true)}
           onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
           placeholder="Senior Product Designer"
@@ -90,7 +91,7 @@ export default function Step1Basics({ data, onSave }: Props) {
         <input
           type="email"
           value={email}
-          onChange={e => setEmail(e.target.value)}
+          onChange={e => { const v = e.target.value; setEmail(v); onChange?.({ email: v }) }}
           onKeyDown={handleKeyDown}
           placeholder="james@example.com"
           className="w-full px-3 py-2 text-[13px] bg-paper border border-border rounded-lg focus:outline-none focus:border-teal focus:ring-1 focus:ring-teal/20 transition-colors"
@@ -102,7 +103,7 @@ export default function Step1Basics({ data, onSave }: Props) {
         <input
           type="tel"
           value={phone}
-          onChange={e => setPhone(e.target.value)}
+          onChange={e => { const v = e.target.value; setPhone(v); onChange?.({ phone: v }) }}
           placeholder="+1 555 0123"
           className="w-full px-3 py-2 text-[13px] bg-paper border border-border rounded-lg focus:outline-none focus:border-teal focus:ring-1 focus:ring-teal/20 transition-colors"
         />
@@ -112,7 +113,7 @@ export default function Step1Basics({ data, onSave }: Props) {
         <label className="text-[12px] text-muted mb-1.5 block">Location</label>
         <input
           value={location}
-          onChange={e => setLocation(e.target.value)}
+          onChange={e => { const v = e.target.value; setLocation(v); onChange?.({ location: v }) }}
           placeholder="San Francisco, CA"
           className="w-full px-3 py-2 text-[13px] bg-paper border border-border rounded-lg focus:outline-none focus:border-teal focus:ring-1 focus:ring-teal/20 transition-colors"
         />

@@ -24,7 +24,8 @@ export default function ProgressIndicator({ currentStep, completedSteps }: Props
       </div>
       <div className="w-full h-[3px] bg-border/40 rounded-full overflow-hidden mb-2">
         <div
-          className="h-full bg-teal rounded-full transition-all duration-500 ease-out"
+          className="h-full bg-teal rounded-full"
+          style={{ transition: 'width 400ms ease-out' }}
           style={{ width: `${progress}%` }}
         />
       </div>

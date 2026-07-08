@@ -4,6 +4,7 @@ import type { EducationEntry } from '../types'
 interface Props {
   data: EducationEntry[]
   onSave: (data: EducationEntry[]) => void
+  onChange?: (entries: EducationEntry[]) => void
 }
 
 const DEGREES = ['BSc', 'BA', 'BEng', 'MSc', 'MA', 'MBA', 'PhD', 'HND', 'Bootcamp', 'Certification', 'Other']
@@ -12,15 +13,17 @@ function emptyEntry(): EducationEntry {
   return { degree: '', field: '', institution: '', startYear: '', endYear: '', inProgress: false, gpa: '' }
 }
 
-export default function Step5Education({ data, onSave }: Props) {
+export default function Step5Education({ data, onSave, onChange }: Props) {
   const [entries, setEntries] = useState<EducationEntry[]>(data.length > 0 ? data : [emptyEntry()])
 
   const update = (i: number, field: keyof EducationEntry, value: string | boolean) => {
-    setEntries(prev => prev.map((e, j) => j === i ? { ...e, [field]: value } : e))
+    const next = entries.map((e, j) => j === i ? { ...e, [field]: value } : e)
+    setEntries(next)
+    onChange?.(next)
   }
 
-  const add = () => setEntries(prev => [...prev, emptyEntry()])
-  const remove = (i: number) => setEntries(prev => prev.filter((_, j) => j !== i))
+  const add = () => setEntries(prev => { const n = [...prev, emptyEntry()]; onChange?.(n); return n })
+  const remove = (i: number) => setEntries(prev => { const n = prev.filter((_, j) => j !== i); onChange?.(n); return n })
 
   const valid = entries.some(e => e.degree && e.field && e.institution)
 

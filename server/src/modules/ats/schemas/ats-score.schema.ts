@@ -1,5 +1,5 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
-import { Document, Types } from 'mongoose';
+import { Document, Types, Schema as MongooseSchema } from 'mongoose';
 
 export type AtsScoreDocument = AtsScore & Document;
 
@@ -16,10 +16,10 @@ interface RoleContext {
 
 @Schema({ timestamps: true })
 export class AtsScore {
-  @Prop({ required: true, type: Types.ObjectId, ref: 'User' })
+  @Prop({ required: true, type: MongooseSchema.Types.ObjectId, ref: 'User' })
   userId!: Types.ObjectId;
 
-  @Prop({ required: true, type: Types.ObjectId, ref: 'Resume' })
+  @Prop({ required: true, type: MongooseSchema.Types.ObjectId, ref: 'Resume' })
   resumeId!: Types.ObjectId;
 
   @Prop()

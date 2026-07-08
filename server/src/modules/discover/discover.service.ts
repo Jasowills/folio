@@ -82,7 +82,7 @@ export class DiscoverService {
     const prefs = await this.prefsModel.findOneAndUpdate(
       { userId: new Types.ObjectId(userId) },
       { $set: update },
-      { upsert: true, new: true },
+      { upsert: true, returnDocument: 'after' },
     ).exec();
 
     if (resumeChanged && prefs.resumeId) {
@@ -446,7 +446,7 @@ export class DiscoverService {
     return this.jobAppModel.findByIdAndUpdate(
       appId,
       { $set: update },
-      { new: true },
+      { returnDocument: 'after' },
     ).exec() as Promise<JobApplicationDocument>;
   }
 

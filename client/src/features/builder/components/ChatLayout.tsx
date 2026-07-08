@@ -1,12 +1,12 @@
-import { useMemo } from 'react'
-import { IconMessage } from '@tabler/icons-react'
+import { useMemo, useRef, useState, useCallback } from 'react'
+import { IconMessage, IconArrowBackUp } from '@tabler/icons-react'
 import type { TemplateId } from '../../resume-editor/templates/types'
 import type { DesignSettings } from '../../../pages/editor/types'
 import { getDefaultLocalData, getSampleLocalData } from '../../resume-editor/utils/resumeBridge'
 import PreviewPane from '../../resume-editor/components/PreviewPane'
 import ContextCard from './ContextCard'
 import ChatInterface from './ChatInterface'
-import type { BuilderStepData, BasicsData, TargetRoleData, EducationEntry, OptionalData, ExperienceRole } from '../types'
+import type { BuilderStepData, BasicsData, TargetRoleData, EducationEntry, OptionalData, ExperienceRole, BuilderSnapshot } from '../types'
 import { buildSectionOrder } from '../types'
 
 interface Props {
@@ -30,6 +30,33 @@ interface Props {
 }
 
 export default function ChatLayout(props: Props) {
+  const undoRef = useRef<{ snapshot: BuilderSnapshot; message: string } | null>(null)
+  const [lastUndoable, setLastUndoable] = useState<{ message: string } | null>(null)
+
+  const captureUndo = (actionMessage: string) => {
+    undoRef.current = {
+      snapshot: { stepData: structuredClone(stepData), design: { ...design }, selectedTemplate },
+      message: actionMessage,
+    }
+    setLastUndoable({ message: actionMessage })
+  }
+
+  const applyUndo = useCallback(() => {
+    const u = undoRef.current
+    if (!u) return
+    const { stepData: sd, design: d, selectedTemplate: st } = u.snapshot
+    if (sd.basics) onSetBasics(sd.basics)
+    if (sd.targetRole) onSetTargetRole(sd.targetRole)
+    if (sd.summary) onSetSummary(sd.summary.text, sd.summary.accepted)
+    onSetEducation(sd.education)
+    onSetSkills(sd.skills)
+    if (sd.optional) onSetOptional(sd.optional)
+    if (st) onSetTemplate(st)
+    if (d) onDesignChange(d)
+    undoRef.current = null
+    setLastUndoable(null)
+  }, [onSetBasics, onSetTargetRole, onSetSummary, onSetEducation, onSetSkills, onSetOptional, onSetTemplate, onDesignChange])
+
   const {
     stepData, selectedTemplate, design, resumeId, zoom,
     onSetTemplate, onDesignChange, onSetBasics, onSetTargetRole, onSetSummary,
@@ -93,7 +120,9 @@ export default function ChatLayout(props: Props) {
   }).length
 
   const handleAction = (fn: string, params: Record<string, unknown>): string | void => {
+    if (!params) { console.warn('[builder] handleAction called with no params for', fn); return }
     console.log('[builder] chat action', fn, params)
+    captureUndo(`I've applied the ${fn.replace(/_/g, ' ')} change. Undo?`)
     switch (fn) {
       case 'set_basics':
         onSetBasics({
@@ -174,15 +203,31 @@ export default function ChatLayout(props: Props) {
         if (params.templateId) onSetTemplate(params.templateId as TemplateId)
         break
       case 'set_design': {
-        const designChanges = (params.design as Partial<DesignSettings>) || params
-        if (designChanges.primaryColor || designChanges.headingFont || designChanges.bodyFont) {
-          console.log('[builder] applying design changes', designChanges)
-          onDesignChange({ ...design, ...designChanges })
-        } else {
-          console.log('[builder] set_design called but no recognizable design fields', params)
+        const designChanges = (params.design as Partial<DesignSettings>) || {}
+        // Support top-level design params (primaryColor, headingFont, bodyFont, columnLayout, sectionSpacing)
+        const topLevelChanges: Record<string, unknown> = {}
+        for (const key of ['primaryColor', 'headingFont', 'bodyFont', 'columnLayout', 'sectionSpacing', 'margins', 'lineSpacing', 'bodyFontSize'] as const) {
+          if (key in params) topLevelChanges[key] = params[key]
+        }
+        const merged = { ...design, ...designChanges, ...topLevelChanges }
+        if (Object.keys(designChanges).length > 0 || Object.keys(topLevelChanges).length > 0) {
+          onDesignChange(merged)
         }
         break
       }
+      case 'generate_summary':
+        // Trigger summary generation with target context
+        if (stepData.targetRole) {
+          // The chat already generated the summary text inline via AI, so this is just a signal
+          // to the UI that new summary content is available
+          console.log('[builder] generate_summary triggered')
+        }
+        break
+      case 'generate_bullets':
+        if (typeof params.index === 'number' && stepData.experience[params.index as number]) {
+          console.log('[builder] generate_bullets triggered for index', params.index)
+        }
+        break
       case 'set_optional':
         onSetOptional({
           certifications: (params.certifications as boolean) || false,
@@ -224,6 +269,8 @@ export default function ChatLayout(props: Props) {
               resumeId={resumeId}
               stepData={stepData}
               onAction={handleAction}
+              onUndo={lastUndoable ? applyUndo : undefined}
+              undoMessage={lastUndoable?.message || null}
             />
           ) : (
             <div className="flex items-center justify-center h-full text-[12px] text-muted/50">

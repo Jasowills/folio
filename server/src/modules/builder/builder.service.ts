@@ -90,7 +90,7 @@ export class BuilderService {
       .findOneAndUpdate(
         { _id: resumeId, userId },
         { $set: { wizardState } },
-        { new: true },
+        { returnDocument: 'after' },
       )
       .exec();
     if (!resume) throw new NotFoundException('Resume not found');
@@ -216,53 +216,62 @@ ${jdContext}`;
       message: string;
       history?: Array<{ role: string; content: string }>;
       resumeSnapshot?: Record<string, unknown>;
+      currentTemplate?: string;
+      currentColor?: string;
+      currentFont?: string;
     },
     onToken: (token: string) => void,
   ): Promise<void> {
     this.logger.log(`[chat] userId=${userId} resumeId=${resumeId} message="${body.message?.slice(0, 100)}"`);
-    const stepData = body.resumeSnapshot || {};
+    const stepData = (body.resumeSnapshot || {}) as Record<string, unknown>;
     const snapshot = JSON.stringify(stepData, null, 2);
 
-    const systemPrompt = `You are an AI resume builder with direct access to modify the user's resume data.
+    const basics = stepData.basics as Record<string, unknown> | undefined;
+    const targetRole = stepData.targetRole as Record<string, unknown> | undefined;
+    const experience = stepData.experience as Array<Record<string, unknown>> | undefined;
+    const skills = stepData.skills as string[] | undefined;
 
-## Current Resume
-\`\`\`json
-${snapshot}
-\`\`\`
+    const stateSummary = body.resumeSnapshot
+      ? `Name: ${(basics?.name as string) || 'Not set'}
+Target role: ${(targetRole?.role as string) || 'Not set'}
+Experience: ${(experience || []).length} entries
+Skills: ${(skills || []).join(', ') || 'None'}
+Current template: ${body.currentTemplate || 'minimal'}
+Current color: ${body.currentColor || '#1a1a2e'}
+Current font: ${body.currentFont || 'Inter'}` 
+      : '';
 
-## Available Actions
-You can modify the resume by emitting action tags. Each tag must be on its own line.
+    const systemPrompt = `You are an AI resume builder. The user will give you instructions to build or modify their resume. You must output action tags to make changes.
 
-### Personal Info
-- \`\`\`[ACTION]{"fn":"set_basics","name":"...","headline":"...","email":"...","phone":"...","location":"...","linkedin":"...","github":"..."}[/ACTION]\`\`\`
+## Current Resume Context
+${body.resumeSnapshot ? stateSummary : snapshot}
 
-### Summary
-- \`\`\`[ACTION]{"fn":"set_summary","text":"..."}[/ACTION]\`\`\`
+## Action Tags
+Output one or more of these tags (each on its own line, no markdown, no backticks):
 
-### Experience
-- \`\`\`[ACTION]{"fn":"add_experience","title":"...","company":"...","startDate":"...","endDate":"...","current":false,"location":"...","bullets":["..."]}[/ACTION]\`\`\`
-- \`\`\`[ACTION]{"fn":"update_experience_bullets","index":0,"bullets":["...","..."]}[/ACTION]\`\`\`
-- \`\`\`[ACTION]{"fn":"remove_experience","index":0}[/ACTION]\`\`\`
+### Content actions:
+[ACTION]{"fn":"set_basics","name":"...","headline":"...","email":"...","phone":"...","location":"...","linkedin":"...","github":"..."}[/ACTION]
+[ACTION]{"fn":"set_summary","text":"..."}[/ACTION]
+[ACTION]{"fn":"add_experience","title":"...","company":"...","startDate":"...","endDate":"...","current":false,"location":"...","bullets":["...","..."]}[/ACTION]
+[ACTION]{"fn":"update_experience_bullets","index":0,"bullets":["...","..."]}[/ACTION]
+[ACTION]{"fn":"remove_experience","index":0}[/ACTION]
+[ACTION]{"fn":"add_education","degree":"...","field":"...","institution":"...","startYear":"...","endYear":"...","gpa":"..."}[/ACTION]
+[ACTION]{"fn":"add_skill","skill":"..."}[/ACTION]
+[ACTION]{"fn":"set_skills","skills":["...","..."]}[/ACTION]
 
-### Education
-- \`\`\`[ACTION]{"fn":"add_education","degree":"...","field":"...","institution":"...","startYear":"...","endYear":"...","gpa":"..."}[/ACTION]\`\`\`
-- \`\`\`[ACTION]{"fn":"remove_education","index":0}[/ACTION]\`\`\`
-
-### Skills
-- \`\`\`[ACTION]{"fn":"add_skill","skill":"..."}[/ACTION]\`\`\`
-- \`\`\`[ACTION]{"fn":"remove_skill","skill":"..."}[/ACTION]\`\`\`
-- \`\`\`[ACTION]{"fn":"set_skills","skills":["...","..."]}[/ACTION]\`\`\`
-
-### Design & Template
-- \`\`\`[ACTION]{"fn":"set_template","templateId":"modern"}[/ACTION]\`\`\` — change the template. Valid ids: minimal, modern, executive, compact, classic, sidebar, bold, creative, tech, academic, charter, prestige, engineer, contemporary, folio
-- \`\`\`[ACTION]{"fn":"set_design","design":{"headingFont":"DM Serif Display","bodyFont":"Plus Jakarta Sans","primaryColor":"#0F6E56","secondaryColor":"#475569","columnLayout":"single-column","bodyFontSize":10,"lineSpacing":1.5,"margins":3,"sectionSpacing":3}}[/ACTION]\`\`\` — change design settings. You can pass a partial design object — only the fields you want to change. Common colors: Teal #0F6E56, Navy #1E3A5F, Forest #2D5A27, Burgundy #722F37, Slate #475569, Amber #92400E, Cobalt #1E40AF, Plum #5B21B6
+### Design actions:
+[ACTION]{"fn":"set_template","templateId":"modern"}[/ACTION]  (ids: minimal, modern, executive, compact, classic, sidebar, bold, creative, tech, academic, charter, prestige, engineer, contemporary, folio)
+[ACTION]{"fn":"set_design","primaryColor":"#1a1a2e"}[/ACTION]
+[ACTION]{"fn":"set_design","headingFont":"DM Serif Display","bodyFont":"Lora"}[/ACTION]  (serif request)
+[ACTION]{"fn":"set_design","columnLayout":"two-column"}[/ACTION]  (or single-column)
+[ACTION]{"fn":"set_design","sectionSpacing":1.5}[/ACTION]  (compact: 0.75, default: 1, spacious: 1.5)
 
 ## Rules
-1. Emit action tags on their own lines for every change the user asks for.
-2. After the actions, write a natural language explanation of what you changed.
-3. If the user asks to review the resume, emit a review_resume action AND write a detailed critique.
-4. Be conversational, helpful, and precise. Use the resume data above to inform your decisions.
-5. If asked about something outside your abilities, explain what you can and cannot do.`;
+1. Output tag(s) FIRST, then your conversational response.
+2. For design actions, ONLY change what the user asked for — do not change unrelated design properties.
+3. Valid template IDs: minimal, modern, executive, compact, classic, sidebar, bold, creative, tech, academic, charter, prestige, engineer, contemporary, folio
+4. Valid colors: navy (#1a1a2e), teal (#0d9488), slate (#475569), rose (#e11d48), amber (#d97706), emerald (#059669), indigo (#4f46e5), violet (#7c3aed), stone (#57534e)
+5. Be conversational. Confirm what you changed.`;
 
     const historyText = (body.history || [])
       .map(m => `${m.role === 'user' ? 'User' : 'Assistant'}: ${m.content}`)
@@ -278,6 +287,7 @@ You can modify the resume by emitting action tags. Each tag must be on its own l
     );
     const reader = stream.getReader();
     const decoder = new TextDecoder();
+    const fullResponse: string[] = [];
 
     try {
       while (true) {
@@ -287,17 +297,198 @@ You can modify the resume by emitting action tags. Each tag must be on its own l
         const lines = chunk.split('\n').filter(l => l.startsWith('data: '));
         for (const line of lines) {
           const json = line.slice(6).trim();
-          if (json === '[DONE]') return;
+          if (json === '[DONE]') break;
           try {
             const parsed = JSON.parse(json);
             const token = parsed.choices?.[0]?.delta?.content || '';
-            if (token) onToken(token);
+            if (token) {
+              fullResponse.push(token);
+              onToken(token);
+            }
           } catch { /* skip partial */ }
         }
       }
     } catch (err) {
       this.logger.error(`Chat stream error: ${(err as Error).message}`);
     }
+
+    // Always generate fallback actions from the user message in case AI
+    // produced malformed or missing action tags (common with small local models)
+    const completeResponse = fullResponse.join('');
+    const fallbackTags = this.generateFallbackActions(completeResponse, stepData, body.message);
+    if (fallbackTags.length > 0) {
+      this.logger.log(`[chat] Generated ${fallbackTags.length} fallback action tags: ${fallbackTags.join(', ').slice(0, 200)}`);
+      for (const tag of fallbackTags) {
+        onToken(tag);
+      }
+      // Also persist directly to DB so data survives even if client-side
+      // action processing fails (e.g. malformed AI tags causing errors)
+      await this.applyFallbackToDb(resumeId, userId, fallbackTags, stepData);
+    } else {
+      this.logger.warn(`[chat] No fallback tags generated. response="${completeResponse.slice(0, 100)}" stepData keys=${Object.keys(stepData).join(',')} msg="${(body.message || '').slice(0, 80)}"`);
+    }
+  }
+
+  private async applyFallbackToDb(
+    resumeId: string,
+    userId: string,
+    tags: string[],
+    currentStepData: Record<string, unknown>,
+  ): Promise<void> {
+    const stepData = { ...currentStepData };
+
+    for (const tag of tags) {
+      const match = tag.match(/\[ACTION\](.*?)\[\/ACTION\]/);
+      if (!match) continue;
+      try {
+        const action = JSON.parse(match[1]);
+        switch (action.fn) {
+          case 'set_basics': {
+            const { name, headline, email, phone, location, linkedin, github, website } = action;
+            stepData.basics = { ...(stepData.basics as any || {}), name, headline, email, phone, location, linkedin, github, website };
+            break;
+          }
+          case 'set_summary':
+            stepData.summary = { text: action.text, accepted: true };
+            break;
+          case 'set_skills':
+            stepData.skills = action.skills || [];
+            break;
+          case 'add_skill': {
+            const existing = (stepData.skills as string[]) || [];
+            if (!existing.includes(action.skill)) {
+              stepData.skills = [...existing, action.skill];
+            }
+            break;
+          }
+          case 'set_template':
+            // template handled by client
+            break;
+        }
+      } catch {}
+    }
+
+    try {
+      await this.resumeModel.findOneAndUpdate(
+        { _id: resumeId, userId },
+        {
+          $set: {
+            'wizardState.stepData.basics': stepData.basics,
+            'wizardState.stepData.summary': stepData.summary,
+            'wizardState.stepData.skills': stepData.skills,
+          },
+        },
+      );
+      this.logger.log(`[chat] Fallback data persisted to DB for resume ${resumeId}`);
+    } catch (err) {
+      this.logger.error(`[chat] Failed to persist fallback: ${(err as Error).message}`);
+    }
+  }
+
+  private generateFallbackActions(
+    response: string,
+    stepData: Record<string, unknown>,
+    userMessage?: string,
+  ): string[] {
+    const tags: string[] = [];
+    const current = stepData;
+    const lower = response.toLowerCase();
+    const userLower = (userMessage || '').toLowerCase();
+
+    // User message first (exact intent), then AI response (may rephrase)
+    const sources = [userLower, lower];
+
+    function extract(re: RegExp, text: string): string | null {
+      const m = text.match(re);
+      return m ? m[1].trim() : null;
+    }
+
+    function extractFromSources(re: RegExp): string | null {
+      for (const src of sources) {
+        const val = extract(re, src);
+        if (val) return val;
+      }
+      return null;
+    }
+
+    // Try to build a full basics object from all sources
+    const basics: Record<string, string> = { ...(current.basics as any || {}) };
+    let basicsChanged = false;
+
+    let nameVal = extractFromSources(/(?:name is|name to|called)\s+([A-Za-z\s\-']+?)(?:\.|,|and|with|$)/);
+    if (nameVal) {
+      nameVal = nameVal.replace(/^(now|please|set|also|the)\s+/i, '').trim();
+    }
+    if (nameVal && !basics.name) { basics.name = nameVal; basicsChanged = true; }
+
+    const emailVal = extractFromSources(/email(?:\s+is|\s+to|\s*:|)\s+([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/);
+    if (emailVal && !basics.email) { basics.email = emailVal; basicsChanged = true; }
+
+    const phoneVal = extractFromSources(/phone(?:\s+is|\s+to|\s*:|)\s+([\d\s\-\+\(\)]+?)(?:\.|,|and|$)/);
+    if (phoneVal && !basics.phone) { basics.phone = phoneVal; basicsChanged = true; }
+
+    const locVal = extractFromSources(/(?:location|based)(?:\s+is|\s+in|\s+to|\s*:|)\s+([A-Za-z\s,]+?)(?:\.|,|and|$)/);
+    if (locVal && !basics.location) { basics.location = locVal; basicsChanged = true; }
+
+    const titleVal = extractFromSources(/(?:title|headline|role)(?:\s+is|\s+to|\s*:|)\s+([A-Za-z\s\-]+?)(?:\.|,|and|with|at|$)/);
+    if (titleVal && !basics.headline) { basics.headline = titleVal; basicsChanged = true; }
+
+    if (basicsChanged) {
+      tags.push(`[ACTION]${JSON.stringify({ fn: 'set_basics', ...basics })}[/ACTION]`);
+    }
+
+    // Check for summary text
+    const summaryText = extractFromSources(/summary(?:\s*:|is)\s*(.+?)(?:experience|education|skills|\.\s*$)/s);
+    if (summaryText && summaryText.length > 10) {
+      tags.push(`[ACTION]${JSON.stringify({ fn: 'set_summary', text: summaryText })}[/ACTION]`);
+    }
+
+    // Check for skills from both sources
+    // Patterns: "Add React, TypeScript to skills", "skills: React", "skills include React"
+    for (const src of sources) {
+      // Try "Add X, Y to skills" first
+      const addSkillsMatch = src.match(/(?:add|added|adding)\s+(.+?)(?:\s+to\s+(?:my\s+)?skills?)/i);
+      if (addSkillsMatch) {
+        const extracted = addSkillsMatch[1].split(/,|;| and | & /).map(s => s.trim()).filter(s => s.length > 1);
+        if (extracted.length > 0) {
+          const existing = (current.skills as string[]) || [];
+          const all = [...new Set([...existing, ...extracted])];
+          tags.push(`[ACTION]${JSON.stringify({ fn: 'set_skills', skills: all })}[/ACTION]`);
+          break;
+        }
+      }
+      // Try "skills: React, TypeScript" pattern
+      const skillsMatch = src.match(/(?:skills|technologies)(?:\s*:|(?: i added| i'?ve added| include| are)\s+)(.+?)(?:\.|experience|education|summary|$)/);
+      if (skillsMatch) {
+        const skillsText = skillsMatch[1];
+        const extractedSkills = skillsText.split(/,|;| and | & /).map(s => s.trim().replace(/^my /, '')).filter(s => s.length > 1);
+        if (extractedSkills.length > 0) {
+          const known = ['to', 'the', 'your', 'with', 'for', 'you', 'a'];
+          const filtered = extractedSkills.filter(s => !known.includes(s.toLowerCase()) && s.length > 1);
+          if (filtered.length > 0) {
+            const existing = (current.skills as string[]) || [];
+            const all = [...new Set([...existing, ...filtered])];
+            tags.push(`[ACTION]${JSON.stringify({ fn: 'set_skills', skills: all })}[/ACTION]`);
+            break;
+          }
+        }
+      }
+    }
+
+    // Check for template changes
+    const validTemplates = ['minimal', 'modern', 'executive', 'compact', 'classic', 'sidebar', 'bold', 'creative', 'tech', 'academic', 'charter', 'prestige', 'engineer', 'contemporary', 'folio'];
+    for (const src of sources) {
+      const templateMatch = src.match(/(?:use|change|switch|apply|set)\s+(?:the\s+)?(?:(.+?)\s+)?template/i);
+      if (templateMatch) {
+        const templateId = templateMatch[1]?.trim().toLowerCase();
+        if (templateId && validTemplates.includes(templateId)) {
+          tags.push(`[ACTION]${JSON.stringify({ fn: 'set_template', templateId })}[/ACTION]`);
+          break;
+        }
+      }
+    }
+
+    return tags;
   }
 
   async finish(
@@ -399,7 +590,7 @@ You can modify the resume by emitting action tags. Each tag must be on its own l
             'wizardState.isComplete': true,
           },
         },
-        { new: true },
+        { returnDocument: 'after' },
       )
       .exec();
 

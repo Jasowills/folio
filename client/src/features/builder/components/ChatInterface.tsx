@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
-import { IconSend, IconRobot, IconUser, IconCheck, IconX } from '@tabler/icons-react'
+import { IconSend, IconRobot, IconUser, IconCheck, IconX, IconArrowBackUp } from '@tabler/icons-react'
 import type { BuilderStepData } from '../types'
+import { useBuilderStore } from '../hooks/useBuilderStore'
 
 interface Action {
   fn: string
@@ -19,6 +20,8 @@ interface Props {
   resumeId: string
   stepData: BuilderStepData
   onAction: (fn: string, params: Record<string, unknown>) => void
+  onUndo?: () => void
+  undoMessage?: string | null
 }
 
 let msgId = 0
@@ -54,12 +57,17 @@ function parseCompleteActions(text: string): Action[] {
   const re = /\[ACTION\](.*?)\[\/ACTION\]/g
   let match
   while ((match = re.exec(text)) !== null) {
-    try { actions.push(JSON.parse(match[1])) } catch { /* skip malformed */ }
+    try {
+      const parsed = JSON.parse(match[1])
+      if (!parsed.fn) continue
+      const { fn, ...params } = parsed
+      actions.push({ fn, params })
+    } catch { /* skip malformed */ }
   }
   return actions
 }
 
-export default function ChatInterface({ resumeId, stepData, onAction }: Props) {
+export default function ChatInterface({ resumeId, stepData, onAction, onUndo, undoMessage }: Props) {
   const [messages, setMessages] = useState<ChatMessage[]>([
     { id: nextId(), role: 'assistant', content: WELCOME, actions: [] },
   ])
@@ -106,6 +114,9 @@ export default function ChatInterface({ resumeId, stepData, onAction }: Props) {
       .slice(-20)
       .map(m => ({ role: m.role, content: m.content }))
 
+    // Pass current design context so AI can handle design commands
+    const { design: currentDesign } = useBuilderStore.getState()
+
     let fullText = ''
     try {
       const token = localStorage.getItem('accessToken')
@@ -116,6 +127,9 @@ export default function ChatInterface({ resumeId, stepData, onAction }: Props) {
           message: text,
           history,
           resumeSnapshot: buildSnapshot(stepData),
+          currentTemplate: useBuilderStore.getState().selectedTemplate || 'minimal',
+          currentColor: currentDesign?.primaryColor || '#1a1a2e',
+          currentFont: currentDesign?.headingFont || 'Inter',
         }),
         signal: controller.signal,
       })
@@ -138,22 +152,27 @@ export default function ChatInterface({ resumeId, stepData, onAction }: Props) {
             const parsed = JSON.parse(json)
             if (parsed.error) { setStreaming(false); return }
             if (parsed.text) fullText += parsed.text
-            if (parsed.text || parsed.done) {
-              const allActions = parseCompleteActions(fullText)
-              const newActions = allActions.slice(execCountRef.current)
-              execCountRef.current = allActions.length
-              for (const a of newActions) {
-                console.log('[chat] parsed action', a.fn, a.params)
-                onAction(a.fn, a.params)
+              if (parsed.text || parsed.done) {
+                const allActions = parseCompleteActions(fullText)
+                const newActions = allActions.slice(execCountRef.current)
+                execCountRef.current = allActions.length
+                console.log('[chat] actions:', { total: allActions.length, newCount: newActions.length, execCount: execCountRef.current, lineText: (parsed.text || '').slice(0, 120) })
+                for (const a of newActions) {
+                  console.log('[chat] DISPATCH', a.fn, JSON.stringify(a.params))
+                  try {
+                    onAction(a.fn, a.params)
+                  } catch (e) {
+                    console.error('[chat] onAction error:', e)
+                  }
+                }
+                if (newActions.length > 0) {
+                  updateLastAssistant(m => ({
+                    ...m,
+                    actions: [...m.actions, ...newActions],
+                  }))
+                }
+                updateLastAssistant(m => ({ ...m, content: stripActions(fullText) }))
               }
-              if (newActions.length > 0) {
-                updateLastAssistant(m => ({
-                  ...m,
-                  actions: [...m.actions, ...newActions],
-                }))
-              }
-              updateLastAssistant(m => ({ ...m, content: stripActions(fullText) }))
-            }
             if (parsed.done) { setStreaming(false); return }
           } catch {}
         }
@@ -232,6 +251,15 @@ export default function ChatInterface({ resumeId, stepData, onAction }: Props) {
                       <span>{actionLabel(a.fn)}</span>
                     </div>
                   ))}
+                  {onUndo && undoMessage && messages.indexOf(m) === messages.length - 1 && (
+                    <button
+                      onClick={onUndo}
+                      className="flex items-center gap-1 text-[10px] text-amber-600 hover:text-amber-700 transition-colors mt-0.5"
+                    >
+                      <IconArrowBackUp size={10} />
+                      <span>Undo?</span>
+                    </button>
+                  )}
                 </div>
               )}
             </div>
@@ -268,10 +296,40 @@ export default function ChatInterface({ resumeId, stepData, onAction }: Props) {
             {streaming ? <IconX size={16} /> : <IconSend size={16} />}
           </button>
         </div>
+
+        {/* Contextual suggested prompts */}
+        {!streaming && messages.length <= 1 && (
+          <div className="flex flex-wrap gap-1.5 mt-2 px-0.5">
+            {getSuggestions(stepData).map((s, i) => (
+              <button
+                key={i}
+                onClick={() => handleSuggestedPrompt(s)}
+                className="text-[10px] px-2.5 py-1.5 rounded-full bg-teal/5 text-teal border border-teal/15 hover:bg-teal/10 hover:border-teal/30 transition-colors whitespace-nowrap"
+              >
+                {s}
+              </button>
+            ))}
+          </div>
+        )}
         <p className="text-[9px] text-muted/40 mt-1.5 text-center">
           The AI can read, write, and modify any part of your resume
         </p>
       </div>
     </div>
   )
+
+  function getSuggestions(sd: BuilderStepData): string[] {
+    const hasExperience = sd.experience.length > 0
+    const hasSummary = sd.summary?.text
+    const hasSkills = sd.skills.length > 0
+    if (!hasExperience) return ['Add my most recent job', 'Add my current role']
+    if (!hasSummary) return ['Write me a professional summary', 'Generate a summary for a senior role']
+    if (!hasSkills) return ['Add my technical skills', "I'm proficient in React and TypeScript"]
+    return ['Switch to the Modern template', 'Make the primary color navy', 'Improve my resume layout']
+  }
+
+  function handleSuggestedPrompt(prompt: string) {
+    setInput(prompt)
+    setTimeout(() => handleSend(), 50)
+  }
 }

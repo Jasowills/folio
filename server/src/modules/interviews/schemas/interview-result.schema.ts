@@ -1,5 +1,5 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose'
-import { Document, Types } from 'mongoose'
+import { Document, Types, Schema as MongooseSchema } from 'mongoose'
 
 export type InterviewResultDocument = InterviewResult & Document
 
@@ -17,7 +17,7 @@ export interface PerQuestionScore {
 
 @Schema({ timestamps: true })
 export class InterviewResult {
-  @Prop({ required: true, type: Types.ObjectId, ref: 'InterviewSession' })
+  @Prop({ required: true, type: MongooseSchema.Types.ObjectId, ref: 'InterviewSession' })
   sessionId!: Types.ObjectId
 
   @Prop({ required: true })

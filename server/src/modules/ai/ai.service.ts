@@ -234,18 +234,25 @@ export class AiService {
       { role: 'user', content: user },
     ];
 
+    const providers: Array<{ provider: 'ollama' | 'openrouter' | 'groq'; baseUrl: string; model: string }> = [];
+
     if (this.groqConfigured) {
-      const groqModel = model || this.groqDefaultModel;
-      return this.streamFromProvider('groq', this.groqBaseUrl, groqModel, messages);
+      providers.push({ provider: 'groq', baseUrl: this.groqBaseUrl, model: model || this.groqDefaultModel });
     }
-
-    const selectedModel = model || (this.ollamaConfigured ? this.ollamaDefaultModel : this.openrouterDefaultModel);
-
     if (this.ollamaConfigured) {
-      return this.streamFromProvider('ollama', this.ollamaBaseUrl, selectedModel, messages);
+      providers.push({ provider: 'ollama', baseUrl: this.ollamaBaseUrl, model: model || this.ollamaDefaultModel });
+    }
+    providers.push({ provider: 'openrouter', baseUrl: this.openrouterBaseUrl, model: model || this.openrouterDefaultModel });
+
+    for (const { provider, baseUrl, model: m } of providers) {
+      try {
+        return await this.streamFromProvider(provider, baseUrl, m, messages);
+      } catch (err) {
+        this.logger.warn(`Stream fallback: ${provider} failed: ${(err as Error).message}`);
+      }
     }
 
-    return this.streamFromProvider('openrouter', this.openrouterBaseUrl, selectedModel, messages);
+    throw new Error('All streaming providers failed');
   }
 
   private async streamFromProvider(

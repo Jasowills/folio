@@ -44,6 +44,63 @@ function parseActions(text: string): Action[] {
   return actions
 }
 
+function generateFallbackActions(text: string, currentData: Record<string, any>): Action[] {
+  const actions: Action[] = []
+  const lower = text.toLowerCase()
+
+  // Name
+  const nameMatch = lower.match(/(?:name is|name to|name:|called)\s+([A-Za-z\s\-']+?)(?:\.|,|and|with)/)
+  if (nameMatch) {
+    const name = nameMatch[1].trim()
+    const basics: Record<string, any> = { ...currentData }
+    if (name && currentData.name !== name) basics.name = name
+    const emailMatch = lower.match(/email(?:\s+is|\s+to|\s*:|)\s+([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/)
+    if (emailMatch) basics.email = emailMatch[1]
+    const phoneMatch = lower.match(/phone(?:\s+is|\s+to|\s*:|)\s+([\d\s\-\(\)]+?)(?:\.|,|and|$)/)
+    if (phoneMatch) basics.phone = phoneMatch[1].trim()
+    const locMatch = lower.match(/(?:location|based)(?:\s+is|\s+in|\s*:|)\s+([A-Za-z\s,]+?)(?:\.|,|and|$)/)
+    if (locMatch) basics.location = locMatch[1].trim()
+    const titleMatch = lower.match(/(?:title|headline)(?:\s+is|\s+to|\s*:|)\s+([A-Za-z\s\-]+?)(?:\.|,|and|with|at|$)/)
+    if (titleMatch) basics.headline = titleMatch[1].trim()
+    if (basics.name || basics.headline || basics.email) {
+      actions.push({ fn: 'set_basics', params: basics })
+    }
+  }
+
+  // Summary
+  const summaryMatch = lower.match(/summary(?:\s*:|is)\s*(.+?)(?:experience|education|skills|\.\s*$)/s)
+  if (summaryMatch) {
+    const text = summaryMatch[1].trim()
+    if (text.length > 10) {
+      actions.push({ fn: 'set_summary', params: { text } })
+    }
+  }
+
+  // Skills
+  const skillsMatch = lower.match(/(?:skills|technologies)(?:\s*:|(?: i added| i'?ve added| include| are)\s+)(.+?)(?:\.|experience|education|summary|$)/)
+  if (skillsMatch) {
+    const skillsText = skillsMatch[1]
+    const skills = skillsText.split(/,|;| and | & /).map(s => s.trim().replace(/^my /, '')).filter(s => s.length > 1 && !['to', 'the', 'your', 'with', 'for', 'you', 'a'].includes(s.toLowerCase()))
+    if (skills.length > 0) {
+      const existing = (currentData.skills || []).map((s: any) => typeof s === 'string' ? s : s.name)
+      const all = [...new Set([...existing, ...skills])]
+      actions.push({ fn: 'set_skills', params: { skills: all } })
+    }
+  }
+
+  // Single skill addition
+  const skillAddMatch = lower.match(/add(?:ed|ing)?\s+([A-Za-z#+.]+)(?:\s+to\s+(?:my\s+)?skills?|\s+skill)/i)
+  if (skillAddMatch && !actions.some(a => a.fn === 'set_skills')) {
+    const skill = skillAddMatch[1].trim()
+    const existing = (currentData.skills || []).map((s: any) => typeof s === 'string' ? s : s.name)
+    if (!existing.includes(skill)) {
+      actions.push({ fn: 'add_skill', params: { skill } })
+    }
+  }
+
+  return actions
+}
+
 export default function AiChatPanel({ data, onUpdate }: Props) {
   const [messages, setMessages] = useState<ChatMessage[]>([
     { id: nextId(), role: 'assistant', content: WELCOME, actions: [] },
@@ -186,8 +243,17 @@ export default function AiChatPanel({ data, onUpdate }: Props) {
       ])
 
       const fullText = result.message?.content || ''
-      const actions = parseActions(fullText)
+      let actions = parseActions(fullText)
       const cleanText = stripActions(fullText)
+
+      // Fallback: try to extract actions from natural language response
+      if (actions.length === 0) {
+        const fallback = generateFallbackActions(fullText, data)
+        if (fallback.length > 0) {
+          console.log('[editor-ai] generated fallback actions', fallback)
+          actions = fallback
+        }
+      }
 
       updateLast(m => ({ ...m, content: cleanText, actions }))
 

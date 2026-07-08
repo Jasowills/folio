@@ -107,15 +107,16 @@ export default function BuilderPage() {
   }
 
   const saveState = () => {
-    if (!store.resumeId || !user) return
-      api.patch(`/builder/${store.resumeId}/state`, {
+    const s = useBuilderStore.getState()
+    if (!s.resumeId || !user) return
+      api.patch(`/builder/${s.resumeId}/state`, {
         wizardState: {
-          currentStep: store.currentStep,
-          completedSteps: store.completedSteps,
-          stepData: store.stepData,
-          isComplete: store.isComplete,
-          selectedTemplate: store.selectedTemplate,
-          design: store.design,
+          currentStep: s.currentStep,
+          completedSteps: s.completedSteps,
+          stepData: s.stepData,
+          isComplete: s.isComplete,
+          selectedTemplate: s.selectedTemplate,
+          design: s.design,
         },
       }).catch(() => showToast('error', 'Failed to save', 'Your changes may not be persisted.'))
   }
@@ -123,10 +124,11 @@ export default function BuilderPage() {
   const handleMarkComplete = async () => {
     store.markComplete()
     saveState()
-    try { await api.post(`/builder/${store.resumeId}/finish`) } catch {
+    const sid = useBuilderStore.getState().resumeId
+    try { await api.post(`/builder/${sid}/finish`) } catch {
       showToast('error', 'Failed to finalize resume', 'Try finishing again.')
     }
-    navigate(`/resume/${store.resumeId}`, { replace: true })
+    navigate(`/resume/${sid}`, { replace: true })
   }
 
   const handleDesignChange = (d: DesignSettings) => {
@@ -288,6 +290,7 @@ export default function BuilderPage() {
       stepData={store.stepData}
       currentStep={store.currentStep}
       completedSteps={store.completedSteps}
+      staleSteps={store.staleSteps}
       selectedTemplate={store.selectedTemplate}
       design={store.design}
       zoom={pdfZoom}

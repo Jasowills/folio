@@ -1,5 +1,6 @@
-import { useMemo } from 'react'
-import { IconEdit } from '@tabler/icons-react'
+import { useMemo, useState, useEffect } from 'react'
+import { createPortal } from 'react-dom'
+import { IconEdit, IconEye, IconX } from '@tabler/icons-react'
 import type { TemplateId } from '../../resume-editor/templates/types'
 import type { DesignSettings } from '../../../pages/editor/types'
 import { getDefaultLocalData, getSampleLocalData } from '../../resume-editor/utils/resumeBridge'
@@ -21,6 +22,7 @@ interface Props {
   stepData: BuilderStepData
   currentStep: number
   completedSteps: number[]
+  staleSteps: number[]
   selectedTemplate: TemplateId | null
   design: DesignSettings
   zoom: number
@@ -47,9 +49,20 @@ interface Props {
 }
 
 export default function WizardLayout(props: Props) {
+  const [mobilePreviewOpen, setMobilePreviewOpen] = useState(false)
+  const [mobilePreviewVisible, setMobilePreviewVisible] = useState(false)
+
+  useEffect(() => {
+    const check = () => setMobilePreviewVisible(window.innerWidth < 768)
+    check()
+    window.addEventListener('resize', check)
+    return () => window.removeEventListener('resize', check)
+  }, [])
+
   const {
     stepData, currentStep, completedSteps, selectedTemplate, design, zoom,
-    streamingSection, streamingText,
+    streamingSection, streamingText, streamingBullets,
+    staleSteps,
     onSetTemplate, onGoToStep, onCompleteStep,
     onSetBasics, onSetTargetRole, onSetSummary, onAddExperience,
     onUpdateExperienceBullets, onRemoveExperience,
@@ -79,7 +92,16 @@ export default function WizardLayout(props: Props) {
         github: basics?.github || defaults.contact.github,
       },
       summary: streamingSection === 'summary' ? streamingText : (summary?.text || defaults.summary),
-      experience: stepData.experience.length > 0 ? stepData.experience.map(e => ({
+      experience: hasStreamingExp
+        ? [...stepData.experience.map(e => ({
+            company: e.company,
+            title: e.title,
+            startDate: e.startDate,
+            endDate: e.endDate,
+            current: e.current,
+            bullets: e.bullets,
+          })), { company: '', title: 'Generating bullets...', startDate: '', endDate: '', current: false, bullets: streamingBullets }]
+        : stepData.experience.length > 0 ? stepData.experience.map(e => ({
         company: e.company,
         title: e.title,
         startDate: e.startDate,
@@ -106,6 +128,9 @@ export default function WizardLayout(props: Props) {
     }
   }, [stepData, design, streamingSection, streamingText])
 
+  // Show streaming bullets on canvas when generating experience bullets
+  const hasStreamingExp = streamingSection === 'experience' && streamingBullets.length > 0
+
   const completedCount = completedSteps.length
 
   const handleExport = () => {
@@ -125,6 +150,7 @@ export default function WizardLayout(props: Props) {
               key={step}
               step={step}
               stepData={stepData}
+              isStale={staleSteps.includes(step)}
               onEdit={() => onGoToStep(step)}
             />
           ))}
@@ -145,7 +171,7 @@ export default function WizardLayout(props: Props) {
       </div>
 
       {/* Right panel — canvas */}
-      <div className="flex-1 bg-[#D4CFC6] overflow-y-auto">
+      <div className="hidden md:flex flex-1 bg-[#D4CFC6] overflow-y-auto">
         <div
           className="flex flex-col items-center justify-start py-8 min-h-full px-8"
           style={{ transform: `scale(${zoom})`, transformOrigin: 'top center' }}
@@ -158,6 +184,43 @@ export default function WizardLayout(props: Props) {
           <ContextCard targetRole={stepData.targetRole} />
         </div>
       </div>
+
+      {/* Mobile canvas preview FAB */}
+      {mobilePreviewVisible && (
+        <button
+          onClick={() => setMobilePreviewOpen(true)}
+          className="fixed bottom-6 right-6 z-50 w-14 h-14 rounded-full bg-teal text-white shadow-xl flex items-center justify-center hover:bg-teal-dark active:scale-95 transition-all"
+          aria-label="Preview resume"
+        >
+          <IconEye size={22} />
+        </button>
+      )}
+
+      {/* Mobile canvas fullscreen modal */}
+      {mobilePreviewOpen && createPortal(
+        <div className="fixed inset-0 z-[100] bg-white flex flex-col">
+          <div className="flex items-center justify-between px-4 py-3 border-b border-border">
+            <span className="text-[13px] font-medium text-ink">Preview</span>
+            <button
+              onClick={() => setMobilePreviewOpen(false)}
+              className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-paper-dark transition-colors"
+            >
+              <IconX size={18} />
+            </button>
+          </div>
+          <div className="flex-1 bg-[#D4CFC6] overflow-y-auto">
+            <div className="flex flex-col items-center py-8 px-4 min-h-full">
+              <PreviewPane
+                data={localData}
+                design={design}
+                templateId={selectedTemplate || 'minimal'}
+              />
+              <ContextCard targetRole={stepData.targetRole} />
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
     </div>
   )
 
@@ -169,6 +232,10 @@ export default function WizardLayout(props: Props) {
         return (
           <Step1Basics
             data={stepData.basics}
+            onChange={(partial) => {
+              const cur = stepData.basics || { name: '', headline: '', email: '', phone: '', location: '' }
+              onSetBasics({ ...cur, ...partial } as BasicsData)
+            }}
             onSave={(data) => { onSetBasics(data); onCompleteStep(1) }}
           />
         )
@@ -176,6 +243,11 @@ export default function WizardLayout(props: Props) {
         return (
           <Step2TargetRole
             data={stepData.targetRole}
+            onChange={(partial) => {
+              // update via onSetTargetRole with merge (saves to store without completeStep)
+              const cur = stepData.targetRole || { role: '', level: '', industry: '' }
+              onSetTargetRole({ ...cur, ...partial } as TargetRoleData)
+            }}
             onSave={(data) => { onSetTargetRole(data); onCompleteStep(2) }}
           />
         )
@@ -203,6 +275,12 @@ export default function WizardLayout(props: Props) {
         return (
           <Step5Education
             data={stepData.education}
+            onChange={(partial) => {
+              const cur = stepData.education.length > 0 ? stepData.education[stepData.education.length - 1] : null
+              if (cur) {
+                onSetEducation([...stepData.education.slice(0, -1), { ...cur, ...partial } as typeof cur])
+              }
+            }}
             onSave={(data) => { onSetEducation(data); onCompleteStep(5) }}
           />
         )
@@ -219,6 +297,10 @@ export default function WizardLayout(props: Props) {
         return (
           <Step7Optional
             data={stepData.optional}
+            onChange={(partial) => {
+              const cur = stepData.optional || { certifications: false, certificationsData: [], languages: false, languagesData: [], projects: false, projectsData: [], volunteer: false, volunteerData: [], awards: false, awardsData: [] }
+              onSetOptional({ ...cur, ...partial })
+            }}
             onSave={(data) => { onSetOptional(data); onCompleteStep(7) }}
           />
         )
@@ -235,7 +317,7 @@ export default function WizardLayout(props: Props) {
   }
 }
 
-function CompletedStepCard({ step, stepData, onEdit }: { step: number; stepData: BuilderStepData; onEdit: () => void }) {
+function CompletedStepCard({ step, stepData, isStale, onEdit }: { step: number; stepData: BuilderStepData; isStale?: boolean; onEdit: () => void }) {
   const getSummary = () => {
     if (step === 1 && stepData.basics) return `${stepData.basics.name} — ${stepData.basics.headline || 'No title'}`
     if (step === 2 && stepData.targetRole) return stepData.targetRole.role
@@ -250,13 +332,21 @@ function CompletedStepCard({ step, stepData, onEdit }: { step: number; stepData:
   return (
     <button
       onClick={onEdit}
-      className="w-full flex items-center justify-between px-6 py-3 border-b border-border/40 hover:bg-paper-dark/30 transition-colors group"
+      className={`w-full flex items-center justify-between px-6 py-3 border-b border-border/40 hover:bg-paper-dark/30 transition-colors group ${isStale ? 'bg-amber-50/60' : ''}`}
     >
       <div className="text-left">
-        <span className="text-[10px] text-muted/60 uppercase tracking-wider">{STEP_LABELS[step]}</span>
+        <span className={`text-[10px] uppercase tracking-wider ${isStale ? 'text-amber-600' : 'text-muted/60'}`}>
+          {STEP_LABELS[step]}
+          {isStale && ' \u2014 needs review'}
+        </span>
         <p className="text-[12px] text-ink truncate max-w-[280px]">{getSummary()}</p>
       </div>
-      <IconEdit size={14} className="text-muted/30 group-hover:text-teal transition-colors shrink-0" />
+      <div className="flex items-center gap-2">
+        {isStale && (
+          <span className="w-2 h-2 rounded-full bg-amber-400 shrink-0" title="Stale - may need regeneration" />
+        )}
+        <IconEdit size={14} className="text-muted/30 group-hover:text-teal transition-colors shrink-0" />
+      </div>
     </button>
   )
 }

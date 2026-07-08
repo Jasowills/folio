@@ -17,7 +17,7 @@ export default function SingleColumn({ data, design, style }: ResumeRenderProps)
       <SummaryRenderer data={data} design={design} style={style} />
       <ExperienceRenderer data={data} design={design} style={style} />
       <EducationRenderer data={data} design={design} style={style} />
-      <SkillsRenderer data={data} design={design} style={style} />
+      <SkillsRenderer data={data} design={design} style={style} variant="inline-list" />
       <CertificationsRenderer data={data} design={design} style={style} />
       <LanguagesRenderer data={data} design={design} style={style} />
       <LinksRenderer data={data} design={design} style={style} />

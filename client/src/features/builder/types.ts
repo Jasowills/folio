@@ -82,14 +82,29 @@ export interface BuilderState {
   design: DesignSettings
   currentStep: number
   completedSteps: number[]
+  stepDependencies: Record<number, number[]>  // step -> steps that depend on it
+  staleSteps: number[]                         // steps whose data is stale due to upstream changes
   stepData: BuilderStepData
   isComplete: boolean
   streamingSection: 'summary' | 'experience' | null
   streamingText: string
   streamingBullets: string[]
+  summaryStreaming: boolean
+  summaryDraft: string
   dirtyAfterEdit: boolean
   _history: BuilderSnapshot[]
   _future: BuilderSnapshot[]
+}
+
+export const STEP_DEPENDENCIES: Record<number, number[]> = {
+  1: [],
+  2: [1],
+  3: [2],
+  4: [2],
+  5: [],
+  6: [2],
+  7: [],
+  8: [1, 2, 3, 4, 5, 6, 7],
 }
 
 export const STEP_LABELS: Record<number, string> = {

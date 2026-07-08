@@ -34,6 +34,21 @@ interface BuilderActions {
   setStreamingSection: (section: 'summary' | 'experience' | null) => void
   setStreamingBullets: (bullets: string[]) => void
   acceptStream: () => void
+  // Per-field live updates (no history push — for real-time canvas sync)
+  updateBasicsField: (field: keyof BasicsData, value: string) => void
+  updateTargetRoleField: (field: keyof TargetRoleData, value: string) => void
+  updateEducationField: (index: number, field: keyof EducationEntry, value: string | boolean) => void
+  updateOptionalField: (field: keyof OptionalData, value: unknown) => void
+  updateExperienceField: (index: number, field: keyof ExperienceRole, value: string | boolean | string[]) => void
+  addExperienceEntry: (role: ExperienceRole) => void
+  // Summary streaming keys
+  setSummaryStreaming: (streaming: boolean) => void
+  setSummaryDraft: (text: string) => void
+  acceptSummaryDraft: () => void
+  // Stale step tracking
+  markStaleStep: (step: number) => void
+  clearStaleStep: (step: number) => void
+  checkStaleDependents: (step: number) => void
   markComplete: () => void
   setDirtyAfterEdit: (dirty: boolean) => void
   hydrate: (state: Partial<BuilderState>) => void
@@ -60,11 +75,15 @@ const initialState: BuilderState = {
   design: { ...DEFAULT_DESIGN },
   currentStep: 0,
   completedSteps: [],
+  stepDependencies: { 1: [], 2: [1], 3: [2], 4: [2], 5: [], 6: [2], 7: [], 8: [1, 2, 3, 4, 5, 6, 7] },
+  staleSteps: [],
   stepData: { ...initialStepData },
   isComplete: false,
   streamingSection: null,
   streamingText: '',
   streamingBullets: [],
+  summaryStreaming: false,
+  summaryDraft: '',
   dirtyAfterEdit: false,
   _history: [],
   _future: [],
@@ -107,16 +126,32 @@ export const useBuilderStore = create<BuilderStore>()(
         set((s) => ({ ...pushHistory(s), design: { ...s.design, ...partial } }))
       },
 
-      goToStep: (n) => set({ currentStep: n, dirtyAfterEdit: false }),
+      goToStep: (n) =>
+        set((s) => ({
+          currentStep: n,
+          dirtyAfterEdit: false,
+          staleSteps: s.staleSteps.filter(st => st !== n),
+        })),
 
       completeStep: (n) =>
         set((s) => {
           const completed = s.completedSteps.includes(n)
             ? s.completedSteps
             : [...s.completedSteps, n]
+          const staleSteps = [...s.staleSteps]
+          // Check for stale dependents
+          const deps = s.stepDependencies
+          for (const [dependent, upstreamSteps] of Object.entries(deps)) {
+            if (upstreamSteps.includes(n) && completed.includes(Number(dependent))) {
+              if (!staleSteps.includes(Number(dependent))) {
+                staleSteps.push(Number(dependent))
+              }
+            }
+          }
           return {
             currentStep: Math.min(n + 1, 8),
             completedSteps: completed,
+            staleSteps,
           }
         }),
 
@@ -203,6 +238,91 @@ export const useBuilderStore = create<BuilderStore>()(
 
       setStreamingBullets: (bullets) => set({ streamingBullets: bullets }),
 
+      // Per-field live updates — no history push for real-time canvas sync
+      updateBasicsField: (field, value) =>
+        set((s) => ({
+          stepData: {
+            ...s.stepData,
+            basics: { ...(s.stepData.basics || { name: '', headline: '', email: '', phone: '', location: '' }), [field]: value } as BasicsData,
+          },
+        })),
+
+      updateTargetRoleField: (field, value) =>
+        set((s) => ({
+          stepData: {
+            ...s.stepData,
+            targetRole: { ...(s.stepData.targetRole || { role: '', level: '', industry: '' }), [field]: value } as TargetRoleData,
+          },
+        })),
+
+      updateEducationField: (index, field, value) =>
+        set((s) => {
+          const edu = [...s.stepData.education]
+          if (edu[index]) edu[index] = { ...edu[index], [field]: value as never }
+          return { stepData: { ...s.stepData, education: edu } }
+        }),
+
+      updateOptionalField: (field, value) =>
+        set((s) => ({
+          stepData: {
+            ...s.stepData,
+            optional: { ...(s.stepData.optional || { certifications: false, certificationsData: [], languages: false, languagesData: [], projects: false, projectsData: [], volunteer: false, volunteerData: [], awards: false, awardsData: [] }), [field]: value } as OptionalData,
+          },
+        })),
+
+      updateExperienceField: (index, field, value) =>
+        set((s) => {
+          const exp = [...s.stepData.experience]
+          if (exp[index]) exp[index] = { ...exp[index], [field]: value as never }
+          return { stepData: { ...s.stepData, experience: exp } }
+        }),
+
+      addExperienceEntry: (role) =>
+        set((s) => ({
+          ...pushHistory(s),
+          stepData: { ...s.stepData, experience: [...s.stepData.experience, role] },
+        })),
+
+      // Summary streaming keys
+      setSummaryStreaming: (streaming) => set({ summaryStreaming: streaming }),
+
+      setSummaryDraft: (text) => set({ summaryDraft: text }),
+
+      acceptSummaryDraft: () => {
+        const s = get()
+        if (s.summaryDraft) {
+          set({
+            ...pushHistory(s),
+            stepData: { ...s.stepData, summary: { text: s.summaryDraft, accepted: true } },
+            summaryStreaming: false,
+            summaryDraft: '',
+          })
+        }
+      },
+
+      // Stale step tracking
+      markStaleStep: (step) =>
+        set((s) => {
+          if (s.staleSteps.includes(step)) return s
+          return { staleSteps: [...s.staleSteps, step] }
+        }),
+
+      clearStaleStep: (step) =>
+        set((s) => ({ staleSteps: s.staleSteps.filter(st => st !== step) })),
+
+      checkStaleDependents: (step) =>
+        set((s) => {
+          const newStale: number[] = []
+          const deps = s.stepDependencies
+          for (const [dependent, upstreamSteps] of Object.entries(deps)) {
+            if (upstreamSteps.includes(step) && s.completedSteps.includes(Number(dependent))) {
+              newStale.push(Number(dependent))
+            }
+          }
+          if (newStale.length === 0) return s
+          return { staleSteps: [...new Set([...s.staleSteps, ...newStale])] }
+        }),
+
       acceptStream: () => {
         const { streamingSection, streamingText, streamingBullets: _sb } = get()
         const s = get()
@@ -217,7 +337,7 @@ export const useBuilderStore = create<BuilderStore>()(
             streamingText: '',
           })
         }
-        set({ streamingSection: null, streamingText: '', streamingBullets: [] })
+        set({ streamingSection: null, streamingText: '', streamingBullets: [], summaryStreaming: false, summaryDraft: '' })
       },
 
       markComplete: () => set({ isComplete: true }),

@@ -145,6 +145,9 @@ export class BuilderController {
       message: string;
       history?: Array<{ role: string; content: string }>;
       resumeSnapshot?: Record<string, unknown>;
+      currentTemplate?: string;
+      currentColor?: string;
+      currentFont?: string;
     },
     @CurrentUser() user: UserDocument,
     @Res() res: Response,

@@ -1,17 +1,17 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
-import { Document, Types } from 'mongoose';
+import { Document, Types, Schema as MongooseSchema } from 'mongoose';
 
 export type CrawlJobDocument = CrawlJob & Document;
 
 @Schema({ timestamps: true })
 export class CrawlJob {
-  @Prop({ required: true, type: Types.ObjectId, ref: 'User' })
+  @Prop({ required: true, type: MongooseSchema.Types.ObjectId, ref: 'User' })
   userId!: Types.ObjectId;
 
   @Prop({ required: true })
   url!: string;
 
-  @Prop({ type: Types.ObjectId, ref: 'Resume' })
+  @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'Resume' })
   resumeId?: Types.ObjectId;
 
   @Prop({ default: 'pending', enum: ['pending', 'running', 'completed', 'failed'] })

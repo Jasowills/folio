@@ -145,7 +145,7 @@ export class ResumesService {
     await this.runAnalysis(resume, rawText);
     await this.saveVersion(resume);
 
-    return this.resumeModel.findByIdAndUpdate(id, resume.toJSON(), { new: true }).exec() as unknown as Promise<ResumeDocument>;
+    return this.resumeModel.findByIdAndUpdate(id, resume.toJSON(), { returnDocument: 'after' }).exec() as unknown as Promise<ResumeDocument>;
   }
 
   async analyzeWithProgress(
@@ -177,7 +177,7 @@ export class ResumesService {
     await this.runAnalysis(resume, rawText, onProgress);
     await this.saveVersion(resume);
 
-    await this.resumeModel.findByIdAndUpdate(id, resume.toJSON(), { new: true }).exec();
+    await this.resumeModel.findByIdAndUpdate(id, resume.toJSON(), { returnDocument: 'after' }).exec();
     return resume;
   }
 

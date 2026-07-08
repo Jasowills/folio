@@ -1,4 +1,5 @@
 import type { ResumeTemplate, ResumeColorTheme, TemplateStyle } from './types'
+import { SVG_TXT as TXT } from './boilerplate'
 
 // ---- SVG preview helpers ----
 
@@ -17,43 +18,12 @@ function _r(x: number, y: number, w: number, h: number, fill: string, r = 0): st
 function _ln(x1: number, y1: number, x2: number, y2: number, stroke: string, w = 0.5): string {
   return `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${stroke}" stroke-width="${w}"/>`
 }
-// ---- Boilerplate content ----
 
 const _L = 14
 const _R = 136 // right edge for text-anchor=end
 
 const SANS = 'sans-serif'
 const SERIF = 'Georgia, serif'
-
-const TXT = {
-  name: 'Your Name',
-  contact: 'Your City, ST 12345  |  (123) 456-7890  |  no_reply@example.com',
-
-  exp: 'EXPERIENCE',
-  e1_t: 'Job Title',
-  e1_c: 'Company, Location',
-  e1_d: 'MONTH 20XX \u2014 Present',
-  e1_b: 'Lorem ipsum dolor sit amet, consectetuer adipiscing',
-  e1_b2: 'Sed diam nonummy nibh euismod tincidunt ut laoreet',
-  e2_t: 'Job Title',
-  e2_c: 'Company, Location',
-  e2_d: 'MONTH 20XX \u2014 MONTH 20XX',
-  e2_b: 'Lorem ipsum dolor sit amet, consectetuer adipiscing',
-
-  edu: 'EDUCATION',
-  edu1_s: 'School Name',
-  edu1_d: 'Degree \u2014 Field of Study',
-  edu1_da: 'MONTH 20XX \u2014 MONTH 20XX',
-
-  skills: 'SKILLS',
-  s1: 'Lorem ipsum',
-  s2: 'Consectetuer',
-  s3: 'Sed diam nonummy',
-  s4: 'Laoreet dolore',
-
-  langs: 'LANGUAGES',
-  l1: 'Lorem ipsum  \u00b7  Dolor sit amet  \u00b7  Consectetuer',
-}
 
 // ---- Text helpers ----
 

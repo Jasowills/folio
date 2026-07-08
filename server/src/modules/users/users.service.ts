@@ -34,7 +34,7 @@ export class UsersService {
     data: Partial<Pick<User, 'name' | 'email' | 'avatar' | 'googleId'>>,
   ): Promise<UserDocument> {
     const user = await this.userModel.findByIdAndUpdate(userId, data, {
-      new: true,
+      returnDocument: 'after',
     });
     if (!user) throw new NotFoundException('User not found');
     return user;
