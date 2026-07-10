@@ -110,7 +110,7 @@ export interface ResumeShim {
   fileUrl?: string
   cloudinaryPublicId?: string
   summary?: string
-  contact?: { email?: string; phone?: string; location?: string; linkedin?: string; website?: string; github?: string }
+  contact?: { email?: string; phone?: string; location?: string; linkedin?: string; website?: string; github?: string; photoUrl?: string }
   experience?: ExperienceEntry[]
   education?: EducationEntry[]
   skills?: string[]

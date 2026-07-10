@@ -7,9 +7,12 @@ interface Props {
   style: TemplateStyle
   design: DesignSettings
   className?: string
+  suppress?: boolean
 }
 
-export default function SectionHeading({ label, style, design, className = '' }: Props) {
+export default function SectionHeading({ label, style, design, className = '', suppress }: Props) {
+  if (suppress) return null
+
   const hStyle = { ...headingStyle(style, design.primaryColor), lineHeight: design.lineSpacing }
   const hClasses = headingClasses(style)
 

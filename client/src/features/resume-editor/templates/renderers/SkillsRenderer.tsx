@@ -8,14 +8,15 @@ interface Props {
   style: TemplateStyle
   className?: string
   variant?: 'chips' | 'inline-list'
+  suppressSectionHeading?: boolean
 }
 
-export default function SkillsRenderer({ data, design, style, className = '', variant = 'chips' }: Props) {
+export default function SkillsRenderer({ data, design, style, className = '', variant = 'chips', suppressSectionHeading = false }: Props) {
   if (!data.skills || data.skills.length === 0) return null
 
   return (
     <div className={`mb-4 ${className}`}>
-      <SectionHeading label="Skills" style={style} design={design} />
+      <SectionHeading label="Skills" style={style} design={design} suppress={suppressSectionHeading} />
       {variant === 'inline-list' ? (
         <p className="text-[11px] text-muted mt-1" style={{ lineHeight: design.lineSpacing }}>
           {data.skills.map(s => s.name).join(', ')}

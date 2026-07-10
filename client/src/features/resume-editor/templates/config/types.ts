@@ -1,4 +1,4 @@
-import type { TemplateStyle } from '../../../templates/types'
+import type { TemplateStyle } from '../../../../templates/types'
 
 export type ColumnLayout = 'single-column' | 'sidebar-left' | 'sidebar-right' | 'header-band-plus-single' | 'asymmetric-grid'
 export type HeaderTreatment = 'centered-stacked' | 'left-aligned' | 'full-bleed-band' | 'card-block' | 'split-header'

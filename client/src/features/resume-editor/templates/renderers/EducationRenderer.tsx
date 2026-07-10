@@ -7,14 +7,15 @@ interface Props {
   data: LocalData
   design: DesignSettings
   style: TemplateStyle
+  suppressSectionHeading?: boolean
 }
 
-export default function EducationRenderer({ data, design, style }: Props) {
+export default function EducationRenderer({ data, design, style, suppressSectionHeading = false }: Props) {
   if (!data.education || data.education.length === 0) return null
 
   return (
     <div className="mb-4">
-      <SectionHeading label="Education" style={style} design={design} />
+      <SectionHeading label="Education" style={style} design={design} suppress={suppressSectionHeading} />
       {data.education.map((edu, i) => (
         <div key={i} className="mb-2 last:mb-0">
           <strong className="text-[12px]" style={{ lineHeight: design.lineSpacing }}>{edu.institution}</strong>

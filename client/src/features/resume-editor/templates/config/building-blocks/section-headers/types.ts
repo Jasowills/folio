@@ -1,4 +1,4 @@
-import type { DesignSettings } from '../../../../pages/editor/types'
+import type { DesignSettings } from '../../../../../../pages/editor/types'
 
 export interface SectionHeaderStyleProps {
   label: string

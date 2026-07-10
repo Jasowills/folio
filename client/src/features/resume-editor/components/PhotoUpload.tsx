@@ -69,7 +69,7 @@ export default function PhotoUpload({ currentPhotoUrl, onPhotoUploaded, onCancel
           const response = await fetch('/api/upload/photo', {
             method: 'POST',
             headers: {
-              'Authorization': `Bearer ${localStorage.getItem('token')}`,
+              'Authorization': `Bearer ${localStorage.getItem('accessToken')}`,
             },
             body: formData,
           })
@@ -88,7 +88,7 @@ export default function PhotoUpload({ currentPhotoUrl, onPhotoUploaded, onCancel
         const uploadResponse = await fetch('/api/upload/photo', {
           method: 'POST',
           headers: {
-            'Authorization': `Bearer ${localStorage.getItem('token')}`,
+            'Authorization': `Bearer ${localStorage.getItem('accessToken')}`,
           },
           body: formData,
         })

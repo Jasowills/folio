@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react'
-import type { DesignSettings } from '../../../../pages/editor/types'
+import type { DesignSettings } from '../../../../../../pages/editor/types'
 
 export interface PillTagsProps {
   design: DesignSettings

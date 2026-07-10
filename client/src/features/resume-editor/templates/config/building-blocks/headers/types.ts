@@ -1,5 +1,5 @@
-import type { LocalData, DesignSettings } from '../../../../pages/editor/types'
-import type { TemplateStyle } from '../../../../templates/types'
+import type { LocalData, DesignSettings } from '../../../../../../pages/editor/types'
+import type { TemplateStyle } from '../../../../../../templates/types'
 
 export interface HeaderProps {
   data: LocalData

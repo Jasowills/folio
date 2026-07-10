@@ -7,9 +7,10 @@ interface Props {
   data: LocalData
   design: DesignSettings
   style: TemplateStyle
+  suppressSectionHeading?: boolean
 }
 
-export default function ExperienceRenderer({ data, design, style }: Props) {
+export default function ExperienceRenderer({ data, design, style, suppressSectionHeading = false }: Props) {
   if (!data.experience || data.experience.length === 0) return null
 
   const bullet = bulletChar(style)
@@ -18,7 +19,7 @@ export default function ExperienceRenderer({ data, design, style }: Props) {
 
   return (
     <div className={`mb-4 ${airy ? 'space-y-4' : compact ? 'space-y-2' : 'space-y-3'}`}>
-      <SectionHeading label="Experience" style={style} design={design} />
+      <SectionHeading label="Experience" style={style} design={design} suppress={suppressSectionHeading} />
       {data.experience.map((exp, i) => (
         <div key={i}>
           <div className="flex items-center justify-between gap-2">

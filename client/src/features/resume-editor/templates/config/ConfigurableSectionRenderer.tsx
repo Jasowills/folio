@@ -1,4 +1,5 @@
 import type { LocalData, DesignSettings } from '../../../../pages/editor/types'
+import type { TemplateStyle } from '../../../../templates/types'
 import type { SectionHeaderStyle } from './types'
 import ConfigurableSectionHeading from './ConfigurableSectionHeading'
 
@@ -23,6 +24,7 @@ const SECTION_MAP: Record<string, React.FC<any>> = {
 interface ConfigurableSectionRendererProps {
   data: LocalData
   design: DesignSettings
+  templateStyle: TemplateStyle
   sectionHeaderStyle: SectionHeaderStyle
   className?: string
   sectionSpacing?: number
@@ -33,6 +35,7 @@ const SECTION_GAP_MAP = ['space-y-1', 'space-y-2', 'space-y-3', 'space-y-4', 'sp
 export default function ConfigurableSectionRenderer({
   data,
   design,
+  templateStyle,
   sectionHeaderStyle,
   className = '',
   sectionSpacing = 3,
@@ -46,14 +49,6 @@ export default function ConfigurableSectionRenderer({
         const Component = SECTION_MAP[key]
         if (!Component) return null
 
-        const style = {
-          header: 'center' as const,
-          heading: 'underline' as const,
-          bullet: 'dot' as const,
-          font: 'sans' as const,
-          spacing: 'normal' as const,
-        }
-
         return (
           <div key={key} className="mb-4">
             <ConfigurableSectionHeading
@@ -62,7 +57,12 @@ export default function ConfigurableSectionRenderer({
               style={sectionHeaderStyle}
               index={index}
             />
-            <Component data={data} design={design} style={style} />
+            <Component
+              data={data}
+              design={design}
+              style={templateStyle}
+              suppressSectionHeading={true}
+            />
           </div>
         )
       })}

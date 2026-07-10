@@ -6,6 +6,7 @@ import type { PdfLayoutDocument } from '../../lib/queries'
 import type { LocalData, DesignSettings } from '../../pages/editor/types'
 import { DEFAULT_DESIGN } from '../../pages/editor/types'
 import type { TemplateId } from './templates/types'
+import { ALL_TEMPLATE_IDS } from './templates/types'
 import type { PdfBlockFormat, PdfTextEdit } from '../pdf-editor/PdfDocumentEditor'
 import { resumeToLocalData, localDataToResumeUpdates, getDefaultLocalData } from './utils/resumeBridge'
 import EditorToolbar from './components/EditorToolbar'
@@ -434,8 +435,6 @@ export default function EditorPage() {
   )
 }
 
-const TEMPLATE_IDS: TemplateId[] = ['minimal', 'modern', 'executive', 'compact', 'classic', 'sidebar', 'bold', 'creative', 'tech', 'academic', 'charter', 'prestige', 'engineer', 'contemporary', 'folio']
-
 function isTemplateId(v: string): v is TemplateId {
-  return (TEMPLATE_IDS as string[]).includes(v)
+  return ALL_TEMPLATE_IDS.includes(v)
 }

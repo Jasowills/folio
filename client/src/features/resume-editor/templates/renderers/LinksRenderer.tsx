@@ -7,15 +7,16 @@ interface Props {
   design: DesignSettings
   style: TemplateStyle
   className?: string
+  suppressSectionHeading?: boolean
 }
 
-export default function LinksRenderer({ data, design, style, className = '' }: Props) {
+export default function LinksRenderer({ data, design, style, className = '', suppressSectionHeading = false }: Props) {
   const links = data.links.filter(l => l.title || l.url)
   if (links.length === 0) return null
 
   return (
     <div className={`mb-4 ${className}`}>
-      <SectionHeading label="Links" style={style} design={design} />
+      <SectionHeading label="Links" style={style} design={design} suppress={suppressSectionHeading} />
       <div className="space-y-0.5 mt-1">
         {links.map((l, i) => (
           <p key={i} className="text-[11px] text-muted" style={{ lineHeight: design.lineSpacing }}>

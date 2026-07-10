@@ -12,7 +12,6 @@ interface Page {
 export function usePagination(sectionOrder: string[]): { pages: Page[][]; containerRef: React.RefObject<HTMLDivElement> } {
   const [pages, setPages] = useState<Page[][]>([[{ sections: sectionOrder, index: 0 }]])
   const containerRef = useRef<HTMLDivElement>(null)
-  const measureRef = useRef<HTMLDivElement>(null)
 
   const measure = useCallback(() => {
     if (!containerRef.current) return
@@ -43,7 +42,7 @@ export function usePagination(sectionOrder: string[]): { pages: Page[][]; contai
       }
     })
 
-    setPages(pageBreaks.map((sections, index) => sections.map(s => ({ sections: [s], index }))))
+    setPages(pageBreaks.map((sectionKeys, index) => [{ sections: sectionKeys, index }]))
   }, [sectionOrder])
 
   useEffect(() => {

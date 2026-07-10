@@ -1,5 +1,5 @@
 import type { LocalData, DesignSettings } from '../../../../pages/editor/types'
-import type { TemplateConfig, ColumnLayout, HeaderTreatment, SectionHeaderStyle } from './types'
+import type { TemplateConfig, ColumnLayout, HeaderTreatment } from './types'
 
 import SingleColumnLayout from './building-blocks/columns/SingleColumnLayout'
 import SidebarLeftLayout from './building-blocks/columns/SidebarLeftLayout'
@@ -44,8 +44,6 @@ const PHOTO_HANDLER_MAP: Record<string, React.FC<any>> = {
   'integrated-into-header': IntegratedHeaderPhoto,
 }
 
-const SECTION_GAP_MAP = ['space-y-1', 'space-y-2', 'space-y-3', 'space-y-4', 'space-y-5']
-
 interface ConfigurableLayoutProps {
   config: TemplateConfig
   data: LocalData
@@ -62,12 +60,11 @@ export default function ConfigurableLayout({ config, data, design }: Configurabl
 
   const header = <HeaderComponent data={data} design={design} style={config.style} photoElement={photoElement} />
 
-  const gap = SECTION_GAP_MAP[design.sectionSpacing] ?? 'space-y-4'
-
   const content = (
     <ConfigurableSectionRenderer
       data={data}
       design={design}
+      templateStyle={config.style}
       sectionHeaderStyle={config.sectionHeaderStyle}
       sectionSpacing={design.sectionSpacing}
     />

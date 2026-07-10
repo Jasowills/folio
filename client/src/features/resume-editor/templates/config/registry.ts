@@ -1,5 +1,5 @@
 import type { TemplateConfig } from './types'
-import type { TemplateStyle } from '../../../templates/types'
+import type { TemplateStyle } from '../../../../templates/types'
 
 const ATS_STYLE: TemplateStyle = {
   header: 'center',
