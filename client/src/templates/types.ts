@@ -27,7 +27,7 @@ export interface ResumeColorTheme {
   primary: string
 }
 
-export interface TemplateRenderProps {
+export interface ResumeRenderProps {
   template: ResumeTemplate
   primaryColor: string
   data: {
@@ -39,6 +39,7 @@ export interface TemplateRenderProps {
       linkedin?: string | null
       website?: string | null
       github?: string | null
+      photoUrl?: string | null
     }
     summary?: string | null
     experience?: Array<{

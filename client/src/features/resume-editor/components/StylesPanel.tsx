@@ -4,6 +4,8 @@ import type { DesignSettings } from '../../../pages/editor/types'
 import { cn } from '../../../lib/utils'
 import { IconTypography, IconPalette, IconLayout, IconTemplate } from '@tabler/icons-react'
 import type { TemplateId } from '../templates'
+import { TEMPLATE_CONFIGS } from '../templates/config/registry'
+import { getTemplateName, getTemplateCategory } from '../templates/registry'
 
 const HEADING_FONTS = ['DM Serif Display', 'Georgia', 'Garamond', 'Merriweather', 'EB Garamond', 'Lora', 'Libre Baskerville']
 const BODY_FONTS = ['Plus Jakarta Sans', 'Calibri', 'Helvetica Neue', 'Source Sans Pro', 'Open Sans', 'Roboto', 'Lato', 'Nunito']
@@ -19,6 +21,8 @@ const PRESET_COLORS = [
   { name: 'Plum', value: '#5B21B6' },
 ]
 
+const LEGACY_IDS = ['minimal', 'modern', 'executive', 'compact', 'classic', 'sidebar', 'bold', 'creative', 'tech', 'academic', 'charter', 'prestige', 'engineer', 'contemporary', 'folio']
+
 interface Props {
   templateId: TemplateId
   design: DesignSettings
@@ -28,6 +32,7 @@ interface Props {
 
 export default function StylesPanel({ templateId, design, onTemplateChange, onDesignChange }: Props) {
   const [tab, setTab] = useState<'templates' | 'colors' | 'fonts' | 'layout'>('templates')
+  const [category, setCategory] = useState<string>('all')
 
   const tabs = [
     { id: 'templates' as const, icon: IconTemplate, label: 'Templates' },
@@ -35,6 +40,12 @@ export default function StylesPanel({ templateId, design, onTemplateChange, onDe
     { id: 'fonts' as const, icon: IconTypography, label: 'Fonts' },
     { id: 'layout' as const, icon: IconLayout, label: 'Layout' },
   ]
+
+  const categories = ['all', 'ATS Classic', 'Modern Minimal', 'Two-Column', 'Executive', 'Creative', 'Tech', 'Academic', 'Photo-Forward']
+
+  const filteredTemplates = category === 'all'
+    ? TEMPLATE_CONFIGS
+    : TEMPLATE_CONFIGS.filter(t => t.category === category)
 
   return (
     <div className="flex flex-col h-full">
@@ -60,10 +71,25 @@ export default function StylesPanel({ templateId, design, onTemplateChange, onDe
       <div className="flex-1 overflow-y-auto">
         {tab === 'templates' && (
           <div className="p-3">
+            <div className="flex flex-wrap gap-1 mb-3">
+              {categories.map(c => (
+                <button
+                  key={c}
+                  onClick={() => setCategory(c)}
+                  className={cn(
+                    'px-2 py-1 text-[9px] font-medium rounded transition-colors cursor-pointer',
+                    category === c ? 'bg-teal text-white' : 'bg-paper text-muted hover:text-ink',
+                  )}
+                >
+                  {c === 'all' ? 'All' : c}
+                </button>
+              ))}
+            </div>
+
             <div className="grid grid-cols-2 gap-2">
-              {TEMPLATES.filter(t => ['minimal', 'modern', 'executive', 'compact', 'classic', 'sidebar', 'bold', 'creative', 'tech', 'academic', 'charter', 'prestige', 'engineer', 'contemporary', 'folio'].includes(t.id)).map(tpl => {
+              {filteredTemplates.map(tpl => {
                 const isActive = templateId === tpl.id
-                const svg = TEMPLATE_PREVIEWS[tpl.id]
+                const svg = TEMPLATE_PREVIEWS[tpl.id] || TEMPLATE_PREVIEWS.minimal
                 return (
                   <button
                     key={tpl.id}
@@ -85,6 +111,7 @@ export default function StylesPanel({ templateId, design, onTemplateChange, onDe
                     </div>
                     <div className="px-2 py-1 border-t border-border">
                       <p className="text-[9px] font-semibold text-ink">{tpl.name}</p>
+                      <p className="text-[8px] text-muted">{tpl.category}</p>
                     </div>
                   </button>
                 )

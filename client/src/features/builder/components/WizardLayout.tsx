@@ -69,6 +69,9 @@ export default function WizardLayout(props: Props) {
     onSetEducation, onSetSkills, onSetOptional, onMarkComplete,
     onSetStreamingText,
   } = props
+
+  const hasStreamingExp = streamingSection === 'experience' && streamingBullets.length > 0
+
   // Build LocalData for canvas from accumulated step data
   const localData = useMemo(() => {
     const empty = getDefaultLocalData()
@@ -126,10 +129,7 @@ export default function WizardLayout(props: Props) {
       editMode: 'guided' as const,
       customSections: [],
     }
-  }, [stepData, design, streamingSection, streamingText])
-
-  // Show streaming bullets on canvas when generating experience bullets
-  const hasStreamingExp = streamingSection === 'experience' && streamingBullets.length > 0
+  }, [stepData, design, streamingSection, streamingText, streamingBullets])
 
   const completedCount = completedSteps.length
 
@@ -275,12 +275,7 @@ export default function WizardLayout(props: Props) {
         return (
           <Step5Education
             data={stepData.education}
-            onChange={(partial) => {
-              const cur = stepData.education.length > 0 ? stepData.education[stepData.education.length - 1] : null
-              if (cur) {
-                onSetEducation([...stepData.education.slice(0, -1), { ...cur, ...partial } as typeof cur])
-              }
-            }}
+            onChange={(entries) => onSetEducation(entries)}
             onSave={(data) => { onSetEducation(data); onCompleteStep(5) }}
           />
         )

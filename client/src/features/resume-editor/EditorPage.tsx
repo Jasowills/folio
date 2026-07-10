@@ -3,23 +3,22 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { AnimatePresence } from 'framer-motion'
 import { useResume, useUpdateResume, useAnalyzeResume, useExtractLayout, useSaveLayoutDocument } from '../../lib/queries'
 import type { PdfLayoutDocument } from '../../lib/queries'
-import { AiService } from '../../lib/ai'
 import type { LocalData, DesignSettings } from '../../pages/editor/types'
 import { DEFAULT_DESIGN } from '../../pages/editor/types'
 import type { TemplateId } from './templates/types'
+import type { PdfBlockFormat, PdfTextEdit } from '../pdf-editor/PdfDocumentEditor'
 import { resumeToLocalData, localDataToResumeUpdates, getDefaultLocalData } from './utils/resumeBridge'
-import PdfDocumentEditor from '../pdf-editor/PdfDocumentEditor'
 import EditorToolbar from './components/EditorToolbar'
 import EditableResumeView from './components/EditableResumeView'
 import PreviewPane from './components/PreviewPane'
 import FloatingPanel from './components/FloatingPanel'
-import AiDrawer from './components/AiDrawer'
 import CommandPalette from './components/CommandPalette'
 import ExportPopover from './components/ExportPopover'
 import ExtractionNotification from './components/ExtractionNotification'
 import AiChatPanel from './components/AiChatPanel'
 import StylesPanel from './components/StylesPanel'
 import SectionsPanel from './components/SectionsPanel'
+import PdfDocumentEditor from '../pdf-editor/PdfDocumentEditor'
 import useEditorKeyboard from './hooks/useEditorKeyboard'
 
 function LoadingState() {
@@ -48,8 +47,6 @@ export default function EditorPage() {
   const navigate = useNavigate()
   const { data: resume, isLoading } = useResume(id!)
   const updateResume = useUpdateResume()
-  const extractLayout = useExtractLayout()
-  const saveLayoutDoc = useSaveLayoutDocument()
 
   const [localData, setLocalData] = useState<LocalData | null>(null)
   const [templateId, setTemplateId] = useState<TemplateId>('minimal')
@@ -59,17 +56,17 @@ export default function EditorPage() {
   const [panelTab, setPanelTab] = useState<'styles' | 'sections' | 'ai'>('styles')
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false)
   const [exportPopoverOpen, setExportPopoverOpen] = useState(false)
-  const [aiDrawerOpen, setAiDrawerOpen] = useState(false)
-  const [aiLoading, setAiLoading] = useState(false)
-  const [aiVariations, setAiVariations] = useState<string[]>([])
   const [showExtractionNote, setShowExtractionNote] = useState(true)
   const [parsing, setParsing] = useState(false)
-  const [extractingLayout, setExtractingLayout] = useState(false)
+  const [showTemplate, setShowTemplate] = useState(false)
   const [layoutDoc, setLayoutDoc] = useState<PdfLayoutDocument | null>(null)
-  const [pdfZoom, setPdfZoom] = useState(1)
-  const [debugMode, setDebugMode] = useState(false)
+  const [extractingLayout, setExtractingLayout] = useState(false)
+  const [pendingFormat, setPendingFormat] = useState<PdfBlockFormat | null>(null)
+  const [pendingTextEdit, setPendingTextEdit] = useState<PdfTextEdit | null>(null)
 
   const analyzeResume = useAnalyzeResume()
+  const extractLayout = useExtractLayout()
+  const saveLayoutDoc = useSaveLayoutDocument()
   const saveAttemptRef = useRef(0)
 
   const isUploadSource = resume?.source === 'upload'
@@ -175,60 +172,6 @@ export default function EditorPage() {
     saveLayoutDoc.mutate({ id: id!, layoutDocument: updatedDoc })
   }
 
-  async function handleAiRewrite(text: string) {
-    setAiLoading(true)
-    setAiVariations([])
-    setAiDrawerOpen(true)
-    try {
-      const variations = await AiService.rewrite(text)
-      setAiVariations(variations)
-    } catch {
-      setAiVariations(['An error occurred. Please try again.'])
-    } finally {
-      setAiLoading(false)
-    }
-  }
-
-  async function handleAiImprove(text: string) {
-    setAiLoading(true)
-    setAiVariations([])
-    setAiDrawerOpen(true)
-    try {
-      const variations = await AiService.improve(text)
-      setAiVariations(variations)
-    } catch {
-      setAiVariations(['An error occurred.'])
-    } finally {
-      setAiLoading(false)
-    }
-  }
-
-  async function handleQuickAction(action: string) {
-    const prompts: Record<string, string> = {
-      'improve-summary': `Improve this resume summary: "${localData?.summary || ''}"`,
-      'rewrite-weak': 'List 3 improvements for weak bullet points.',
-      'suggest-skills': 'Suggest 5 relevant skills to add.',
-      'ats-score': 'List 3 ATS optimization tips.',
-    }
-    const prompt = prompts[action]
-    if (!prompt) return
-    setAiDrawerOpen(true)
-    setAiLoading(true)
-    setAiVariations([])
-    try {
-      const result = await AiService.chat([
-        { role: 'system', content: 'You are a resume expert. Provide concise, actionable advice.' },
-        { role: 'user', content: prompt },
-      ])
-      const content = result.message?.content || ''
-      setAiVariations(content.split('\n').filter((l: string) => l.trim().length > 5).slice(0, 5))
-    } catch {
-      setAiVariations(['An error occurred.'])
-    } finally {
-      setAiLoading(false)
-    }
-  }
-
   const commands = [
     { id: 'save', label: 'Save changes', action: forceSave },
     { id: 'open-styles', label: 'Open Styles panel', action: () => openPanel('styles') },
@@ -254,14 +197,6 @@ export default function EditorPage() {
           activePanel={panelOpen ? panelTab : null}
           onExport={() => setExportPopoverOpen(o => !o)}
           onBack={() => navigate('/resumes')}
-          zoom={{
-            zoom: pdfZoom,
-            onZoomIn: () => setPdfZoom(z => Math.min(2, z + 0.1)),
-            onZoomOut: () => setPdfZoom(z => Math.max(0.25, z - 0.1)),
-            onZoomReset: () => setPdfZoom(1),
-          }}
-          debugMode={debugMode}
-          onDebugToggle={() => setDebugMode(d => !d)}
         />
 
         <ExtractionNotification
@@ -282,37 +217,76 @@ export default function EditorPage() {
         )}
 
         <div className="flex-1 flex overflow-hidden relative">
-          {layoutDoc && (
-            <PdfDocumentEditor
-              layoutDocument={layoutDoc}
-              onSave={handleLayoutDocSave}
-              onAiRewrite={handleAiRewrite}
-              onAiImprove={handleAiImprove}
-              zoom={pdfZoom}
-              onZoomChange={setPdfZoom}
-              fileUrl={resume?.fileUrl}
-              debugMode={debugMode}
-            />
+          <AnimatePresence>
+            {panelOpen && panelTab === 'ai' && (
+              <FloatingPanel
+                tab={panelTab}
+                onClose={() => setPanelOpen(false)}
+                side="left"
+                push
+              >
+                <AiChatPanel
+                  data={currentData}
+                  onUpdate={handleLocalDataChange}
+                  design={design}
+                  onDesignUpdate={setDesign}
+                  templateId={templateId}
+                  onTemplateChange={setTemplateId}
+                  onShowTemplate={() => setShowTemplate(true)}
+                  onFormatPdf={setPendingFormat}
+                  onEditText={setPendingTextEdit}
+                />
+              </FloatingPanel>
+            )}
+          </AnimatePresence>
+
+          {showTemplate ? (
+            <div className="flex-1 overflow-auto bg-[#D4CFC6]">
+              <PreviewPane
+                data={currentData}
+                design={design}
+                templateId={templateId}
+              />
+            </div>
+          ) : (
+            <div className="flex-1 overflow-auto bg-[#D4CFC6]">
+              {layoutDoc ? (
+                <PdfDocumentEditor
+                  layoutDocument={layoutDoc}
+                  onSave={handleLayoutDocSave}
+                  fileUrl={resume?.fileUrl}
+                  pendingFormat={pendingFormat}
+                  onFormatApplied={() => setPendingFormat(null)}
+                  pendingTextEdit={pendingTextEdit}
+                  onTextEditApplied={() => setPendingTextEdit(null)}
+                />
+              ) : null}
+            </div>
           )}
 
-          {!layoutDoc && !extractingLayout && (
-            <div className="flex-1 flex items-center justify-center text-sm text-muted">
-              <p>No layout data available. This PDF may be a scanned image.</p>
+          {isUploadSource && (
+            <div className="absolute top-3 right-3 z-10">
+              <button
+                onClick={() => setShowTemplate(v => !v)}
+                className="px-3 py-1.5 text-[11px] font-medium rounded-lg bg-white/90 border border-border shadow-sm hover:bg-white transition-colors text-ink/70 hover:text-ink"
+              >
+                {showTemplate ? 'View Original' : 'View Template'}
+              </button>
             </div>
           )}
 
           <AnimatePresence>
-            {panelOpen && (
+            {panelOpen && panelTab !== 'ai' && (
               <FloatingPanel
                 tab={panelTab}
                 onClose={() => setPanelOpen(false)}
-                side={panelTab === 'ai' ? 'left' : 'right'}
+                side="right"
               >
                 {panelTab === 'styles' && (
                   <StylesPanel
                     templateId={templateId}
                     design={design}
-                    onTemplateChange={setTemplateId}
+                    onTemplateChange={id => { setTemplateId(id); setShowTemplate(true) }}
                     onDesignChange={d => { setDesign(d); setSaved(false) }}
                   />
                 )}
@@ -322,25 +296,10 @@ export default function EditorPage() {
                     onUpdate={handleLocalDataChange}
                   />
                 )}
-                {panelTab === 'ai' && (
-                  <AiChatPanel
-                    data={currentData}
-                    onUpdate={handleLocalDataChange}
-                  />
-                )}
               </FloatingPanel>
             )}
           </AnimatePresence>
         </div>
-
-        <AiDrawer
-          open={aiDrawerOpen}
-          loading={aiLoading}
-          variations={aiVariations}
-          onSelect={() => setAiDrawerOpen(false)}
-          onRegenerate={() => {}}
-          onClose={() => setAiDrawerOpen(false)}
-        />
 
         <ExportPopover
           open={exportPopoverOpen}
@@ -389,6 +348,29 @@ export default function EditorPage() {
       )}
 
       <div className="flex-1 flex overflow-hidden relative">
+        <AnimatePresence>
+          {panelOpen && panelTab === 'ai' && (
+            <FloatingPanel
+              tab={panelTab}
+              onClose={() => setPanelOpen(false)}
+              side="left"
+              push
+            >
+              <AiChatPanel
+                data={currentData}
+                onUpdate={handleLocalDataChange}
+                design={design}
+                onDesignUpdate={setDesign}
+                templateId={templateId}
+                onTemplateChange={setTemplateId}
+                onShowTemplate={() => setShowTemplate(true)}
+                onFormatPdf={setPendingFormat}
+                onEditText={setPendingTextEdit}
+              />
+            </FloatingPanel>
+          )}
+        </AnimatePresence>
+
         <div className="flex-1 flex overflow-hidden">
           <div className="w-[480px] min-w-[320px] overflow-y-auto border-r border-border bg-white">
             <div className="px-6 py-8">
@@ -409,38 +391,23 @@ export default function EditorPage() {
           </div>
         </div>
 
-        <AiDrawer
-          open={aiDrawerOpen}
-          loading={aiLoading}
-          variations={aiVariations}
-          onSelect={() => setAiDrawerOpen(false)}
-          onRegenerate={() => {}}
-          onClose={() => setAiDrawerOpen(false)}
-        />
-
         <AnimatePresence>
-          {panelOpen && (
+          {panelOpen && panelTab !== 'ai' && (
             <FloatingPanel
               tab={panelTab}
               onClose={() => setPanelOpen(false)}
-              side={panelTab === 'ai' ? 'left' : 'right'}
+              side="right"
             >
               {panelTab === 'styles' && (
                 <StylesPanel
                   templateId={templateId}
                   design={design}
-                  onTemplateChange={setTemplateId}
+                  onTemplateChange={id => { setTemplateId(id); setShowTemplate(true) }}
                   onDesignChange={d => { setDesign(d); setSaved(false) }}
                 />
               )}
               {panelTab === 'sections' && (
                 <SectionsPanel
-                  data={currentData}
-                  onUpdate={handleLocalDataChange}
-                />
-              )}
-              {panelTab === 'ai' && (
-                <AiChatPanel
                   data={currentData}
                   onUpdate={handleLocalDataChange}
                 />

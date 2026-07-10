@@ -250,14 +250,18 @@ ${body.resumeSnapshot ? stateSummary : snapshot}
 Output one or more of these tags (each on its own line, no markdown, no backticks):
 
 ### Content actions:
-[ACTION]{"fn":"set_basics","name":"...","headline":"...","email":"...","phone":"...","location":"...","linkedin":"...","github":"..."}[/ACTION]
+[ACTION]{"fn":"set_basics","name":"...","headline":"...","email":"...","phone":"...","location":"...","linkedin":"...","github":"...","website":"..."}[/ACTION]
+[ACTION]{"fn":"set_target_role","role":"...","level":"...","industry":"...","company":"...","companyUrl":"...","jobDescription":"..."}[/ACTION]
 [ACTION]{"fn":"set_summary","text":"..."}[/ACTION]
-[ACTION]{"fn":"add_experience","title":"...","company":"...","startDate":"...","endDate":"...","current":false,"location":"...","bullets":["...","..."]}[/ACTION]
+[ACTION]{"fn":"add_experience","title":"...","company":"...","startDate":"...","endDate":"...","current":false,"bullets":["...","..."],"rawNotes":"..."}[/ACTION]
 [ACTION]{"fn":"update_experience_bullets","index":0,"bullets":["...","..."]}[/ACTION]
 [ACTION]{"fn":"remove_experience","index":0}[/ACTION]
-[ACTION]{"fn":"add_education","degree":"...","field":"...","institution":"...","startYear":"...","endYear":"...","gpa":"..."}[/ACTION]
+[ACTION]{"fn":"add_education","degree":"...","field":"...","institution":"...","startYear":"...","endYear":"...","inProgress":false,"gpa":"..."}[/ACTION]
+[ACTION]{"fn":"remove_education","index":0}[/ACTION]
 [ACTION]{"fn":"add_skill","skill":"..."}[/ACTION]
+[ACTION]{"fn":"remove_skill","skill":"..."}[/ACTION]
 [ACTION]{"fn":"set_skills","skills":["...","..."]}[/ACTION]
+[ACTION]{"fn":"set_optional","certifications":true,"certificationsData":[{"name":"AWS SAA","issuer":"Amazon","date":"2024"}],"languages":true,"languagesData":["English (Native)","Spanish (Professional)"],"projects":true,"projectsData":[{"name":"...","description":"...","url":"...","rawNotes":"..."}],"volunteer":true,"volunteerData":[{"organization":"...","role":"...","description":"..."}],"awards":true,"awardsData":[{"title":"...","issuer":"...","date":"..."}]}[/ACTION]
 
 ### Design actions:
 [ACTION]{"fn":"set_template","templateId":"modern"}[/ACTION]  (ids: minimal, modern, executive, compact, classic, sidebar, bold, creative, tech, academic, charter, prestige, engineer, contemporary, folio)
@@ -335,7 +339,7 @@ Output one or more of these tags (each on its own line, no markdown, no backtick
     tags: string[],
     currentStepData: Record<string, unknown>,
   ): Promise<void> {
-    const stepData = { ...currentStepData };
+    const stepData = structuredClone(currentStepData) as Record<string, unknown>;
 
     for (const tag of tags) {
       const match = tag.match(/\[ACTION\](.*?)\[\/ACTION\]/);
@@ -345,43 +349,94 @@ Output one or more of these tags (each on its own line, no markdown, no backtick
         switch (action.fn) {
           case 'set_basics': {
             const { name, headline, email, phone, location, linkedin, github, website } = action;
-            stepData.basics = { ...(stepData.basics as any || {}), name, headline, email, phone, location, linkedin, github, website };
+            stepData.basics = { ...((stepData.basics as Record<string, unknown>) || {}), name, headline, email, phone, location, linkedin, github, website };
             break;
           }
+          case 'set_target_role':
+            stepData.targetRole = { role: action.role, level: action.level, industry: action.industry, company: action.company, companyUrl: action.companyUrl, jobDescription: action.jobDescription };
+            break;
           case 'set_summary':
             stepData.summary = { text: action.text, accepted: true };
             break;
+          case 'add_experience': {
+            const exp = (stepData.experience as Array<Record<string, unknown>>) || [];
+            stepData.experience = [...exp, { company: action.company, title: action.title, startDate: action.startDate, endDate: action.endDate, current: action.current || false, bullets: action.bullets || [], rawNotes: action.rawNotes || '' }];
+            break;
+          }
+          case 'remove_experience': {
+            const exp = (stepData.experience as Array<Record<string, unknown>>) || [];
+            if (typeof action.index === 'number') {
+              stepData.experience = exp.filter((_, i) => i !== action.index);
+            }
+            break;
+          }
+          case 'update_experience_bullets': {
+            const exp = (stepData.experience as Array<Record<string, unknown>>) || [];
+            if (typeof action.index === 'number' && exp[action.index]) {
+              exp[action.index] = { ...exp[action.index], bullets: action.bullets || [] };
+              stepData.experience = exp;
+            }
+            break;
+          }
           case 'set_skills':
             stepData.skills = action.skills || [];
             break;
           case 'add_skill': {
             const existing = (stepData.skills as string[]) || [];
-            if (!existing.includes(action.skill)) {
+            if (action.skill && !existing.includes(action.skill)) {
               stepData.skills = [...existing, action.skill];
             }
             break;
           }
+          case 'remove_skill': {
+            const existing = (stepData.skills as string[]) || [];
+            stepData.skills = existing.filter((s: string) => s !== action.skill);
+            break;
+          }
+          case 'add_education': {
+            const edu = (stepData.education as Array<Record<string, unknown>>) || [];
+            stepData.education = [...edu, { degree: action.degree, field: action.field, institution: action.institution, startYear: action.startYear, endYear: action.endYear, inProgress: action.inProgress || false, gpa: action.gpa || '' }];
+            break;
+          }
+          case 'remove_education': {
+            const edu = (stepData.education as Array<Record<string, unknown>>) || [];
+            if (typeof action.index === 'number') {
+              stepData.education = edu.filter((_, i) => i !== action.index);
+            }
+            break;
+          }
+          case 'set_optional':
+            stepData.optional = { certifications: action.certifications || false, certificationsData: action.certificationsData || [], languages: action.languages || false, languagesData: action.languagesData || [], projects: action.projects || false, projectsData: action.projectsData || [], volunteer: action.volunteer || false, volunteerData: action.volunteerData || [], awards: action.awards || false, awardsData: action.awardsData || [] };
+            break;
           case 'set_template':
-            // template handled by client
+            break;
+          case 'set_design':
+            stepData.design = { ...((stepData.design as Record<string, unknown>) || {}), ...action };
             break;
         }
       } catch {}
     }
 
-    try {
-      await this.resumeModel.findOneAndUpdate(
-        { _id: resumeId, userId },
-        {
-          $set: {
-            'wizardState.stepData.basics': stepData.basics,
-            'wizardState.stepData.summary': stepData.summary,
-            'wizardState.stepData.skills': stepData.skills,
-          },
-        },
-      );
-      this.logger.log(`[chat] Fallback data persisted to DB for resume ${resumeId}`);
-    } catch (err) {
-      this.logger.error(`[chat] Failed to persist fallback: ${(err as Error).message}`);
+    const updateFields: Record<string, unknown> = {};
+    if (stepData.basics) updateFields['wizardState.stepData.basics'] = stepData.basics;
+    if (stepData.targetRole) updateFields['wizardState.stepData.targetRole'] = stepData.targetRole;
+    if (stepData.summary) updateFields['wizardState.stepData.summary'] = stepData.summary;
+    if (stepData.experience) updateFields['wizardState.stepData.experience'] = stepData.experience;
+    if (stepData.education) updateFields['wizardState.stepData.education'] = stepData.education;
+    if (stepData.skills) updateFields['wizardState.stepData.skills'] = stepData.skills;
+    if (stepData.optional) updateFields['wizardState.stepData.optional'] = stepData.optional;
+    if (stepData.design) updateFields['wizardState.design'] = stepData.design;
+
+    if (Object.keys(updateFields).length > 0) {
+      try {
+        await this.resumeModel.findOneAndUpdate(
+          { _id: resumeId, userId },
+          { $set: updateFields },
+        );
+        this.logger.log(`[chat] Fallback data persisted to DB for resume ${resumeId} (${Object.keys(updateFields).length} fields)`);
+      } catch (err) {
+        this.logger.error(`[chat] Failed to persist fallback: ${(err as Error).message}`);
+      }
     }
   }
 
@@ -478,7 +533,7 @@ Output one or more of these tags (each on its own line, no markdown, no backtick
     // Check for template changes
     const validTemplates = ['minimal', 'modern', 'executive', 'compact', 'classic', 'sidebar', 'bold', 'creative', 'tech', 'academic', 'charter', 'prestige', 'engineer', 'contemporary', 'folio'];
     for (const src of sources) {
-      const templateMatch = src.match(/(?:use|change|switch|apply|set)\s+(?:the\s+)?(?:(.+?)\s+)?template/i);
+      const templateMatch = src.match(/(?:use|change|switch|apply|set)\s+(?:the\s+)?(?:to\s+)?(.+?)\s+template/i);
       if (templateMatch) {
         const templateId = templateMatch[1]?.trim().toLowerCase();
         if (templateId && validTemplates.includes(templateId)) {

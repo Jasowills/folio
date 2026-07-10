@@ -12,6 +12,7 @@ interface ResumeContact {
   linkedin?: string | null;
   website?: string | null;
   github?: string | null;
+  photoUrl?: string | null;
 }
 
 interface ResumeExperience {

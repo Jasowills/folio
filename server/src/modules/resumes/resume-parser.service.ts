@@ -393,6 +393,23 @@ export class ResumeParserService {
       Promise.resolve(this.parseCertifications(sections)),
       Promise.resolve(this.parseLanguages(sections)),
     ]);
+    // Fallback: if email not found in header, search full text
+    if (!contactResult.email) {
+      const fullEmailMatch = rawText.match(EMAIL_RE);
+      if (fullEmailMatch) {
+        contactResult.email = fullEmailMatch[0].toLowerCase();
+        this.logger.log(`parse: email fallback from full text — "${contactResult.email}"`);
+      }
+    }
+    // Fallback: if phone not found in header, search full text
+    if (!contactResult.phone) {
+      const fullPhoneMatch = rawText.match(PHONE_RE);
+      if (fullPhoneMatch) {
+        contactResult.phone = fullPhoneMatch[0].trim();
+        this.logger.log(`parse: phone fallback from full text — "${contactResult.phone}"`);
+      }
+    }
+
     this.logger.log(`parse: contact name="${contactResult.name}", email=${contactResult.email}, phone=${contactResult.phone}, linkedin=${contactResult.linkedin}, github=${contactResult.github}, website=${contactResult.website}, location=${contactResult.location}`);
     this.logger.log(`parse: summary length=${summaryResult?.length || 0}, experience=${experienceResult.length} entries, education=${educationResult.length} entries, skills=${skillsResult.length} raw items, certifications=${certsResult.length}, languages=${langsResult.length}`);
 
@@ -740,17 +757,15 @@ export class ResumeParserService {
 
     if (current) blocks.push(current);
 
+    // Merge company-only entries (no bullets, no dates) into the previous entry
     for (let i = 0; i < blocks.length; i++) {
       const block = blocks[i];
       const next = blocks[i + 1];
-      if (!block.company && next && next.bullets.length === 0) {
+      if (!block.company && next && next.bullets.length === 0 && !next.startDate && !next.endDate) {
         const hasTitleKw = this.matchesTitleKeyword(next.title);
         const hasCompanyKw = next.company ? this.matchesTitleKeyword(next.company) : false;
         if (!hasTitleKw || hasCompanyKw) {
           block.company = next.title;
-          if (next.startDate) block.startDate = block.startDate || next.startDate;
-          if (next.endDate) block.endDate = block.endDate || next.endDate;
-          if (next.current) block.current = block.current || next.current;
           blocks.splice(i + 1, 1);
           i--;
         }
@@ -842,7 +857,13 @@ export class ResumeParserService {
     const lower = line.toLowerCase();
     const hasSuffix = COMPANY_SUFFIXES.some(s => new RegExp(`\\b${s}$`, 'i').test(lower));
     if (hasSuffix) return true;
-    if (/^[A-Z][a-zA-Z]+\s*[—–]\s*[A-Z]/.test(line)) return false;
+    // "Company — Location" pattern: if the part before the separator doesn't match title keywords, treat as company
+    const dashMatch = line.match(/^([A-Za-z][A-Za-z'.\s]{1,40})\s*[—–]\s*[A-Z]/);
+    if (dashMatch) {
+      const beforeDash = dashMatch[1].trim();
+      if (!this.matchesTitleKeyword(beforeDash) && beforeDash.length >= 2) return true;
+      return false;
+    }
     if (/^[A-Z][a-zA-Z'.\s]{2,40}$/.test(line) && !this.matchesTitleKeyword(line)) return true;
     return false;
   }
@@ -1042,15 +1063,35 @@ export class ResumeParserService {
     if (clean.length < 2 || clean.length > 60) return null;
 
     const lower = clean.toLowerCase();
+
+    // Exact dictionary match
     if (SKILL_DICTIONARY[lower]) return SKILL_DICTIONARY[lower];
 
+    // Fuzzy dictionary match — whole-word match with short remaining text guard
     for (const [key, value] of Object.entries(SKILL_DICTIONARY)) {
       if (lower === key) return value;
-      if (lower.includes(key) && lower.length < key.length + 10) return value;
+      const keyRegex = new RegExp(`\\b${key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i');
+      if (keyRegex.test(lower)) {
+        const remaining = lower.replace(keyRegex, '').trim();
+        // Only treat as variant if very little remains (punctuation, whitespace)
+        if (remaining.length <= 3) return value;
+        // Otherwise it's a compound skill (e.g. "Ruby on Rails" contains "ruby" but isn't just "Ruby")
+      }
     }
 
-    if (/^[A-Z][a-zA-Z+#.]+$/.test(clean) && !ALL_SECTION_HEADERS.some(h => clean.toLowerCase() === h)) {
-      return clean;
+    // Reject known non-skill patterns
+    if (ALL_SECTION_HEADERS.some(h => lower === h)) return null;
+    if (/^\d+$/.test(clean)) return null;
+    if (/^[-•*♦‣⁃◦‣\d.)]+$/.test(clean)) return null;
+
+    // Accept anything that looks like a reasonable skill name:
+    // Must start with a letter or digit, contain letters/digits/spaces/slashes/dots/hashes/+/#
+    if (/^[a-zA-Z0-9][a-zA-Z0-9\s/+.#&-]{1,58}$/.test(clean)) {
+      // Title-case normalize, but preserve all-caps words (e.g. "SEO", "API")
+      return clean.replace(/\b\w+/g, word => {
+        if (/^[A-Z]{2,}$/.test(word)) return word;
+        return word.charAt(0).toUpperCase() + word.slice(1).toLowerCase();
+      });
     }
 
     return null;
@@ -1088,24 +1129,37 @@ export class ResumeParserService {
       const text = line.replace(/^[-•*♦\d.)\s]+/, '').trim();
       if (!text) continue;
 
-      const urlMatch = text.match(URL_RE);
+      // Skip lines that are just URLs or very short
+      if (text.length < 3) continue;
 
       let name = text;
       let issuer: string | null = null;
 
+      // Try to split by known issuers
       for (const known of knownIssuers) {
-        const regex = new RegExp(`\\b${known}\\b`, 'gi');
+        const regex = new RegExp(`\\b${known.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'gi');
         const matches = [...text.matchAll(regex)];
         if (matches.length > 0) {
           const match = matches[matches.length - 1];
-          name = text.substring(0, match.index).replace(/[•·|—–-]\s*$/, '').trim();
-          issuer = match[0];
-          if (issuer === 'aws' || issuer === 'amazon web services') issuer = 'AWS';
-          else if (issuer === 'AWS') issuer = 'AWS';
+          const before = text.substring(0, match.index).replace(/[•·|—–-]\s*$/, '').trim();
+          const after = text.substring(match.index + match[0].length).replace(/[•·|—–-]\s*$/, '').trim();
+          // Use the part before the issuer as the name, after as additional info
+          if (before) {
+            name = before;
+            issuer = match[0];
+          } else if (after) {
+            name = after;
+            issuer = match[0];
+          } else {
+            name = match[0];
+            issuer = null;
+          }
+          if (issuer === 'aws' || issuer?.toLowerCase() === 'amazon web services') issuer = 'AWS';
           break;
         }
       }
 
+      // Try to split by separators if no issuer found
       if (!issuer) {
         const separators = ['issued by', 'certified by', 'through', '|', '•', '·', '—', '–'];
         for (const sep of separators) {
@@ -1113,7 +1167,7 @@ export class ResumeParserService {
           if (idx > 0) {
             const candidateName = text.substring(0, idx).trim();
             const candidateIssuer = text.substring(idx + sep.length).replace(/\b\d{4}\b.*$/, '').trim();
-            if (candidateName) {
+            if (candidateName && candidateName.length > 2) {
               name = candidateName;
               issuer = candidateIssuer || null;
               break;
@@ -1122,11 +1176,19 @@ export class ResumeParserService {
         }
       }
 
+      // Clean up the name
       const date = this.extractCertDate(text);
-      const cleanedName = name.replace(/^[-•*♦\s]+/, '').trim();
-      if (cleanedName) {
-        certs.push({ name: cleanedName, issuer, date });
-      }
+      let cleanedName = name
+        .replace(/^[-•*♦\s]+/, '')
+        .replace(/\(\s*\)/g, '') // Remove empty parentheses
+        .replace(/\s{2,}/g, ' ')
+        .trim();
+
+      // Skip if name is empty or just punctuation/whitespace
+      if (!cleanedName || /^[-•·|—–\s()]+$/.test(cleanedName)) continue;
+      if (cleanedName.length < 2) continue;
+
+      certs.push({ name: cleanedName, issuer, date });
     }
 
     return certs;

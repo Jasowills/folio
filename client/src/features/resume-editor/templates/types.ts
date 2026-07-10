@@ -5,6 +5,7 @@ export interface ResumeRenderProps {
   data: LocalData
   design: DesignSettings
   style: TemplateStyle
+  sectionSpacing?: number
 }
 
 export type ResumeLayout = React.ComponentType<ResumeRenderProps>
@@ -27,4 +28,16 @@ export const TEMPLATE_DEFS = [
   { id: 'folio', name: 'Folio', description: 'Left-accent headings, display font, clean', layout: 'single-column' as const },
 ] as const
 
-export type TemplateId = (typeof TEMPLATE_DEFS)[number]['id']
+export type TemplateId = string
+
+export const ALL_TEMPLATE_IDS: TemplateId[] = [
+  ...TEMPLATE_DEFS.map(t => t.id),
+  'ledger', 'meridian', 'foundry', 'almanac', 'bureau', 'ironclad', 'northline', 'plainscript',
+  'halcyon', 'driftwood', 'paperwhite', 'fieldnote', 'vellum',
+  'meridian-split', 'compass', 'skyline', 'atlas', 'harbor',
+  'boardroom', 'summit', 'chairman', 'monarch', 'statesman',
+  'prism', 'canvas-bold', 'studio', 'palette', 'kinetic',
+  'terminal', 'commit', 'syntax', 'kernel', 'stack',
+  'thesis', 'faculty', 'curriculum', 'archive',
+  'portrait', 'frame', 'profile-card',
+]

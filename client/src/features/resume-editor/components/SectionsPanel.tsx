@@ -3,6 +3,8 @@ import { ALL_SECTION_NAMES } from '../../../pages/editor/types'
 import { IconPlus, IconTrash, IconGripVertical } from '@tabler/icons-react'
 import { useState } from 'react'
 
+const RENDERABLE_SECTIONS = new Set(['summary', 'experience', 'education', 'skills', 'certifications', 'languages', 'links'])
+
 interface Props {
   data: LocalData
   onUpdate: (data: LocalData) => void
@@ -15,19 +17,10 @@ export default function SectionsPanel({ data, onUpdate }: Props) {
     ALL_SECTION_NAMES.map(s => [s.key, s.label])
   )
 
-  const presentSections = data.sectionOrder.filter(s => {
-    if (s === 'summary') return !!data.summary
-    if (s === 'experience') return data.experience.length > 0
-    if (s === 'education') return data.education.length > 0
-    if (s === 'skills') return data.skills.length > 0
-    if (s === 'certifications') return data.certifications.length > 0
-    if (s === 'languages') return data.languages.length > 0
-    if (s === 'links') return data.links.length > 0
-    return true
-  })
+  const presentSections = data.sectionOrder
 
   const availableSections = ALL_SECTION_NAMES.filter(
-    s => !data.sectionOrder.includes(s.key) && !presentSections.includes(s.key)
+    s => RENDERABLE_SECTIONS.has(s.key) && !data.sectionOrder.includes(s.key)
   )
 
   function moveSection(index: number, direction: -1 | 1) {

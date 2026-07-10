@@ -38,8 +38,16 @@ export default function Step7Optional({ data, onSave, onChange }: Props) {
     setter: (v: boolean) => void,
     current: boolean,
   ) => {
-    setter(!current)
-    setTimeout(fireOnChange, 0)
+    const next = !current
+    setter(next)
+    onChange?.({
+      ...buildData(),
+      certifications: setter === setCertOn ? next : certOn,
+      languages: setter === setLangOn ? next : langOn,
+      projects: setter === setProjOn ? next : projOn,
+      volunteer: setter === setVolOn ? next : volOn,
+      awards: setter === setAwdOn ? next : awdOn,
+    })
   }
 
   return (

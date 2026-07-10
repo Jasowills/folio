@@ -1,26 +1,16 @@
 import type { ResumeRenderProps } from '../types'
 import HeaderRenderer from '../renderers/HeaderRenderer'
-import SummaryRenderer from '../renderers/SummaryRenderer'
-import ExperienceRenderer from '../renderers/ExperienceRenderer'
-import EducationRenderer from '../renderers/EducationRenderer'
-import SkillsRenderer from '../renderers/SkillsRenderer'
-import CertificationsRenderer from '../renderers/CertificationsRenderer'
-import LanguagesRenderer from '../renderers/LanguagesRenderer'
-import LinksRenderer from '../renderers/LinksRenderer'
+import SectionRenderer from '../renderers/SectionRenderer'
 
-export default function SingleColumn({ data, design, style }: ResumeRenderProps) {
-  const spacing = style.spacing === 'compact' ? 'space-y-3' : style.spacing === 'airy' ? 'space-y-5' : 'space-y-4'
+const SECTION_GAP_MAP = ['space-y-1', 'space-y-2', 'space-y-3', 'space-y-4', 'space-y-5']
+
+export default function SingleColumn({ data, design, style, sectionSpacing }: ResumeRenderProps) {
+  const spacing = SECTION_GAP_MAP[sectionSpacing ?? 3] ?? 'space-y-4'
 
   return (
     <div className={spacing}>
       <HeaderRenderer data={data} design={design} style={style} />
-      <SummaryRenderer data={data} design={design} style={style} />
-      <ExperienceRenderer data={data} design={design} style={style} />
-      <EducationRenderer data={data} design={design} style={style} />
-      <SkillsRenderer data={data} design={design} style={style} variant="inline-list" />
-      <CertificationsRenderer data={data} design={design} style={style} />
-      <LanguagesRenderer data={data} design={design} style={style} />
-      <LinksRenderer data={data} design={design} style={style} />
+      <SectionRenderer data={data} design={design} style={style} className={spacing} />
     </div>
   )
 }

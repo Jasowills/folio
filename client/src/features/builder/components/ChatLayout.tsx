@@ -24,12 +24,21 @@ interface Props {
   onUpdateExperienceBullets: (index: number, bullets: string[]) => void
   onRemoveExperience: (index: number) => void
   onSetEducation: (data: EducationEntry[]) => void
+  onSetExperience: (exp: ExperienceRole[]) => void
   onSetSkills: (skills: string[]) => void
   onSetOptional: (data: OptionalData) => void
   onMarkComplete: () => void
 }
 
 export default function ChatLayout(props: Props) {
+  const {
+    stepData, selectedTemplate, design, resumeId, zoom,
+    onSetTemplate, onDesignChange, onSetBasics, onSetTargetRole, onSetSummary,
+    onAddExperience, onUpdateExperienceBullets, onRemoveExperience,
+    onSetEducation, onSetExperience, onSetSkills, onSetOptional,
+    onMarkComplete,
+  } = props
+
   const undoRef = useRef<{ snapshot: BuilderSnapshot; message: string } | null>(null)
   const [lastUndoable, setLastUndoable] = useState<{ message: string } | null>(null)
 
@@ -48,6 +57,7 @@ export default function ChatLayout(props: Props) {
     if (sd.basics) onSetBasics(sd.basics)
     if (sd.targetRole) onSetTargetRole(sd.targetRole)
     if (sd.summary) onSetSummary(sd.summary.text, sd.summary.accepted)
+    onSetExperience(sd.experience)
     onSetEducation(sd.education)
     onSetSkills(sd.skills)
     if (sd.optional) onSetOptional(sd.optional)
@@ -55,15 +65,8 @@ export default function ChatLayout(props: Props) {
     if (d) onDesignChange(d)
     undoRef.current = null
     setLastUndoable(null)
-  }, [onSetBasics, onSetTargetRole, onSetSummary, onSetEducation, onSetSkills, onSetOptional, onSetTemplate, onDesignChange])
+  }, [onSetBasics, onSetTargetRole, onSetSummary, onSetExperience, onSetEducation, onSetSkills, onSetOptional, onSetTemplate, onDesignChange])
 
-  const {
-    stepData, selectedTemplate, design, resumeId, zoom,
-    onSetTemplate, onDesignChange, onSetBasics, onSetTargetRole, onSetSummary,
-    onAddExperience, onUpdateExperienceBullets, onRemoveExperience,
-    onSetEducation, onSetSkills, onSetOptional,
-    onMarkComplete,
-  } = props
   const localData = useMemo(() => {
     const empty = getDefaultLocalData()
     const hasData = stepData.basics !== null || stepData.summary !== null || stepData.experience.length > 0 || stepData.education.length > 0 || stepData.skills.length > 0 || stepData.optional !== null
@@ -122,7 +125,12 @@ export default function ChatLayout(props: Props) {
   const handleAction = (fn: string, params: Record<string, unknown>): string | void => {
     if (!params) { console.warn('[builder] handleAction called with no params for', fn); return }
     console.log('[builder] chat action', fn, params)
-    captureUndo(`I've applied the ${fn.replace(/_/g, ' ')} change. Undo?`)
+
+    const noopActions = ['generate_summary', 'generate_bullets']
+    if (!noopActions.includes(fn)) {
+      captureUndo(`I've applied the ${fn.replace(/_/g, ' ')} change. Undo?`)
+    }
+
     switch (fn) {
       case 'set_basics':
         onSetBasics({
@@ -140,7 +148,16 @@ export default function ChatLayout(props: Props) {
         onSetSummary((params.text as string) || '', true)
         break
       case 'add_experience':
-        onAddExperience(params as unknown as ExperienceRole)
+        onAddExperience({
+          company: (params.company as string) || '',
+          title: (params.title as string) || '',
+          startDate: (params.startDate as string) || '',
+          endDate: (params.endDate as string) || '',
+          current: (params.current as boolean) || false,
+          location: (params.location as string) || '',
+          bullets: (params.bullets as string[]) || [],
+          rawNotes: (params.rawNotes as string) || '',
+        })
         break
       case 'set_skills':
         onSetSkills((params.skills as string[]) || [])
@@ -204,7 +221,6 @@ export default function ChatLayout(props: Props) {
         break
       case 'set_design': {
         const designChanges = (params.design as Partial<DesignSettings>) || {}
-        // Support top-level design params (primaryColor, headingFont, bodyFont, columnLayout, sectionSpacing)
         const topLevelChanges: Record<string, unknown> = {}
         for (const key of ['primaryColor', 'headingFont', 'bodyFont', 'columnLayout', 'sectionSpacing', 'margins', 'lineSpacing', 'bodyFontSize'] as const) {
           if (key in params) topLevelChanges[key] = params[key]
@@ -216,10 +232,7 @@ export default function ChatLayout(props: Props) {
         break
       }
       case 'generate_summary':
-        // Trigger summary generation with target context
         if (stepData.targetRole) {
-          // The chat already generated the summary text inline via AI, so this is just a signal
-          // to the UI that new summary content is available
           console.log('[builder] generate_summary triggered')
         }
         break
@@ -242,8 +255,9 @@ export default function ChatLayout(props: Props) {
           awardsData: (params.awardsData as Array<{ title: string; issuer: string; date: string }>) || [],
         })
         break
+      default:
+        console.warn('[builder] unhandled action', fn, params)
     }
-    console.log('[builder] unhandled action', fn, params)
   }
 
   return (

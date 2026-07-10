@@ -56,7 +56,12 @@ async function bootstrap() {
       },
     },
   }));
-  app.use(compression());
+  app.use(compression({
+    filter: (req, res) => {
+      if (req.headers.accept === 'text/event-stream') return false;
+      return compression.filter(req, res);
+    },
+  }));
   app.use(cookieParser());
   app.enableCors({ origin: process.env.CLIENT_URL, credentials: true });
   app.setGlobalPrefix('api');

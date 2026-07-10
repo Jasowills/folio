@@ -265,6 +265,7 @@ export default function BuilderPage() {
     onAddExperience: (role: ExperienceRole) => { store.addExperience(role); saveState() },
     onUpdateExperienceBullets: (index: number, bullets: string[]) => { store.updateExperienceBullets(index, bullets); saveState() },
     onRemoveExperience: (index: number) => { store.removeExperience(index); saveState() },
+    onSetExperience: (exp: ExperienceRole[]) => { store.setExperience(exp); saveState() },
     onSetEducation: (data: EducationEntry[]) => { store.setEducation(data); saveState() },
     onSetSkills: (skills: string[]) => { store.setSkills(skills); saveState() },
     onSetOptional: (data: OptionalData) => { store.setOptional(data); saveState() },

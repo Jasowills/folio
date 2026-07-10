@@ -1,7 +1,10 @@
 import { useState, useRef, useEffect } from 'react'
 import { IconSend, IconRobot, IconUser, IconCheck } from '@tabler/icons-react'
 import { AiService } from '../../../lib/ai'
-import type { LocalData } from '../../../pages/editor/types'
+import type { LocalData, DesignSettings } from '../../../pages/editor/types'
+import type { TemplateId } from '../templates/types'
+import { getTemplateName } from '../templates/registry'
+import type { PdfBlockFormat, PdfTextEdit } from '../../pdf-editor/PdfDocumentEditor'
 
 interface Action {
   fn: string
@@ -18,6 +21,13 @@ interface ChatMessage {
 interface Props {
   data: LocalData
   onUpdate: (data: LocalData) => void
+  design: DesignSettings
+  onDesignUpdate: (design: DesignSettings) => void
+  templateId: TemplateId
+  onTemplateChange: (id: TemplateId) => void
+  onShowTemplate: () => void
+  onFormatPdf: (format: PdfBlockFormat) => void
+  onEditText: (edit: PdfTextEdit) => void
 }
 
 let msgId = 0
@@ -31,15 +41,27 @@ const WELCOME =
   "• \"Suggest a better headline\""
 
 function stripActions(text: string): string {
-  return text.replace(/\[ACTION\].*?\[\/ACTION\]/g, '')
+  return text
+    .replace(/\r/g, '')
+    .replace(/[\t ]*\[ACTION\][\s\S]*?\[\/[%\s]*ACTION\][\t ]*/g, '')
+    .split('\n')
+    .filter((line, i, arr) => {
+      if (line.trim() === '' && i > 0 && arr[i - 1]?.trim() === '') return false
+      return true
+    })
+    .join('\n')
+    .trim()
 }
 
 function parseActions(text: string): Action[] {
   const actions: Action[] = []
-  const re = /\[ACTION\](.*?)\[\/ACTION\]/g
+  const re = /\[ACTION\](.*?)\[\/[%\s]*ACTION\]/g
   let match
   while ((match = re.exec(text)) !== null) {
-    try { actions.push(JSON.parse(match[1])) } catch { /* skip malformed */ }
+    try {
+      const parsed = JSON.parse(match[1])
+      actions.push({ fn: parsed.fn, params: parsed.params || parsed })
+    } catch { /* skip malformed */ }
   }
   return actions
 }
@@ -101,13 +123,17 @@ function generateFallbackActions(text: string, currentData: Record<string, any>)
   return actions
 }
 
-export default function AiChatPanel({ data, onUpdate }: Props) {
+export default function AiChatPanel({ data, onUpdate, design, onDesignUpdate, templateId, onTemplateChange, onShowTemplate, onFormatPdf, onEditText }: Props) {
   const [messages, setMessages] = useState<ChatMessage[]>([
     { id: nextId(), role: 'assistant', content: WELCOME, actions: [] },
   ])
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
   const listRef = useRef<HTMLDivElement>(null)
+  const dataRef = useRef(data)
+  dataRef.current = data
+  const designRef = useRef(design)
+  designRef.current = design
 
   useEffect(() => {
     if (listRef.current) listRef.current.scrollTop = listRef.current.scrollHeight
@@ -117,26 +143,23 @@ export default function AiChatPanel({ data, onUpdate }: Props) {
   const updateLast = (updater: (m: ChatMessage) => ChatMessage) =>
     setMessages(prev => prev.map((m, i) => i === prev.length - 1 ? updater(m) : m))
 
-  const applyAction = (action: Action) => {
+  const applyActionToData = (action: Action, d: LocalData): LocalData => {
     const { fn, params } = action
     switch (fn) {
       case 'set_summary':
-        if (typeof params.text === 'string') {
-          onUpdate({ ...data, summary: params.text })
-        }
-        break
+        if (typeof params.text === 'string') return { ...d, summary: params.text }
+        return d
       case 'set_basics':
-        onUpdate({
-          ...data,
-          name: (params.name as string) ?? data.name,
+        return {
+          ...d,
+          name: (params.name as string) ?? d.name,
           contact: {
-            ...data.contact,
-            email: (params.email as string) ?? data.contact.email,
-            phone: (params.phone as string) ?? data.contact.phone,
-            location: (params.location as string) ?? data.contact.location,
+            ...d.contact,
+            email: (params.email as string) ?? d.contact.email,
+            phone: (params.phone as string) ?? d.contact.phone,
+            location: (params.location as string) ?? d.contact.location,
           },
-        })
-        break
+        }
       case 'add_experience': {
         const exp = {
           company: (params.company as string) || '',
@@ -146,27 +169,24 @@ export default function AiChatPanel({ data, onUpdate }: Props) {
           current: !!params.current,
           bullets: (params.bullets as string[]) || [],
         }
-        onUpdate({ ...data, experience: [...data.experience, exp] })
-        break
+        return { ...d, experience: [...d.experience, exp] }
       }
       case 'remove_experience': {
         const idx = params.index as number
-        onUpdate({ ...data, experience: data.experience.filter((_, i) => i !== idx) })
-        break
+        return { ...d, experience: d.experience.filter((_, i) => i !== idx) }
       }
       case 'add_skill':
-        if (typeof params.skill === 'string' && !data.skills.some(s => s.name === params.skill)) {
-          onUpdate({ ...data, skills: [...data.skills, { name: params.skill, category: params.category as string | undefined }] })
+        if (typeof params.skill === 'string' && !d.skills.some(s => s.name === params.skill)) {
+          return { ...d, skills: [...d.skills, { name: params.skill, category: params.category as string | undefined }] }
         }
-        break
+        return d
       case 'remove_skill':
-        onUpdate({ ...data, skills: data.skills.filter(s => s.name !== params.skill) })
-        break
+        return { ...d, skills: d.skills.filter(s => s.name !== params.skill) }
       case 'set_skills':
         if (Array.isArray(params.skills)) {
-          onUpdate({ ...data, skills: params.skills.map((s: any) => typeof s === 'string' ? { name: s } : s) })
+          return { ...d, skills: params.skills.map((s: any) => typeof s === 'string' ? { name: s } : s) }
         }
-        break
+        return d
       case 'add_education': {
         const edu = {
           institution: (params.institution as string) || '',
@@ -176,8 +196,7 @@ export default function AiChatPanel({ data, onUpdate }: Props) {
           endDate: params.endDate as string | undefined,
           gpa: params.gpa as string | undefined,
         }
-        onUpdate({ ...data, education: [...data.education, edu] })
-        break
+        return { ...d, education: [...d.education, edu] }
       }
       case 'add_certification': {
         const cert = {
@@ -185,17 +204,59 @@ export default function AiChatPanel({ data, onUpdate }: Props) {
           issuer: (params.issuer as string) || '',
           date: params.date as string | undefined,
         }
-        onUpdate({ ...data, certifications: [...(data.certifications || []), cert] })
-        break
+        return { ...d, certifications: [...(d.certifications || []), cert] }
       }
       case 'add_language':
-        if (typeof params.language === 'string' && !data.languages.includes(params.language)) {
-          onUpdate({ ...data, languages: [...data.languages, params.language] })
+        if (typeof params.language === 'string' && !d.languages.includes(params.language)) {
+          return { ...d, languages: [...d.languages, params.language] }
         }
-        break
+        return d
       case 'remove_language':
-        onUpdate({ ...data, languages: data.languages.filter(l => l !== params.language) })
-        break
+        return { ...d, languages: d.languages.filter(l => l !== params.language) }
+      case 'set_design':
+        return d
+      case 'set_template':
+        return d
+      case 'format_pdf':
+        return d
+      case 'edit_pdf_text':
+        return d
+      case 'remove_education': {
+        const eidx = params.index as number
+        return { ...d, education: d.education.filter((_, i) => i !== eidx) }
+      }
+      case 'remove_certification': {
+        const cidx = params.index as number
+        return { ...d, certifications: (d.certifications || []).filter((_, i) => i !== cidx) }
+      }
+      case 'add_link':
+        if (params.url) {
+          return { ...d, links: [...(d.links || []), { title: (params.title as string) || '', url: params.url as string }] }
+        }
+        return d
+      case 'remove_link': {
+        const lidx = params.index as number
+        return { ...d, links: (d.links || []).filter((_, i) => i !== lidx) }
+      }
+      case 'update_experience': {
+        const uidx = params.index as number
+        if (typeof uidx !== 'number' || uidx < 0 || uidx >= d.experience.length) return d
+        const existing = d.experience[uidx]
+        return {
+          ...d,
+          experience: d.experience.map((e, i) => i === uidx ? {
+            ...e,
+            title: (params.title as string) ?? e.title,
+            company: (params.company as string) ?? e.company,
+            startDate: (params.startDate as string) ?? e.startDate,
+            endDate: (params.endDate as string) ?? e.endDate,
+            current: (params.current as boolean) ?? e.current,
+            bullets: Array.isArray(params.bullets) ? (params.bullets as string[]) : e.bullets,
+          } : e),
+        }
+      }
+      default:
+        return d
     }
   }
 
@@ -207,63 +268,156 @@ export default function AiChatPanel({ data, onUpdate }: Props) {
     const userMsg: ChatMessage = { id: nextId(), role: 'user', content: text, actions: [] }
     addMessage(userMsg)
 
-    const assistantMsg: ChatMessage = { id: nextId(), role: 'assistant', content: '', actions: [] }
+    const assistantId = nextId()
+    const assistantMsg: ChatMessage = { id: assistantId, role: 'assistant', content: '', actions: [] }
     addMessage(assistantMsg)
     setLoading(true)
 
+    let fullText = ''
+
     try {
+      const resumeContext = [
+        data.name && `Name: ${data.name}`,
+        data.summary && `Summary: ${data.summary.slice(0, 300)}`,
+        data.experience.length > 0 && `Experience: ${data.experience.map(e => `${e.title} at ${e.company} (${e.startDate || '?'} - ${e.endDate || 'Present'})${e.bullets?.length ? ': ' + e.bullets.slice(0, 2).join('; ') : ''}`).join('\n  ')}`,
+        data.education.length > 0 && `Education: ${data.education.map(e => `${e.degree} in ${e.field} — ${e.institution}`).join('; ')}`,
+        data.skills.length > 0 && `Skills: ${data.skills.map(s => s.name).join(', ')}`,
+        data.certifications?.length > 0 && `Certifications: ${data.certifications.map(c => c.name).join(', ')}`,
+        data.languages.length > 0 && `Languages: ${data.languages.join(', ')}`,
+      ].filter(Boolean).join('\n')
+
+      const designContext =
+        `Current design: headingFont="${design.headingFont}", bodyFont="${design.bodyFont}", ` +
+        `bodyFontSize=${design.bodyFontSize}px, lineSpacing=${design.lineSpacing}, ` +
+        `primaryColor="${design.primaryColor}", secondaryColor="${design.secondaryColor}", ` +
+        `columnLayout="${design.columnLayout}", margins=${design.margins}, sectionSpacing=${design.sectionSpacing}`
+
+      const templateContext =
+        `Templates: minimal, modern(two-col), executive, compact, classic, sidebar, bold, creative(two-col), tech(two-col), academic, charter, prestige, engineer, contemporary, folio.\n` +
+        `Current: ${templateId}`
+
       const systemPrompt =
-        'You are an AI resume editor. You can modify the user\'s resume by emitting [ACTION] tags in your response.\n\n' +
-        'Available actions (include AFTER your text explanation):\n' +
-        '• [ACTION]{"fn":"set_summary","text":"new summary text"}[/ACTION]\n' +
-        '• [ACTION]{"fn":"set_basics","name":"...","email":"...","phone":"...","location":"..."}[/ACTION]\n' +
-        '• [ACTION]{"fn":"add_experience","title":"...","company":"...","startDate":"...","endDate":"...","current":false,"bullets":["..."]}[/ACTION]\n' +
-        '• [ACTION]{"fn":"remove_experience","index":0}[/ACTION]\n' +
-        '• [ACTION]{"fn":"add_skill","skill":"React","category":"Frontend"}[/ACTION]\n' +
-        '• [ACTION]{"fn":"remove_skill","skill":"SomeSkill"}[/ACTION]\n' +
-        '• [ACTION]{"fn":"set_skills","skills":["React","TypeScript"]}[/ACTION]\n' +
-        '• [ACTION]{"fn":"add_education","institution":"MIT","degree":"BS","field":"CS","startDate":"2020","endDate":"2024"}[/ACTION]\n' +
-        '• [ACTION]{"fn":"add_certification","name":"AWS Developer","issuer":"Amazon","date":"2024"}[/ACTION]\n' +
-        '• [ACTION]{"fn":"add_language","language":"Spanish"}[/ACTION]\n' +
-        '• [ACTION]{"fn":"remove_language","language":"Spanish"}[/ACTION]\n\n' +
-        'Always explain what you changed and why. Include action tags so the UI can apply the changes.\n\n' +
-        `Current resume data: ${JSON.stringify({
-          name: data.name,
-          summary: data.summary,
-          experience: data.experience.map(e => ({ title: e.title, company: e.company })),
-          education: data.education.map(e => ({ degree: e.degree, institution: e.institution })),
-          skills: data.skills.map(s => s.name),
-          certifications: data.certifications?.map(c => c.name) || [],
-          languages: data.languages,
-        }, null, 2)}`
+        `You are a resume editor. Edit the user's resume using [ACTION] tags. Be concise.\n\n` +
+        `RESUME:\n${resumeContext}\n\n` +
+        `${designContext}\n${templateContext}\n\n` +
+        `ACTIONS (always include at least one when user asks for a change):\n\n` +
+        `PDF EDITING:\n` +
+        `edit_pdf_text — find and replace text: {"fn":"edit_pdf_text","find":"old text","replace":"new text"}\n` +
+        `format_pdf — change color/font/size: {"fn":"format_pdf","target":"headings|body|all","color":"#hex","fontFamily":"Arial","fontSize":11,"matchText":"optional section"}\n\n` +
+        `TEMPLATE:\n` +
+        `set_template — {"fn":"set_template","templateId":"minimal|modern|executive|compact|classic|sidebar|bold|creative|tech|academic|charter|prestige|engineer|contemporary|folio"}\n` +
+        `set_design — GLOBAL color/font: {"fn":"set_design","primaryColor":"#hex","headingFont":"Name","bodyFont":"Name"}\n\n` +
+        `CONTENT (template view only):\n` +
+        `set_summary, set_basics, add/remove/update_experience, add/remove_skill, set_skills, add/remove_education, add/remove_certification, add/remove_language, add/remove_link\n\n` +
+        `RULES:\n` +
+        `- Text changes → edit_pdf_text (not set_summary)\n` +
+        `- Color/font on specific section → format_pdf with matchText (not set_design)\n` +
+        `- Only use set_design for overall theme changes\n` +
+        `- Only use set_template when user asks to switch template\n\n` +
+        `EXAMPLES:\n` +
+        `"Change role to Full Stack Engineer"\n→ [ACTION]{"fn":"edit_pdf_text","find":"Software Engineer","replace":"Full Stack Engineer"}[/ACTION]\n` +
+        `"Change heading color to blue"\n→ [ACTION]{"fn":"format_pdf","target":"headings","color":"#2563EB"}[/ACTION]\n` +
+        `"Change body font to Arial"\n→ [ACTION]{"fn":"format_pdf","target":"body","fontFamily":"Arial"}[/ACTION]\n` +
+        `"Make it professional"\n→ [ACTION]{"fn":"set_template","templateId":"executive"}[/ACTION]`
 
-      const result = await AiService.chat([
-        { role: 'system', content: systemPrompt },
-        { role: 'user', content: text },
-      ])
+      await AiService.chatStream(
+        [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: text },
+        ],
+        (token) => {
+          fullText += token
+          const clean = stripActions(fullText)
+          updateLast(m => ({ ...m, content: clean }))
+        },
+        () => {
+          let actions = parseActions(fullText)
+          const cleanText = stripActions(fullText)
 
-      const fullText = result.message?.content || ''
-      let actions = parseActions(fullText)
-      const cleanText = stripActions(fullText)
+          if (actions.length === 0) {
+            const fallback = generateFallbackActions(fullText, dataRef.current)
+            if (fallback.length > 0) {
+              console.log('[editor-ai] generated fallback actions', fallback)
+              actions = fallback
+            }
+          }
 
-      // Fallback: try to extract actions from natural language response
-      if (actions.length === 0) {
-        const fallback = generateFallbackActions(fullText, data)
-        if (fallback.length > 0) {
-          console.log('[editor-ai] generated fallback actions', fallback)
-          actions = fallback
-        }
-      }
+          const hasActions = actions.length > 0
 
-      updateLast(m => ({ ...m, content: cleanText, actions }))
+          const defaultReply = (() => {
+            if (!hasActions) return cleanText
+            const fns = actions.map(a => a.fn)
+            if (fns.includes('edit_pdf_text')) return 'Text updated.'
+            if (fns.includes('format_pdf')) return 'Formatting applied.'
+            if (fns.includes('set_design')) return 'Design updated. Check the preview.'
+            if (fns.includes('set_template')) return 'Template changed. Check the preview.'
+            if (fns.some(f => f.startsWith('add_'))) return 'Added.'
+            if (fns.some(f => f.startsWith('remove_'))) return 'Removed.'
+            if (fns.some(f => f.startsWith('set_'))) return 'Updated.'
+            return 'Done.'
+          })()
 
-      for (const a of actions) {
-        console.log('[editor-ai] applying action', a.fn, a.params)
-        applyAction(a)
-      }
+          updateLast(m => ({ ...m, content: cleanText || defaultReply, actions }))
+
+          let merged = { ...dataRef.current }
+          let designMerged = { ...designRef.current }
+          for (const a of actions) {
+            const p = a.params || {}
+            console.log('[editor-ai] applying action', a.fn, p)
+            if (a.fn === 'set_design') {
+              const changes = (p.design as Partial<DesignSettings>) || {}
+              const topLevel: Record<string, unknown> = {}
+              for (const key of ['primaryColor', 'headingFont', 'bodyFont', 'columnLayout', 'sectionSpacing', 'margins', 'lineSpacing', 'bodyFontSize'] as const) {
+                if (key in p) topLevel[key] = p[key]
+              }
+              designMerged = { ...designMerged, ...changes, ...topLevel }
+            } else {
+              merged = applyActionToData(a, merged)
+            }
+          }
+          if (actions.some(a => a.fn !== 'set_design' && a.fn !== 'set_template')) {
+            onUpdate(merged)
+          }
+          if (actions.some(a => a.fn === 'set_design')) {
+            onDesignUpdate(designMerged)
+          }
+          if (actions.some(a => a.fn === 'set_design' || a.fn === 'set_template')) {
+            onShowTemplate()
+          }
+          const templateAction = actions.find(a => a.fn === 'set_template')
+          if (templateAction && templateAction.params.templateId) {
+            onTemplateChange(templateAction.params.templateId as TemplateId)
+            onShowTemplate()
+          }
+          const formatAction = actions.find(a => a.fn === 'format_pdf')
+          if (formatAction) {
+            const p = formatAction.params || {}
+            const target = (p.target as 'all' | 'headings' | 'body') || 'all'
+            const updates: Record<string, unknown> = {}
+            if (p.color) updates.color = p.color
+            if (p.fontFamily) updates.fontFamily = p.fontFamily
+            if (p.fontSize) updates.fontSize = p.fontSize
+            if (Object.keys(updates).length > 0) {
+              onFormatPdf({ target, matchText: p.matchText as string | undefined, updates: updates as PdfBlockFormat['updates'] })
+            }
+          }
+          const editTextAction = actions.find(a => a.fn === 'edit_pdf_text')
+          if (editTextAction) {
+            const p = editTextAction.params || {}
+            if (p.find && p.replace) {
+              onEditText({ find: p.find as string, replace: p.replace as string })
+            }
+          }
+          setLoading(false)
+        },
+        (err) => {
+          console.error('[editor-ai] stream error', err)
+          updateLast(m => ({ ...m, content: m.content || 'Sorry, something went wrong. Please try again.', actions: [] }))
+          setLoading(false)
+        },
+      )
     } catch {
-      updateLast(m => ({ ...m, content: m.content || 'Sorry, something went wrong. Please try again.' }))
-    } finally {
+      updateLast(m => ({ ...m, content: m.content || 'Sorry, something went wrong. Please try again.', actions: [] }))
       setLoading(false)
     }
   }
@@ -285,17 +439,26 @@ export default function AiChatPanel({ data, onUpdate }: Props) {
       add_certification: 'Added certification',
       add_language: 'Added language',
       remove_language: 'Removed language',
+      set_design: 'Updated design',
+      set_template: 'Changed template',
+      remove_education: 'Removed education',
+      remove_certification: 'Removed certification',
+      add_link: 'Added link',
+      remove_link: 'Removed link',
+      update_experience: 'Updated experience',
+      format_pdf: 'Formatted PDF',
+      edit_pdf_text: 'Edited text',
     }
     return labels[fn] || `Applied: ${fn}`
   }
 
   return (
     <div className="flex flex-col h-full bg-white">
-      <div ref={listRef} className="flex-1 overflow-y-auto px-4 py-4 space-y-4">
+      <div ref={listRef} className="flex-1 overflow-y-auto px-4 py-3 space-y-4">
         {messages.map(m => (
           <div key={m.id} className={`flex gap-2.5 ${m.role === 'user' ? 'justify-end' : ''}`}>
             {m.role === 'assistant' && (
-              <div className="w-7 h-7 rounded-full bg-teal/10 flex items-center justify-center shrink-0 mt-0.5">
+              <div className={`w-7 h-7 rounded-full bg-teal/10 flex items-center justify-center shrink-0 mt-0.5 ${loading && m.content === '' ? 'animate-pulse' : ''}`}>
                 <IconRobot size={14} className="text-teal" />
               </div>
             )}
@@ -327,7 +490,7 @@ export default function AiChatPanel({ data, onUpdate }: Props) {
               {m.actions.length > 0 && (
                 <div className="mt-1.5 space-y-0.5">
                   {m.actions.map((a, i) => (
-                    <div key={i} className="flex items-center gap-1 text-[10px] text-teal">
+                    <div key={i} className="flex items-center gap-1 text-[10px] text-teal font-medium animate-[fadeIn_0.3s_ease-in]">
                       <IconCheck size={10} className="shrink-0" />
                       <span>{actionLabel(a.fn)}</span>
                     </div>
@@ -340,7 +503,7 @@ export default function AiChatPanel({ data, onUpdate }: Props) {
       </div>
 
       <div className="border-t border-border px-4 py-3">
-        <div className="flex items-end gap-2 bg-paper rounded-xl border border-border focus-within:border-teal/50 transition-colors px-3 py-2">
+        <div className="flex items-end gap-2 bg-paper rounded-xl border border-border focus-within:border-teal/50 transition-colors px-4 py-2.5">
           <textarea
             value={input}
             onChange={e => setInput(e.target.value)}

@@ -72,4 +72,16 @@ export class UploadController {
     if (!deleted) throw new NotFoundException('Upload not found');
     return { message: 'Upload deleted' };
   }
+
+  @Post('photo')
+  @UseInterceptors(FileInterceptor('file'))
+  @HttpCode(HttpStatus.CREATED)
+  @ApiOperation({ summary: 'Upload a profile photo (JPEG, PNG, WebP, max 2MB)' })
+  @ApiConsumes('multipart/form-data')
+  async uploadPhoto(
+    @UploadedFile() file: Express.Multer.File,
+    @CurrentUser() user: UserDocument,
+  ) {
+    return this.uploadService.uploadPhoto(user._id.toString(), file);
+  }
 }

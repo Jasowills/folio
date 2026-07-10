@@ -166,6 +166,7 @@ export default function PdfBlock({
 
   return (
     <div
+      data-block-id={block.id}
       style={{
         position: 'absolute',
         left: `${block.x}pt`,

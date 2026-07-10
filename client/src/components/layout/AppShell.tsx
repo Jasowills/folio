@@ -90,8 +90,8 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
         'lg:translate-x-0',
         mobileNavOpen ? 'translate-x-0' : '-translate-x-full',
       )}>
-        <div className="flex items-center justify-between gap-2.5 px-5 h-14 border-b border-border shrink-0">
-          <div className="flex items-center gap-2.5">
+        <div className="flex items-center justify-between px-5 h-12 border-b border-border shrink-0">
+          <div className="flex items-center gap-1">
             <span className="font-display text-ink text-base font-bold tracking-tight">
               Folio
             </span>

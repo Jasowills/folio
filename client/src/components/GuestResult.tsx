@@ -4,6 +4,17 @@ import { motion, AnimatePresence } from 'framer-motion'
 import PdfViewer from './PdfViewer'
 import { ScoreRing } from '../components/ScoreRing'
 
+const _ISO_MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+function toDisplayDate(iso?: string | null): string {
+  if (!iso) return ''
+  const parts = iso.split('-')
+  if (parts.length === 2) {
+    const monthIdx = parseInt(parts[1], 10) - 1
+    if (monthIdx >= 0 && monthIdx < 12) return `${_ISO_MONTHS[monthIdx]} ${parts[0]}`
+  }
+  return iso
+}
+
 function ScoreHeroSection({ score, compact }: { score: number; compact?: boolean }) {
   const getInterpretation = (s: number) => {
     if (s >= 85) return 'Excellent. Your resume is highly competitive.'
@@ -223,7 +234,7 @@ export default function GuestResult({
                               </div>
                               {(exp.startDate || exp.endDate) && (
                                 <span className="text-[10px] text-muted-light shrink-0 mt-0.5">
-                                  {exp.startDate || ''} – {exp.endDate || (exp.current ? 'Present' : '')}
+                                  {toDisplayDate(exp.startDate)} – {exp.endDate ? toDisplayDate(exp.endDate) : (exp.current ? 'Present' : '')}
                                 </span>
                               )}
                             </div>
@@ -253,7 +264,7 @@ export default function GuestResult({
                             <p className="text-xs font-semibold text-ink">{edu.institution}</p>
                             <p className="text-[11px] text-muted">{edu.degree}{edu.field ? `, ${edu.field}` : ''}</p>
                             {(edu.startDate || edu.endDate) && (
-                              <p className="text-[10px] text-muted-light mt-0.5">{edu.startDate || ''} – {edu.endDate || ''}</p>
+                              <p className="text-[10px] text-muted-light mt-0.5">{toDisplayDate(edu.startDate)}{edu.startDate && edu.endDate ? ' – ' : ''}{toDisplayDate(edu.endDate)}</p>
                             )}
                           </div>
                         ))}

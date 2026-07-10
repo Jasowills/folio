@@ -14,7 +14,6 @@ export const SECTION_PATTERNS: Record<string, string[]> = {
     'professional history', 'experience and achievements',
     'career experience', 'internship experience', 'ux projects',
     'relevant projects', 'professional experience and projects',
-    'key projects', 'selected projects',
   ],
   education: [
     'education', 'academic background', 'educational background',
@@ -180,6 +179,13 @@ export const SKILL_DICTIONARY: Record<string, string> = {
   'ci cd': 'CI/CD', tdd: 'TDD', bdd: 'BDD', ddd: 'DDD',
   microservices: 'Microservices', serverless: 'Serverless',
   'event-driven': 'Event-Driven', 'event driven': 'Event-Driven',
+  solidity: 'Solidity', truffle: 'Truffle', hardhat: 'Hardhat',
+  wagmi: 'wagmi', ethers: 'Ethers.js', web3: 'Web3',
+  metamask: 'MetaMask', ipfs: 'IPFS', chainlink: 'Chainlink',
+  'smart contracts': 'Smart Contracts', defi: 'DeFi',
+  nft: 'NFT', polygon: 'Polygon', binance: 'Binance',
+  avalanche: 'Avalanche', arbitrum: 'Arbitrum', optimism: 'Optimism',
+  foundry: 'Foundry', alchemy: 'Alchemy', infura: 'Infura',
   solid: 'SOLID', 'clean architecture': 'Clean Architecture',
   'design patterns': 'Design Patterns',
 

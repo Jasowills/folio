@@ -25,6 +25,7 @@ interface BuilderActions {
   addExperience: (role: ExperienceRole) => void
   updateExperienceBullets: (index: number, bullets: string[]) => void
   removeExperience: (index: number) => void
+  setExperience: (exp: ExperienceRole[]) => void
   setEducation: (edu: EducationEntry[]) => void
   setSkills: (skills: string[]) => void
   addSkill: (skill: string) => void
@@ -197,6 +198,12 @@ export const useBuilderStore = create<BuilderStore>()(
           },
         })),
 
+      setExperience: (exp) =>
+        set((s) => ({
+          ...pushHistory(s),
+          stepData: { ...s.stepData, experience: exp },
+        })),
+
       setEducation: (edu) => {
         console.log('[builder] setEducation', edu.length, 'entries')
         set((s) => ({ ...pushHistory(s), stepData: { ...s.stepData, education: edu } }))
@@ -324,8 +331,8 @@ export const useBuilderStore = create<BuilderStore>()(
         }),
 
       acceptStream: () => {
-        const { streamingSection, streamingText, streamingBullets: _sb } = get()
         const s = get()
+        const { streamingSection, streamingText, streamingBullets } = s
         if (streamingSection === 'summary') {
           set({
             ...pushHistory(s),
@@ -335,9 +342,28 @@ export const useBuilderStore = create<BuilderStore>()(
             },
             streamingSection: null,
             streamingText: '',
+            streamingBullets: [],
+            summaryStreaming: false,
+            summaryDraft: '',
+          })
+        } else if (streamingSection === 'experience') {
+          set({
+            ...pushHistory(s),
+            streamingSection: null,
+            streamingText: '',
+            streamingBullets: [],
+            summaryStreaming: false,
+            summaryDraft: '',
+          })
+        } else {
+          set({
+            streamingSection: null,
+            streamingText: '',
+            streamingBullets: [],
+            summaryStreaming: false,
+            summaryDraft: '',
           })
         }
-        set({ streamingSection: null, streamingText: '', streamingBullets: [], summaryStreaming: false, summaryDraft: '' })
       },
 
       markComplete: () => set({ isComplete: true }),

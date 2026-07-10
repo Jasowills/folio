@@ -754,7 +754,7 @@ export default function ResumeBuilder() {
             <span className="hidden sm:inline">Upload</span>
           </button>
           <button
-            onClick={() => createResume.mutateAsync().then((r) => navigate(`/resume/${r._id}`))}
+            onClick={() => navigate('/resumes/builder')}
             className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-teal rounded-md hover:bg-teal-dark transition-colors cursor-pointer"
           >
             <IconPlus className="h-3.5 w-3.5" />

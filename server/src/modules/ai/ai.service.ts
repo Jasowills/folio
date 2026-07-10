@@ -191,7 +191,7 @@ export class AiService {
         if (trimmed.length > 0 && trimmed[0] === '"' && trimmed.includes('":')) return false
         return true
       }
-      return this.callWithRetry(messages, model, 2048, isValidText);
+      return this.callWithRetry(messages, model, 2048, isValidText, 'text');
     }
 
     const cached = this.cache.get(cacheKey);
@@ -309,7 +309,7 @@ export class AiService {
     const raw = await this.callWithRetry(messages, model, maxTokens, (text) => {
       const parsed = this.parseJson(text);
       return Object.keys(parsed).length > 0;
-    });
+    }, 'json');
     if (category === 'interview' || category === 'atsScoring') {
       this.logger.log(`[callAi] raw response (first 800 chars): ${raw.slice(0, 800)}`);
     }
@@ -329,6 +329,7 @@ export class AiService {
     model: string,
     messages: ChatMessage[],
     maxTokens?: number,
+    format: 'json' | 'text' = 'json',
   ): Promise<string | null> {
     const key = this.providerKey(provider, model);
 
@@ -339,7 +340,7 @@ export class AiService {
 
     try {
       if (provider === 'ollama') {
-        return await this.callOllama(model, messages, maxTokens);
+        return await this.callOllama(model, messages, maxTokens, format);
       }
       if (provider === 'groq') {
         return await this.callGroq(model, messages, maxTokens);
@@ -362,6 +363,7 @@ export class AiService {
     model?: string,
     maxTokens?: number,
     validate?: (raw: string) => boolean,
+    format: 'json' | 'text' = 'json',
   ): Promise<string> {
     const usesOllama = this.ollamaConfigured;
     const tokens = maxTokens ?? this.maxTokens;
@@ -375,29 +377,29 @@ export class AiService {
 
     for (let attempt = 1; attempt <= 3; attempt++) {
       // Try primary provider
-      const r1 = await this.tryProvider(primaryProvider, primaryModel, messages, tokens);
+      const r1 = await this.tryProvider(primaryProvider, primaryModel, messages, tokens, format);
       if (valid(r1)) return r1;
 
       // If Ollama is primary, try Groq next (OpenRouter consistently 402s)
       if (usesOllama) {
         if (this.groqConfigured) {
-          const r2 = await this.tryProvider('groq', this.groqDefaultModel, messages, tokens);
+          const r2 = await this.tryProvider('groq', this.groqDefaultModel, messages, tokens, format);
           if (valid(r2)) return r2;
-          const r3 = await this.tryProvider('groq', this.groqFallbackModel, messages, tokens);
+          const r3 = await this.tryProvider('groq', this.groqFallbackModel, messages, tokens, format);
           if (valid(r3)) return r3;
         }
-        const r4 = await this.tryProvider('openrouter', this.openrouterDefaultModel, messages, tokens);
+        const r4 = await this.tryProvider('openrouter', this.openrouterDefaultModel, messages, tokens, format);
         if (valid(r4)) return r4;
-        const r5 = await this.tryProvider('openrouter', fallbackModel, messages, tokens);
+        const r5 = await this.tryProvider('openrouter', fallbackModel, messages, tokens, format);
         if (valid(r5)) return r5;
       } else {
         // OpenRouter is primary — try Groq before OpenRouter fallback
-        const r2 = await this.tryProvider('openrouter', fallbackModel, messages, tokens);
+        const r2 = await this.tryProvider('openrouter', fallbackModel, messages, tokens, format);
         if (valid(r2)) return r2;
         if (this.groqConfigured) {
-          const r3 = await this.tryProvider('groq', this.groqDefaultModel, messages, tokens);
+          const r3 = await this.tryProvider('groq', this.groqDefaultModel, messages, tokens, format);
           if (valid(r3)) return r3;
-          const r4 = await this.tryProvider('groq', this.groqFallbackModel, messages, tokens);
+          const r4 = await this.tryProvider('groq', this.groqFallbackModel, messages, tokens, format);
           if (valid(r4)) return r4;
         }
       }
@@ -620,27 +622,39 @@ export class AiService {
     model: string,
     messages: ChatMessage[],
     maxTokens?: number,
+    format: 'json' | 'text' = 'json',
   ): Promise<string> {
     const url = `${this.ollamaBaseUrl}/chat/completions`;
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 120_000);
+    const timeout = setTimeout(() => controller.abort(), 60_000);
 
     const finish = () => clearTimeout(timeout);
 
     try {
       this.logger.log(`Calling Ollama ${model} at ${this.ollamaBaseUrl}`);
 
+      const body: Record<string, unknown> = {
+        model,
+        stream: false,
+        messages,
+        options: {
+          num_predict: maxTokens ?? this.maxTokens,
+          temperature: 0.3,
+          top_p: 0.9,
+          top_k: 40,
+          repeat_penalty: 1.1,
+        },
+        keep_alive: '10m',
+      };
+      if (format === 'json') {
+        body.response_format = { type: 'json_object' };
+      }
+
       const res = await fetch(url, {
         signal: controller.signal,
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          model,
-          max_tokens: maxTokens ?? this.maxTokens,
-          stream: false,
-          messages,
-          response_format: { type: 'json_object' } as const,
-        } as OpenRouterRequest),
+        body: JSON.stringify(body as unknown as OpenRouterRequest),
       });
 
       finish();

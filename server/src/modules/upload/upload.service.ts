@@ -15,6 +15,9 @@ const ALLOWED_MIMES = new Set([
 ]);
 const MAX_SIZE = 5 * 1024 * 1024;
 
+const PHOTO_MIMES = new Set(['image/jpeg', 'image/png', 'image/webp']);
+const PHOTO_MAX_SIZE = 2 * 1024 * 1024;
+
 @Injectable()
 export class UploadService {
   constructor(
@@ -74,5 +77,26 @@ export class UploadService {
     await this.storage.delete(upload.key, 'raw');
     await this.uploadModel.deleteOne({ _id: uploadId }).exec();
     return true;
+  }
+
+  async uploadPhoto(userId: string, file: Express.Multer.File) {
+    if (!file) throw new BadRequestException('No file provided');
+    if (!PHOTO_MIMES.has(file.mimetype)) {
+      throw new BadRequestException('Only JPEG, PNG, and WebP images are allowed');
+    }
+    if (file.size > PHOTO_MAX_SIZE) {
+      throw new BadRequestException('Photo exceeds 2MB limit');
+    }
+
+    const ext = path.extname(file.originalname);
+    const publicId = `photos/${userId}/${randomUUID()}${ext}`;
+
+    const { url } = await this.storage.upload(file.buffer, {
+      folder: 'folio-photos',
+      publicId,
+      resourceType: 'image',
+    });
+
+    return { url, publicId };
   }
 }

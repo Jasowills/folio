@@ -73,10 +73,12 @@ export class ResumesService {
     const resume = await this.findById(id, userId);
 
     resume.set(data);
-    await this.detectRedFlags(resume);
     await this.saveVersion(resume);
 
-    return resume.save();
+    return resume.save().then(async (saved) => {
+      this.detectRedFlags(saved).catch(() => {});
+      return saved;
+    });
   }
 
   async uploadFile(
@@ -185,7 +187,6 @@ export class ResumesService {
     parsed: ParsedResume,
     rawText: string,
   ): Promise<ParsedResume> {
-    // Only attempt when the AI service is reachable (Ollama or OpenRouter)
     if (!process.env.OLLAMA_BASE_URL && !process.env.OPENROUTER_API_KEY) {
       this.logger.log('enrichWithAi: no AI provider configured, skipping');
       return parsed;
@@ -202,43 +203,90 @@ export class ResumesService {
 
       const merged = { ...parsed };
 
-      // Override contact fields where AI found something the parser missed
+      // ── Name: prefer AI ──
+      if (aiResult.name && typeof aiResult.name === 'string' && aiResult.name.length > 2) {
+        this.logger.log(`enrichWithAi: name — parser="${parsed.name}", ai="${aiResult.name}"`);
+        merged.name = aiResult.name as string;
+      }
+
+      // ── Contact: prefer AI (better at extracting URLs/emails from text) ──
       if (aiResult.contact && typeof aiResult.contact === 'object') {
         const aiContact = aiResult.contact as Record<string, unknown>;
         if (!merged.contact) merged.contact = { email: null, phone: null, location: null, linkedin: null, website: null, github: null };
         for (const field of ['email', 'phone', 'location', 'linkedin', 'website', 'github'] as const) {
           if (aiContact[field] && typeof aiContact[field] === 'string' && aiContact[field] !== null) {
             const aiVal = aiContact[field] as string;
-            if (!merged.contact[field] || aiVal !== parsed.contact[field]) {
-              this.logger.log(`enrichWithAi: contact.${field} — parser="${parsed.contact[field]}", ai="${aiVal}"`);
-              merged.contact[field] = aiVal;
-            }
+            this.logger.log(`enrichWithAi: contact.${field} — parser="${parsed.contact[field]}", ai="${aiVal}"`);
+            merged.contact[field] = aiVal;
           }
         }
       }
 
-      // Override name if AI found something better
-      if (aiResult.name && typeof aiResult.name === 'string' && aiResult.name.length > 2) {
-        if (!merged.name || parsed.name !== aiResult.name) {
-          this.logger.log(`enrichWithAi: name — parser="${parsed.name}", ai="${aiResult.name}"`);
-          merged.name = aiResult.name as string;
-        }
-      }
-
-      // Override summary if AI found one and parser didn't
+      // ── Summary: prefer AI ──
       if (aiResult.summary && typeof aiResult.summary === 'string' && aiResult.summary.length > 20) {
-        if (!merged.summary || merged.summary.length < 20) {
-          this.logger.log(`enrichWithAi: summary — parser="${parsed.summary?.slice(0, 50)}", ai="${(aiResult.summary as string).slice(0, 50)}"`);
-          merged.summary = aiResult.summary as string;
-        }
+        this.logger.log(`enrichWithAi: summary — parser="${parsed.summary?.slice(0, 50)}", ai="${(aiResult.summary as string).slice(0, 50)}"`);
+        merged.summary = aiResult.summary as string;
       }
 
-      // Merge experience — prefer AI results for completeness
+      // ── Experience: AI primary, parser validates structure ──
       if (Array.isArray(aiResult.experience) && aiResult.experience.length > 0) {
         const aiExp = aiResult.experience as Array<Record<string, unknown>>;
-        if (aiExp.length >= parsed.experience.length) {
-          this.logger.log(`enrichWithAi: experience — parser=${parsed.experience.length}, ai=${aiExp.length}, using AI`);
-          merged.experience = aiExp.map((e) => ({
+
+        // Match AI entries to parser entries by title/company/dates
+        const matchedAi: Array<Record<string, unknown>> = [];
+        const usedParser = new Set<number>();
+
+        for (const aiEntry of aiExp) {
+          const aiTitle = String(aiEntry.title || '').toLowerCase().trim();
+          const aiCompany = String(aiEntry.company || '').toLowerCase().trim();
+          const aiStart = String(aiEntry.startDate || '').trim();
+          const aiEnd = String(aiEntry.endDate || '').trim();
+
+          // Find best matching parser entry
+          let bestScore = 0;
+          let bestIdx = -1;
+
+          for (let j = 0; j < parsed.experience.length; j++) {
+            if (usedParser.has(j)) continue;
+            const p = parsed.experience[j];
+            const pTitle = p.title.toLowerCase().trim();
+            const pCompany = p.company.toLowerCase().trim();
+
+            let score = 0;
+            // Title match
+            if (aiTitle && pTitle && (pTitle.includes(aiTitle) || aiTitle.includes(pTitle))) score += 3;
+            else if (aiTitle && pTitle) {
+              const tw = aiTitle.split(/\s+/);
+              const pw = pTitle.split(/\s+/);
+              const common = tw.filter(w => pw.includes(w)).length;
+              score += common / Math.max(tw.length, pw.length) * 2;
+            }
+            // Company match
+            if (aiCompany && pCompany && (pCompany.includes(aiCompany) || aiCompany.includes(pCompany))) score += 3;
+            // Date proximity
+            if (aiStart && p.startDate && aiStart.slice(0, 4) === p.startDate.slice(0, 4)) score += 1;
+            if (aiEnd && p.endDate && aiEnd.slice(0, 4) === p.endDate.slice(0, 4)) score += 1;
+
+            if (score > bestScore) {
+              bestScore = score;
+              bestIdx = j;
+            }
+          }
+
+          if (bestScore >= 2) {
+            usedParser.add(bestIdx);
+            matchedAi.push(aiEntry);
+          } else if (parsed.experience.length === 0) {
+            // No parser entries to validate against — trust AI
+            matchedAi.push(aiEntry);
+          }
+          // else: AI entry doesn't match any parser entry — likely hallucination, skip
+        }
+
+        // If we matched at least some entries, use AI exclusively
+        // (don't add back unmatched parser entries — they're usually noise from wrapped text or merged projects)
+        if (matchedAi.length > 0) {
+          merged.experience = matchedAi.map((e) => ({
             company: String(e.company || ''),
             title: String(e.title || ''),
             startDate: (e.startDate as string) || null,
@@ -246,10 +294,67 @@ export class ResumesService {
             current: Boolean(e.current),
             bullets: Array.isArray(e.bullets) ? e.bullets.map(String) : [],
           }));
+          this.logger.log(`enrichWithAi: experience — parser=${parsed.experience.length}, ai=${aiExp.length}, matched=${matchedAi.length}, final=${merged.experience.length}`);
+        } else {
+          // No valid AI entries — keep parser
+          this.logger.log(`enrichWithAi: experience — no AI entries matched parser, keeping parser results`);
         }
       }
 
-      // Merge skills — union of both
+      // ── Education: same validation approach ──
+      if (Array.isArray(aiResult.education) && aiResult.education.length > 0) {
+        const aiEdu = aiResult.education as Array<Record<string, unknown>>;
+
+        const matchedAi: Array<Record<string, unknown>> = [];
+        const usedParser = new Set<number>();
+
+        for (const aiEntry of aiEdu) {
+          const aiInst = String(aiEntry.institution || '').toLowerCase().trim();
+          const aiDeg = String(aiEntry.degree || '').toLowerCase().trim();
+          const aiField = String(aiEntry.field || '').toLowerCase().trim();
+
+          let bestScore = 0;
+          let bestIdx = -1;
+
+          for (let j = 0; j < parsed.education.length; j++) {
+            if (usedParser.has(j)) continue;
+            const p = parsed.education[j];
+            const pInst = p.institution.toLowerCase().trim();
+            const pDeg = p.degree.toLowerCase().trim();
+
+            let score = 0;
+            if (aiInst && pInst && (pInst.includes(aiInst) || aiInst.includes(pInst))) score += 4;
+            if (aiDeg && pDeg && (pDeg.includes(aiDeg) || aiDeg.includes(pDeg))) score += 2;
+            if (aiField && p.field && (p.field.toLowerCase().includes(aiField) || aiField.includes(p.field.toLowerCase()))) score += 1;
+
+            if (score > bestScore) {
+              bestScore = score;
+              bestIdx = j;
+            }
+          }
+
+          if (bestScore >= 2) {
+            usedParser.add(bestIdx);
+            matchedAi.push(aiEntry);
+          } else if (parsed.education.length === 0) {
+            matchedAi.push(aiEntry);
+          }
+        }
+
+        if (matchedAi.length > 0) {
+          merged.education = matchedAi.map((e) => ({
+            institution: String(e.institution || ''),
+            degree: String(e.degree || ''),
+            field: (e.field as string) || null,
+            startDate: (e.startDate as string) || null,
+            endDate: (e.endDate as string) || null,
+            gpa: (e.gpa as string) || null,
+          }));
+          this.logger.log(`enrichWithAi: education — parser=${parsed.education.length}, ai=${aiEdu.length}, matched=${matchedAi.length}, final=${merged.education.length}`);
+        }
+      }
+
+      // ── Skills: union ──
       if (Array.isArray(aiResult.skills)) {
         const aiSkills = (aiResult.skills as string[]).filter((s): s is string => typeof s === 'string');
         if (aiSkills.length > 0) {
@@ -259,35 +364,35 @@ export class ResumesService {
         }
       }
 
-      // Merge education — prefer AI if it found more
-      if (Array.isArray(aiResult.education) && aiResult.education.length > 0) {
-        const aiEdu = aiResult.education as Array<Record<string, unknown>>;
-        if (aiEdu.length >= parsed.education.length) {
-          this.logger.log(`enrichWithAi: education — parser=${parsed.education.length}, ai=${aiEdu.length}, using AI`);
-          merged.education = aiEdu.map((e) => ({
-            institution: String(e.institution || ''),
-            degree: String(e.degree || ''),
-            field: (e.field as string) || null,
-            startDate: (e.startDate as string) || null,
-            endDate: (e.endDate as string) || null,
-            gpa: (e.gpa as string) || null,
-          }));
-        }
-      }
-
-      // Merge certifications — union
+      // ── Certifications: prefer AI, deduplicate by normalized name ──
       if (Array.isArray(aiResult.certifications)) {
         const aiCerts = aiResult.certifications as Array<Record<string, unknown>>;
         if (aiCerts.length > 0) {
-          const existingNames = new Set(parsed.certifications.map((c) => c.name.toLowerCase()));
+          const normalizeCert = (name: string) =>
+            name.replace(/^[-•*♦\d.)\s]+/, '').replace(/\(.*?\)/g, '').replace(/\s+/g, ' ').trim().toLowerCase();
+
+          // Use AI certs as the primary list
+          merged.certifications = [];
+          const seen = new Set<string>();
           for (const c of aiCerts) {
             const name = String(c.name || '');
-            if (name && !existingNames.has(name.toLowerCase())) {
+            const norm = normalizeCert(name);
+            if (name && norm && !seen.has(norm)) {
               merged.certifications.push({ name, issuer: (c.issuer as string) || null, date: (c.date as string) || null });
-              existingNames.add(name.toLowerCase());
+              seen.add(norm);
             }
           }
-          this.logger.log(`enrichWithAi: certifications — parser=${parsed.certifications.length}, merged=${merged.certifications.length}`);
+
+          // Only add parser certs that AI missed (no normalized name overlap)
+          for (const c of parsed.certifications) {
+            const norm = normalizeCert(c.name);
+            if (c.name && norm && !seen.has(norm)) {
+              merged.certifications.push(c);
+              seen.add(norm);
+            }
+          }
+
+          this.logger.log(`enrichWithAi: certifications — parser=${parsed.certifications.length}, ai=${aiCerts.length}, final=${merged.certifications.length}`);
         }
       }
 

@@ -124,7 +124,7 @@ export default function Step1Basics({ data, onSave, onChange }: Props) {
         <label className="text-[12px] text-muted mb-1.5 block">LinkedIn URL <span className="text-muted/50">(optional)</span></label>
         <input
           value={linkedin}
-          onChange={e => setLinkedin(e.target.value)}
+          onChange={e => { const v = e.target.value; setLinkedin(v); onChange?.({ linkedin: v }) }}
           placeholder="https://linkedin.com/in/jamesokar/"
           className="w-full px-3 py-2 text-[13px] bg-paper border border-border rounded-lg focus:outline-none focus:border-teal focus:ring-1 focus:ring-teal/20 transition-colors"
         />
@@ -134,7 +134,7 @@ export default function Step1Basics({ data, onSave, onChange }: Props) {
         <label className="text-[12px] text-muted mb-1.5 block">Portfolio or GitHub <span className="text-muted/50">(optional)</span></label>
         <input
           value={github}
-          onChange={e => setGithub(e.target.value)}
+          onChange={e => { const v = e.target.value; setGithub(v); onChange?.({ github: v }) }}
           placeholder="https://github.com/jamesokar/"
           className="w-full px-3 py-2 text-[13px] bg-paper border border-border rounded-lg focus:outline-none focus:border-teal focus:ring-1 focus:ring-teal/20 transition-colors"
         />

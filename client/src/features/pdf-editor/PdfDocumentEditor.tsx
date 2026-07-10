@@ -6,6 +6,17 @@ import { usePdfUndo } from './hooks/usePdfUndo'
 import { usePdfReflow } from './hooks/usePdfReflow'
 import { usePdfPageRenderer } from './hooks/usePdfPageRenderer'
 
+export interface PdfBlockFormat {
+  target: 'all' | 'headings' | 'body'
+  matchText?: string
+  updates: { fontFamily?: string; fontSize?: number; color?: string }
+}
+
+export interface PdfTextEdit {
+  find: string
+  replace: string
+}
+
 interface PdfDocumentEditorProps {
   layoutDocument: PdfLayoutDocument
   onSave: (updatedDoc: PdfLayoutDocument) => void
@@ -17,11 +28,17 @@ interface PdfDocumentEditorProps {
   fileUrl?: string
   debugMode?: boolean
   debugOpacity?: number
+  pendingFormat?: PdfBlockFormat | null
+  onFormatApplied?: () => void
+  pendingTextEdit?: PdfTextEdit | null
+  onTextEditApplied?: () => void
 }
 
 let blockCounter = Date.now()
 
-export default function PdfDocumentEditor({ layoutDocument, onSave, onAiRewrite, onAiImprove, issues, zoom: externalZoom, onZoomChange, fileUrl, debugMode: externalDebug, debugOpacity: externalOpacity }: PdfDocumentEditorProps) {
+function escapeRegex(s: string) { return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') }
+
+export default function PdfDocumentEditor({ layoutDocument, onSave, onAiRewrite, onAiImprove, issues, zoom: externalZoom, onZoomChange, fileUrl, debugMode: externalDebug, debugOpacity: externalOpacity, pendingFormat, onFormatApplied, pendingTextEdit, onTextEditApplied }: PdfDocumentEditorProps) {
   const [pages, setPages] = useState<PdfLayoutPage[]>(layoutDocument.pages)
   const [focusedBlockId, setFocusedBlockId] = useState<string | null>(null)
   const [internalZoom, setInternalZoom] = useState(1)
@@ -74,6 +91,57 @@ export default function PdfDocumentEditor({ layoutDocument, onSave, onAiRewrite,
       onSave({ ...layoutDocument, pages: updatedPages })
     }, 1500)
   }, [layoutDocument, onSave])
+
+  useEffect(() => {
+    if (!pendingFormat) return
+    const { target, matchText, updates } = pendingFormat
+    const matchLower = matchText?.toLowerCase()
+    setPages(prev => {
+      const updated = prev.map(page => ({
+        ...page,
+        blocks: page.blocks.map(b => {
+          const matchesType = target === 'all'
+            ? true
+            : target === 'headings'
+              ? b.isLikelyHeading
+              : !b.isLikelyHeading
+          const matchesText = !matchLower || b.text.toLowerCase().includes(matchLower)
+          return matchesType && matchesText ? { ...b, ...updates } : b
+        }),
+      }))
+      pushSnapshot(prevPages.current)
+      prevPages.current = updated
+      scheduleSave(updated)
+      return updated
+    })
+    onFormatApplied?.()
+  }, [pendingFormat])
+
+  useEffect(() => {
+    if (!pendingTextEdit) return
+    const { find, replace } = pendingTextEdit
+    const findLower = find.toLowerCase()
+    setPages(prev => {
+      let replaced = false
+      const updated = prev.map(page => ({
+        ...page,
+        blocks: page.blocks.map(b => {
+          if (!replaced && b.text.toLowerCase().includes(findLower)) {
+            replaced = true
+            return { ...b, text: b.text.replace(new RegExp(escapeRegex(find), 'i'), replace) }
+          }
+          return b
+        }),
+      }))
+      if (replaced) {
+        pushSnapshot(prevPages.current)
+        prevPages.current = updated
+        scheduleSave(updated)
+      }
+      return updated
+    })
+    onTextEditApplied?.()
+  }, [pendingTextEdit])
 
   const handleBlockFocus = useCallback((blockId: string) => {
     setFocusedBlockId(blockId)
@@ -134,6 +202,21 @@ export default function PdfDocumentEditor({ layoutDocument, onSave, onAiRewrite,
       return updated
     })
   }, [])
+
+  const handleFormatBlock = useCallback((blockId: string, updates: { fontFamily?: string; fontSize?: number; color?: string }) => {
+    setPages(prev => {
+      const updated = prev.map(page => ({
+        ...page,
+        blocks: page.blocks.map(b =>
+          b.id === blockId ? { ...b, ...updates } : b
+        ),
+      }))
+      pushSnapshot(prevPages.current)
+      prevPages.current = updated
+      scheduleSave(updated)
+      return updated
+    })
+  }, [pushSnapshot, scheduleSave])
 
   const handleAddBlock = useCallback((pageNumber: number) => {
     const nextId = `b_${++blockCounter}`
@@ -315,6 +398,7 @@ export default function PdfDocumentEditor({ layoutDocument, onSave, onAiRewrite,
         canvasRef={canvasRef}
         onRewrite={handleAiRewrite}
         onImprove={handleAiImprove}
+        onFormatBlock={handleFormatBlock}
       />
     </div>
   )

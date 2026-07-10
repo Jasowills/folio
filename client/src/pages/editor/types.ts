@@ -68,7 +68,7 @@ export interface LocalData {
   title: string
   name: string
   summary: string
-  contact: { email: string; phone: string; location: string; linkedin?: string; website?: string; github?: string }
+  contact: { email: string; phone: string; location: string; linkedin?: string; website?: string; github?: string; photoUrl?: string }
   experience: ExperienceEntry[]
   education: EducationEntry[]
   skills: SkillEntry[]

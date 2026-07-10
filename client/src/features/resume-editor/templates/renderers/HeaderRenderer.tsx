@@ -19,7 +19,7 @@ export default function HeaderRenderer({ data, design, style }: Props) {
   switch (style.header) {
     case 'dark-block':
       return (
-        <div className="bg-ink text-white text-center py-6 px-8 -mx-[6mm] -mt-[6mm] mb-6" style={{ marginLeft: `-${6 + design.margins * 3}mm`, marginRight: `-${6 + design.margins * 3}mm`, marginTop: `-${6 + design.margins * 3}mm` }}>
+        <div className="bg-ink text-white text-center py-6 px-8 mb-6" style={{ marginLeft: '-8mm', marginRight: '-8mm', marginTop: '-6mm' }}>
           <h1 className="font-bold tracking-wide mb-1 text-[24px]" style={{ fontFamily: headingFontFamily(design), lineHeight: design.lineSpacing }}>
             {data.name}
           </h1>

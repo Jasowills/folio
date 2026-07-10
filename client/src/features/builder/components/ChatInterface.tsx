@@ -203,11 +203,11 @@ export default function ChatInterface({ resumeId, stepData, onAction, onUndo, un
       set_skills: 'Updated skills',
       review_resume: 'Reviewed resume',
       set_target_role: 'Set target role',
-      remove_experience: 'Removed experience',
-      update_experience_bullets: 'Updated bullet points',
-      add_education: 'Added education',
-      remove_education: 'Removed education',
       set_optional: 'Updated optional sections',
+      set_design: 'Updated design',
+      set_template: 'Changed template',
+      generate_summary: 'Generated summary',
+      generate_bullets: 'Generated bullet points',
     }
     return labels[fn] || `Executed: ${fn}`
   }
@@ -328,8 +328,89 @@ export default function ChatInterface({ resumeId, stepData, onAction, onUndo, un
     return ['Switch to the Modern template', 'Make the primary color navy', 'Improve my resume layout']
   }
 
-  function handleSuggestedPrompt(prompt: string) {
+  async function handleSuggestedPrompt(prompt: string) {
     setInput(prompt)
-    setTimeout(() => handleSend(), 50)
+    // Wait for React to update input state, then fetch directly
+    await new Promise(r => setTimeout(r, 0))
+    const text = prompt.trim()
+    if (!text || streaming) return
+    stopStream()
+    setInput('')
+
+    const userMsg: ChatMessage = { id: nextId(), role: 'user', content: text, actions: [] }
+    addMessage(userMsg)
+
+    const assistantMsg: ChatMessage = { id: nextId(), role: 'assistant', content: '', actions: [], streaming: true }
+    addMessage(assistantMsg)
+
+    setStreaming(true)
+    execCountRef.current = 0
+    const controller = new AbortController()
+    streamRef.current = controller
+
+    const history = messages
+      .filter(m => m.role !== 'assistant' || m.id !== assistantMsg.id)
+      .slice(-20)
+      .map(m => ({ role: m.role, content: m.content }))
+
+    const { design: currentDesign } = useBuilderStore.getState()
+
+    let fullText = ''
+    try {
+      const token = localStorage.getItem('accessToken')
+      const res = await fetch(`/api/builder/${resumeId}/chat`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        body: JSON.stringify({
+          message: text,
+          history,
+          resumeSnapshot: buildSnapshot(stepData),
+          currentTemplate: useBuilderStore.getState().selectedTemplate || 'minimal',
+          currentColor: currentDesign?.primaryColor || '#1a1a2e',
+          currentFont: currentDesign?.headingFont || 'Inter',
+        }),
+        signal: controller.signal,
+      })
+
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+
+      const reader = res.body?.getReader()
+      if (!reader) throw new Error('No response body')
+
+      const decoder = new TextDecoder()
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+        const chunk = decoder.decode(value, { stream: true })
+        const lines = chunk.split('\n').filter(l => l.startsWith('data: '))
+        for (const line of lines) {
+          const json = line.slice(6).trim()
+          if (json === '[DONE]') continue
+          try {
+            const parsed = JSON.parse(json)
+            if (parsed.error) { setStreaming(false); return }
+            if (parsed.text) fullText += parsed.text
+              if (parsed.text || parsed.done) {
+                const allActions = parseCompleteActions(fullText)
+                const newActions = allActions.slice(execCountRef.current)
+                execCountRef.current = allActions.length
+                for (const a of newActions) {
+                  try { onAction(a.fn, a.params) } catch (e) { console.error('[chat] onAction error:', e) }
+                }
+                if (newActions.length > 0) {
+                  updateLastAssistant(m => ({ ...m, actions: [...m.actions, ...newActions] }))
+                }
+                updateLastAssistant(m => ({ ...m, content: stripActions(fullText) }))
+              }
+            if (parsed.done) { setStreaming(false); return }
+          } catch {}
+        }
+      }
+      setStreaming(false)
+    } catch (err) {
+      if ((err as Error).name === 'AbortError') return
+      updateLastAssistant(m => ({ ...m, content: m.content || 'Sorry, something went wrong. Please try again.' }))
+      setStreaming(false)
+    }
   }
 }

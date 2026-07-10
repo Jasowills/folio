@@ -46,7 +46,22 @@ export function hasFlag(section: string): boolean {
   return RED_FLAGS.some(rf => rf.section?.toLowerCase() === section)
 }
 
+const ISO_MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+
+export function toDisplayDate(iso?: string | null): string | undefined {
+  if (!iso) return undefined
+  const parts = iso.split('-')
+  if (parts.length === 2) {
+    const monthIdx = parseInt(parts[1], 10) - 1
+    if (monthIdx >= 0 && monthIdx < 12) return `${ISO_MONTHS[monthIdx]} ${parts[0]}`
+  }
+  if (parts.length === 1 && /^\d{4}$/.test(parts[0])) return parts[0]
+  return iso
+}
+
 export function formatDate(start?: string, end?: string, current?: boolean): string {
-  const parts = [start, current ? 'Present' : end].filter(Boolean)
+  const s = toDisplayDate(start)
+  const e = current ? 'Present' : toDisplayDate(end)
+  const parts = [s, e].filter(Boolean)
   return parts.join(' \u2014 ')
 }
