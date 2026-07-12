@@ -9,7 +9,7 @@ interface Page {
   index: number
 }
 
-export function usePagination(sectionOrder: string[]): { pages: Page[][]; containerRef: React.RefObject<HTMLDivElement> } {
+export function usePagination(sectionOrder: string[]): { pages: Page[][]; containerRef: React.RefObject<HTMLDivElement | null> } {
   const [pages, setPages] = useState<Page[][]>([[{ sections: sectionOrder, index: 0 }]])
   const containerRef = useRef<HTMLDivElement>(null)
 

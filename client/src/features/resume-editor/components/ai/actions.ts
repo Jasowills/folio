@@ -40,25 +40,6 @@ const PHONE_PATTERN = /phone\s*(?:is|to|:)?\s*([\d\s\-().+]{7,})/i
 const LOCATION_PATTERN = /(?:location|based|city)\s*(?:is|in|:)?\s*([A-Za-z\s,]+?)(?:\.|,| and |$)/i
 const TITLE_PATTERN = /(?:title|headline|role|position)\s*(?:is|to|:)?\s*(.+?)(?:\.|,| and | at | with | for |$)/i
 
-const SECTION_MAP: Record<string, string> = {
-  summary: 'summary',
-  objective: 'summary',
-  about: 'summary',
-  profile: 'summary',
-  experience: 'experience',
-  work: 'experience',
-  employment: 'experience',
-  education: 'education',
-  skills: 'skills',
-  technical: 'skills',
-  technologies: 'skills',
-  certifications: 'certifications',
-  certificates: 'certifications',
-  languages: 'languages',
-  links: 'links',
-  projects: 'projects',
-}
-
 const DESIGN_COLOR_MAP: Record<string, string> = {
   blue: '#2563EB',
   navy: '#1E3A5F',
@@ -81,8 +62,7 @@ const DESIGN_COLOR_MAP: Record<string, string> = {
   grey: '#6B7280',
 }
 
-const HEX_COLOR = /#(?:[0-9a-fA-F]{3}){1,2}\b/g
-const COLORWORD = /\b(blue|navy|darkblue|red|green|purple|orange|pink|teal|slate|burgundy|forest|cobalt|plum|amber|black|white|gray|grey)\b/gi
+const HEX_COLOR = /#(?:[0-9a-fA-F]{8}|[0-9a-fA-F]{6}|[0-9a-fA-F]{4}|[0-9a-fA-F]{3})\b/g
 
 export function parseHexColor(input: string): string | undefined {
   const hex = input.match(HEX_COLOR)?.[0]
@@ -142,7 +122,7 @@ export function classifyIntent(text: string): 'deterministic' | 'streaming' {
   return 'streaming'
 }
 
-export function parseActionFromText(text: string, currentData: LocalData): Action[] {
+export function parseActionFromText(text: string, _currentData: LocalData): Action[] {
   const lower = text.toLowerCase().trim()
   const actions: Action[] = []
 
@@ -472,7 +452,7 @@ function inferSectionHighlights(actions: Action[]): CanvasHighlight[] {
   const highlights: CanvasHighlight[] = []
 
   for (const action of actions) {
-    const { fn, params } = action
+    const { fn } = action
 
     if (fn === 'set_basics' || fn === 'set_summary') {
       const sectionKey = fn === 'set_summary' ? 'summary' : undefined
@@ -509,7 +489,7 @@ function inferSectionHighlights(actions: Action[]): CanvasHighlight[] {
   return highlights
 }
 
-function buildConfirmation(actions: Action[], data: LocalData): string | undefined {
+function buildConfirmation(actions: Action[], _data: LocalData): string | undefined {
   if (actions.length === 0) return undefined
   if (actions.length > 1) {
     return `Applied ${actions.length} changes.`

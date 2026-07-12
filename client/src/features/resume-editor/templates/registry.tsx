@@ -1,4 +1,4 @@
-import type { ResumeLayout, TemplateId } from './types'
+import type { ResumeLayout } from './types'
 import { TEMPLATE_DEFS } from './types'
 import type { TemplateStyle } from '../../../templates/types'
 import SingleColumn from './layouts/SingleColumn'

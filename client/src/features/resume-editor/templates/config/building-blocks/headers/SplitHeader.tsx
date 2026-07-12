@@ -1,7 +1,7 @@
 import type { HeaderProps } from './types'
 import { headingFontFamily } from '../../../renderers/utils'
 
-export default function SplitHeader({ data, design, style, photoElement }: HeaderProps) {
+export default function SplitHeader({ data, design, style: _style, photoElement: _photoElement }: HeaderProps) {
   const contactItems = [
     data.contact.email,
     data.contact.phone,

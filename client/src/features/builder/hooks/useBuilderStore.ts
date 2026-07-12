@@ -332,7 +332,7 @@ export const useBuilderStore = create<BuilderStore>()(
 
       acceptStream: () => {
         const s = get()
-        const { streamingSection, streamingText, streamingBullets } = s
+        const { streamingSection, streamingText } = s
         if (streamingSection === 'summary') {
           set({
             ...pushHistory(s),

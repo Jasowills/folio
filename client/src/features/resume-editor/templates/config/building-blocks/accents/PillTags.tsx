@@ -7,7 +7,7 @@ export interface PillTagsProps {
   className?: string
 }
 
-export default function PillTags({ design, children, className = '' }: PillTagsProps) {
+export default function PillTags({ design: _design, children, className = '' }: PillTagsProps) {
   return (
     <div className={`flex flex-wrap gap-1 ${className}`}>
       {children}

@@ -1,4 +1,3 @@
-import type { TemplateConfig } from './config/types'
 import { getTemplateConfig } from './config/registry'
 
 interface PreviewProps {

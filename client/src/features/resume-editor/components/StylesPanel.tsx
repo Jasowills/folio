@@ -1,11 +1,10 @@
 import { useState } from 'react'
-import { TEMPLATES, TEMPLATE_PREVIEWS } from '../../../templates'
+import { TEMPLATE_PREVIEWS } from '../../../templates'
 import type { DesignSettings } from '../../../pages/editor/types'
 import { cn } from '../../../lib/utils'
 import { IconTypography, IconPalette, IconLayout, IconTemplate } from '@tabler/icons-react'
 import type { TemplateId } from '../templates'
 import { TEMPLATE_CONFIGS } from '../templates/config/registry'
-import { getTemplateName, getTemplateCategory } from '../templates/registry'
 import TemplatePreview from '../templates/TemplatePreview'
 
 const HEADING_FONTS = ['DM Serif Display', 'Georgia', 'Garamond', 'Merriweather', 'EB Garamond', 'Lora', 'Libre Baskerville']
@@ -21,8 +20,6 @@ const PRESET_COLORS = [
   { name: 'Cobalt', value: '#1E40AF' },
   { name: 'Plum', value: '#5B21B6' },
 ]
-
-const LEGACY_IDS = ['minimal', 'modern', 'executive', 'compact', 'classic', 'sidebar', 'bold', 'creative', 'tech', 'academic', 'charter', 'prestige', 'engineer', 'contemporary', 'folio']
 
 interface Props {
   templateId: TemplateId

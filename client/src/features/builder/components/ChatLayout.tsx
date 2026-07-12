@@ -1,5 +1,5 @@
 import { useMemo, useRef, useState, useCallback } from 'react'
-import { IconMessage, IconArrowBackUp } from '@tabler/icons-react'
+import { IconMessage } from '@tabler/icons-react'
 import type { TemplateId } from '../../resume-editor/templates/types'
 import type { DesignSettings } from '../../../pages/editor/types'
 import { getDefaultLocalData, getSampleLocalData } from '../../resume-editor/utils/resumeBridge'
@@ -36,7 +36,6 @@ export default function ChatLayout(props: Props) {
     onSetTemplate, onDesignChange, onSetBasics, onSetTargetRole, onSetSummary,
     onAddExperience, onUpdateExperienceBullets, onRemoveExperience,
     onSetEducation, onSetExperience, onSetSkills, onSetOptional,
-    onMarkComplete,
   } = props
 
   const undoRef = useRef<{ snapshot: BuilderSnapshot; message: string } | null>(null)
@@ -115,12 +114,6 @@ export default function ChatLayout(props: Props) {
       customSections: [],
     }
   }, [stepData, design])
-
-  const completedCount = Object.values(stepData).filter(v => {
-    if (Array.isArray(v)) return v.length > 0
-    if (v && typeof v === 'object' && 'text' in v) return !!(v as { text: string }).text
-    return v !== null
-  }).length
 
   const handleAction = (fn: string, params: Record<string, unknown>): string | void => {
     if (!params) { console.warn('[builder] handleAction called with no params for', fn); return }

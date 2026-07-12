@@ -1,5 +1,4 @@
 import type { ColumnLayoutProps } from './types'
-import type { DesignSettings } from '../../../../../../pages/editor/types'
 
 export default function SidebarRightLayout({ header, children, sidebarContent, design, className = '' }: ColumnLayoutProps) {
   return (

@@ -1,7 +1,7 @@
 import type { HeaderProps } from './types'
 import { headingFontFamily } from '../../../renderers/utils'
 
-export default function LeftAlignedHeader({ data, design, style, photoElement }: HeaderProps) {
+export default function LeftAlignedHeader({ data, design, style: _style, photoElement }: HeaderProps) {
   const contactItems = [
     data.contact.email,
     data.contact.phone,

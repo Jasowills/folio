@@ -174,7 +174,7 @@ export default function AiChatPanel({
     }
   }
 
-  const streamWithAI = async (userText: string, assistantId: string) => {
+  const streamWithAI = async (userText: string, _assistantId: string) => {
     let fullText = ''
 
     try {
@@ -188,7 +188,7 @@ export default function AiChatPanel({
         (token) => {
           fullText += token
           const clean = stripActions(fullText)
-          updateLast(m => ({ ...m, content: clean || undefined }))
+          updateLast(m => ({ ...m, content: clean || '' }))
         },
         () => {
           let actions = parseStreamedActions(fullText)

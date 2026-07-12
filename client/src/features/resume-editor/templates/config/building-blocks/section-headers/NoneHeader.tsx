@@ -1,5 +1,5 @@
 import type { SectionHeaderStyleProps } from './types'
 
-export default function NoneHeader({ label, design, className = '' }: SectionHeaderStyleProps) {
+export default function NoneHeader(_props: SectionHeaderStyleProps) {
   return null
 }

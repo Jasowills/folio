@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
-import { IconSend, IconRobot, IconUser, IconCheck, IconX, IconArrowBackUp } from '@tabler/icons-react'
+import { IconSend, IconRobot, IconUser, IconX, IconArrowBackUp } from '@tabler/icons-react'
 import type { BuilderStepData } from '../types'
 import { useBuilderStore } from '../hooks/useBuilderStore'
 import { classifyIntent, parseActionFromText } from '../../resume-editor/components/ai/actions'

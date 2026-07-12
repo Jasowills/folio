@@ -94,7 +94,7 @@ function eduEntry(y: number, school: string, detail: string, dates: string, fami
 function skillsTags(y: number, skills: string[], x = _L, color = _accent): string {
   let o = _txU(x, y, 2.2, TXT.skills, color, true, SANS)
   let cy = y + 4
-  skills.forEach((s, i) => {
+  skills.forEach((s) => {
     const w = s.length * 2 + 4
     if (x + w > 140) { x = _L; cy += 3.5 }
     o += _r(x, cy - 1.2, w, 3, _lt, 1)
@@ -133,18 +133,6 @@ function _eEN(x: number, y: number, school: string, detail: string, dates: strin
 // Single column previews — 10 variants
 function singleColPreview(i: number): string {
   const a = _accent, d = _dk, l = _lt, m = _mut, bg = _bg
-
-  // Base content: header + 2 exp entries + 1 edu entry + skills tags + langs
-  function body(family = SANS): string {
-    return headerBlock(10, false, family)
-      + '\n' + sectionHd(_L, 23, TXT.exp, a, family)
-      + '\n' + expEntry(27, TXT.e1_t, TXT.e1_c, TXT.e1_d, [TXT.e1_b, TXT.e1_b2], family)
-      + '\n' + expEntry(39, TXT.e2_t, TXT.e2_c, TXT.e2_d, [TXT.e2_b], family)
-      + '\n' + sectionHd(_L, 53, TXT.edu, a, family)
-      + '\n' + eduEntry(57, TXT.edu1_s, TXT.edu1_d, TXT.edu1_da, family)
-      + '\n' + skillsTags(66, [TXT.s1, TXT.s2, TXT.s3, TXT.s4])
-      + '\n' + langsLine(82)
-  }
 
   const variants: Array<() => string> = [
     // 0: Clean Minimal — left name, thin underline headings

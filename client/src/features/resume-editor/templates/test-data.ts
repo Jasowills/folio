@@ -1,4 +1,4 @@
-import type { LocalData } from '../pages/editor/types'
+import type { LocalData } from '../../../pages/editor/types'
 
 export const SPARSE_RESUME: LocalData = {
   title: 'Sparse Resume',

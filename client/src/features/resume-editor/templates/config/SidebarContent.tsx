@@ -8,7 +8,7 @@ interface SidebarContentProps {
   photoElement?: React.ReactNode
 }
 
-export default function SidebarContent({ data, design, config, photoElement }: SidebarContentProps) {
+export default function SidebarContent({ data, design, config: _config, photoElement }: SidebarContentProps) {
   const sections = data.sectionOrder || []
 
   const sidebarSections = sections.filter(s =>

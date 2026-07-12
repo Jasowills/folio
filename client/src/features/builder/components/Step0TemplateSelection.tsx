@@ -2,7 +2,7 @@ import { useState } from 'react'
 import type { TemplateId } from '../../resume-editor/templates/types'
 import { TEMPLATE_DEFS } from '../../resume-editor/templates/types'
 import { TEMPLATE_PREVIEWS } from '../../../templates'
-import { TEMPLATE_CONFIGS, getTemplateCategory } from '../../resume-editor/templates/config/registry'
+import { TEMPLATE_CONFIGS } from '../../resume-editor/templates/config/registry'
 
 interface Props {
   selected: TemplateId | null
@@ -38,7 +38,7 @@ const LEGACY_CATEGORY_MAP: Record<string, string> = {
   contemporary: 'Two-Column', folio: 'Creative',
 }
 
-function getBadge(templateId: string, category: string): TemplateMeta {
+function getBadge(_templateId: string, category: string): TemplateMeta {
   return CATEGORY_BADGES[category] || { badge: 'Standard', badgeColor: 'text-muted bg-paper border-border' }
 }
 

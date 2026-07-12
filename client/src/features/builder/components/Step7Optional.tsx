@@ -28,8 +28,6 @@ export default function Step7Optional({ data, onSave, onChange }: Props) {
     awards: awdOn, awardsData: awdOn ? awdData : [],
   })
 
-  const fireOnChange = () => onChange?.(buildData())
-
   const handleSave = () => {
     onSave(buildData())
   }

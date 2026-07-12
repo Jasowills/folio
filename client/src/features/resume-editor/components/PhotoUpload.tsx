@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback, useEffect } from 'react'
+import { useState, useRef, useCallback } from 'react'
 
 interface PhotoUploadProps {
   currentPhotoUrl?: string
@@ -8,7 +8,6 @@ interface PhotoUploadProps {
 
 export default function PhotoUpload({ currentPhotoUrl, onPhotoUploaded, onCancel }: PhotoUploadProps) {
   const [preview, setPreview] = useState<string | null>(currentPhotoUrl || null)
-  const [crop, setCrop] = useState({ x: 0, y: 0 })
   const [zoom, setZoom] = useState(1)
   const [isUploading, setIsUploading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -171,7 +170,6 @@ export default function PhotoUpload({ currentPhotoUrl, onPhotoUploaded, onCancel
               <button
                 onClick={() => {
                   setPreview(null)
-                  setCrop({ x: 0, y: 0 })
                   setZoom(1)
                 }}
                 className="px-4 py-2 text-sm text-gray-600 hover:text-gray-800"

@@ -63,7 +63,7 @@ export default function WizardLayout(props: Props) {
     stepData, currentStep, completedSteps, selectedTemplate, design, zoom,
     streamingSection, streamingText, streamingBullets,
     staleSteps,
-    onSetTemplate, onGoToStep, onCompleteStep,
+    onGoToStep, onCompleteStep,
     onSetBasics, onSetTargetRole, onSetSummary, onAddExperience,
     onUpdateExperienceBullets, onRemoveExperience,
     onSetEducation, onSetSkills, onSetOptional, onMarkComplete,
@@ -130,12 +130,6 @@ export default function WizardLayout(props: Props) {
       customSections: [],
     }
   }, [stepData, design, streamingSection, streamingText, streamingBullets])
-
-  const completedCount = completedSteps.length
-
-  const handleExport = () => {
-    onMarkComplete()
-  }
 
   return (
     <div className="flex flex-1 overflow-hidden">
