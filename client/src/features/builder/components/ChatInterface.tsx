@@ -2,6 +2,8 @@ import { useState, useRef, useEffect, useCallback } from 'react'
 import { IconSend, IconRobot, IconUser, IconCheck, IconX, IconArrowBackUp } from '@tabler/icons-react'
 import type { BuilderStepData } from '../types'
 import { useBuilderStore } from '../hooks/useBuilderStore'
+import { classifyIntent, parseActionFromText } from '../../resume-editor/components/ai/actions'
+import { getDefaultLocalData } from '../../resume-editor/utils/resumeBridge'
 
 interface Action {
   fn: string
@@ -13,6 +15,7 @@ interface ChatMessage {
   role: 'user' | 'assistant'
   content: string
   actions: Action[]
+  actionLabels: string[]
   streaming?: boolean
 }
 
@@ -69,7 +72,7 @@ function parseCompleteActions(text: string): Action[] {
 
 export default function ChatInterface({ resumeId, stepData, onAction, onUndo, undoMessage }: Props) {
   const [messages, setMessages] = useState<ChatMessage[]>([
-    { id: nextId(), role: 'assistant', content: WELCOME, actions: [] },
+    { id: nextId(), role: 'assistant', content: WELCOME, actions: [], actionLabels: [] },
   ])
   const [input, setInput] = useState('')
   const [streaming, setStreaming] = useState(false)
@@ -98,10 +101,30 @@ export default function ChatInterface({ resumeId, stepData, onAction, onUndo, un
     setInput('')
     stopStream()
 
-    const userMsg: ChatMessage = { id: nextId(), role: 'user', content: text, actions: [] }
+    const userMsg: ChatMessage = { id: nextId(), role: 'user', content: text, actions: [], actionLabels: [] }
     addMessage(userMsg)
 
-    const assistantMsg: ChatMessage = { id: nextId(), role: 'assistant', content: '', actions: [], streaming: true }
+    // Deterministic fast path — no network, no server call
+    const intent = classifyIntent(text)
+    if (intent === 'deterministic') {
+      const dummyData = getDefaultLocalData()
+      const parsed = parseActionFromText(text, dummyData)
+      if (parsed.length > 0) {
+        const labels = parsed.map(a => actionLabel(a.fn))
+        for (const a of parsed) {
+          try { onAction(a.fn, a.params) } catch (e) { console.error('[chat] onAction error:', e) }
+        }
+        const content = parsed.length === 1 ? `Done! ${labels[0]}.` : `Done! ${labels.length} changes applied.`
+        const assistantMsg: ChatMessage = {
+          id: nextId(), role: 'assistant', content,
+          actions: parsed, actionLabels: labels, streaming: false,
+        }
+        addMessage(assistantMsg)
+        return
+      }
+    }
+
+    const assistantMsg: ChatMessage = { id: nextId(), role: 'assistant', content: '', actions: [], actionLabels: [], streaming: true }
     addMessage(assistantMsg)
 
     setStreaming(true)
@@ -166,9 +189,11 @@ export default function ChatInterface({ resumeId, stepData, onAction, onUndo, un
                   }
                 }
                 if (newActions.length > 0) {
+                  const newLabels = newActions.map(a => actionLabel(a.fn))
                   updateLastAssistant(m => ({
                     ...m,
                     actions: [...m.actions, ...newActions],
+                    actionLabels: [...m.actionLabels, ...newLabels],
                   }))
                 }
                 updateLastAssistant(m => ({ ...m, content: stripActions(fullText) }))
@@ -243,12 +268,12 @@ export default function ChatInterface({ resumeId, stepData, onAction, onUndo, un
                   <span className="inline-block w-1.5 h-4 bg-teal ml-0.5 animate-pulse align-text-bottom" />
                 )}
               </div>
-              {m.actions.length > 0 && (
+              {m.actionLabels.length > 0 && (
                 <div className="mt-1.5 space-y-0.5">
-                  {m.actions.map((a, i) => (
-                    <div key={i} className="flex items-center gap-1 text-[10px] text-teal">
-                      <IconCheck size={10} className="shrink-0" />
-                      <span>{actionLabel(a.fn)}</span>
+                  {m.actionLabels.map((label, i) => (
+                    <div key={i} className="flex items-center gap-1.5 text-[10px] font-medium text-teal animate-action-slide" style={{ animationDelay: `${i * 80}ms` }}>
+                      <span className="w-1.5 h-1.5 rounded-full bg-teal shrink-0" />
+                      <span>{label}</span>
                     </div>
                   ))}
                   {onUndo && undoMessage && messages.indexOf(m) === messages.length - 1 && (
@@ -337,11 +362,34 @@ export default function ChatInterface({ resumeId, stepData, onAction, onUndo, un
     stopStream()
     setInput('')
 
-    const userMsg: ChatMessage = { id: nextId(), role: 'user', content: text, actions: [] }
+    const userMsg: ChatMessage = { id: nextId(), role: 'user', content: text, actions: [], actionLabels: [] }
     addMessage(userMsg)
 
-    const assistantMsg: ChatMessage = { id: nextId(), role: 'assistant', content: '', actions: [], streaming: true }
+    // Deterministic fast path
+    const intent = classifyIntent(text)
+    if (intent === 'deterministic') {
+      const dummyData = getDefaultLocalData()
+      const parsed = parseActionFromText(text, dummyData)
+      if (parsed.length > 0) {
+        const labels = parsed.map(a => actionLabel(a.fn))
+        for (const a of parsed) {
+          try { onAction(a.fn, a.params) } catch (e) { console.error('[chat] onAction error:', e) }
+        }
+        const content = parsed.length === 1 ? `Done! ${labels[0]}.` : `Done! ${labels.length} changes applied.`
+        const assistantMsg: ChatMessage = {
+          id: nextId(), role: 'assistant', content,
+          actions: parsed, actionLabels: labels, streaming: false,
+        }
+        addMessage(assistantMsg)
+        return
+      }
+    }
+
+    const assistantMsg: ChatMessage = { id: nextId(), role: 'assistant', content: '', actions: [], actionLabels: [], streaming: true }
     addMessage(assistantMsg)
+
+    setStreaming(true)
+    execCountRef.current = 0
 
     setStreaming(true)
     execCountRef.current = 0
@@ -398,7 +446,8 @@ export default function ChatInterface({ resumeId, stepData, onAction, onUndo, un
                   try { onAction(a.fn, a.params) } catch (e) { console.error('[chat] onAction error:', e) }
                 }
                 if (newActions.length > 0) {
-                  updateLastAssistant(m => ({ ...m, actions: [...m.actions, ...newActions] }))
+                  const newLabels = newActions.map(a => actionLabel(a.fn))
+                  updateLastAssistant(m => ({ ...m, actions: [...m.actions, ...newActions], actionLabels: [...m.actionLabels, ...newLabels] }))
                 }
                 updateLastAssistant(m => ({ ...m, content: stripActions(fullText) }))
               }

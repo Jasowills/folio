@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { AnimatePresence } from 'framer-motion'
 import { useResume, useUpdateResume, useAnalyzeResume, useExtractLayout, useSaveLayoutDocument } from '../../lib/queries'
@@ -17,6 +17,8 @@ import CommandPalette from './components/CommandPalette'
 import ExportPopover from './components/ExportPopover'
 import ExtractionNotification from './components/ExtractionNotification'
 import AiChatPanel from './components/AiChatPanel'
+import type { CanvasHighlight } from './components/ai/actions'
+import CanvasHighlightOverlay from './components/CanvasHighlightOverlay'
 import StylesPanel from './components/StylesPanel'
 import SectionsPanel from './components/SectionsPanel'
 import PdfDocumentEditor from '../pdf-editor/PdfDocumentEditor'
@@ -64,6 +66,16 @@ export default function EditorPage() {
   const [extractingLayout, setExtractingLayout] = useState(false)
   const [pendingFormat, setPendingFormat] = useState<PdfBlockFormat | null>(null)
   const [pendingTextEdit, setPendingTextEdit] = useState<PdfTextEdit | null>(null)
+  const [canvasHighlights, setCanvasHighlights] = useState<CanvasHighlight[]>([])
+  const canvasContainerRef = useRef<HTMLDivElement>(null)
+  const highlightTimerRef = useRef<number | null>(null)
+
+  const handleCanvasHighlight = useCallback((highlights: CanvasHighlight[]) => {
+    if (highlightTimerRef.current) clearTimeout(highlightTimerRef.current)
+    setCanvasHighlights(highlights)
+    const maxDuration = Math.max(...highlights.map(h => h.duration || 1500))
+    highlightTimerRef.current = window.setTimeout(() => setCanvasHighlights([]), maxDuration + 200)
+  }, [])
 
   const analyzeResume = useAnalyzeResume()
   const extractLayout = useExtractLayout()
@@ -146,6 +158,23 @@ export default function EditorPage() {
     window.addEventListener('beforeunload', handleBeforeUnload)
     return () => window.removeEventListener('beforeunload', handleBeforeUnload)
   }, [saved])
+
+  useEffect(() => {
+    function handleGlobalKey(e: KeyboardEvent) {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+        e.preventDefault()
+        setCommandPaletteOpen(o => !o)
+      }
+    }
+    window.addEventListener('keydown', handleGlobalKey)
+    return () => window.removeEventListener('keydown', handleGlobalKey)
+  }, [])
+
+  useEffect(() => {
+    return () => {
+      if (highlightTimerRef.current) clearTimeout(highlightTimerRef.current)
+    }
+  }, [])
 
   async function forceSave() {
     if (!id || !localData) return
@@ -236,18 +265,20 @@ export default function EditorPage() {
                   onShowTemplate={() => setShowTemplate(true)}
                   onFormatPdf={setPendingFormat}
                   onEditText={setPendingTextEdit}
+                  onHighlight={handleCanvasHighlight}
                 />
               </FloatingPanel>
             )}
           </AnimatePresence>
 
           {showTemplate ? (
-            <div className="flex-1 overflow-auto bg-[#D4CFC6]">
+            <div ref={canvasContainerRef} className="flex-1 overflow-auto bg-[#D4CFC6] relative">
               <PreviewPane
                 data={currentData}
                 design={design}
                 templateId={templateId}
               />
+              <CanvasHighlightOverlay highlights={canvasHighlights} containerRef={canvasContainerRef} />
             </div>
           ) : (
             <div className="flex-1 overflow-auto bg-[#D4CFC6]">
@@ -367,6 +398,7 @@ export default function EditorPage() {
                 onShowTemplate={() => setShowTemplate(true)}
                 onFormatPdf={setPendingFormat}
                 onEditText={setPendingTextEdit}
+                onHighlight={handleCanvasHighlight}
               />
             </FloatingPanel>
           )}
@@ -383,12 +415,13 @@ export default function EditorPage() {
             </div>
           </div>
 
-          <div className="flex-1 overflow-auto bg-[#D4CFC6]">
+          <div ref={canvasContainerRef} className="flex-1 overflow-auto bg-[#D4CFC6] relative">
             <PreviewPane
               data={currentData}
               design={design}
               templateId={templateId}
             />
+            <CanvasHighlightOverlay highlights={canvasHighlights} containerRef={canvasContainerRef} />
           </div>
         </div>
 

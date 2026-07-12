@@ -6,7 +6,7 @@ interface ResumePaperProps {
 
 export default function ResumePaper({ children }: ResumePaperProps) {
   return (
-    <div className="w-[210mm] min-h-[297mm] bg-white shadow-[0_2px_20px_rgba(0,0,0,0.12)] rounded-sm flex-shrink-0">
+    <div data-resume-paper className="w-[210mm] min-h-[297mm] bg-white shadow-[0_2px_20px_rgba(0,0,0,0.12)] rounded-sm flex-shrink-0 transition-shadow duration-300">
       {children}
     </div>
   )

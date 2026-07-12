@@ -50,7 +50,7 @@ export default function ConfigurableSectionRenderer({
         if (!Component) return null
 
         return (
-          <div key={key} className="mb-4">
+          <div key={key} data-section={key} className="mb-4">
             <ConfigurableSectionHeading
               label={key.charAt(0).toUpperCase() + key.slice(1)}
               design={design}

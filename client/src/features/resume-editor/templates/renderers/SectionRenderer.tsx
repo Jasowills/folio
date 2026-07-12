@@ -29,7 +29,11 @@ export default function SectionRenderer({ data, design, style, className }: Sect
       {sections.map(key => {
         const Component = SECTION_MAP[key]
         if (!Component) return null
-        return <Component key={key} data={data} design={design} style={style} />
+        return (
+          <div key={key} data-section={key}>
+            <Component data={data} design={design} style={style} />
+          </div>
+        )
       })}
     </div>
   )

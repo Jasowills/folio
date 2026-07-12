@@ -17,7 +17,7 @@ export function usePagination(sectionOrder: string[]): { pages: Page[][]; contai
     if (!containerRef.current) return
 
     const container = containerRef.current
-    const sections = Array.from(container.querySelectorAll('[data-section-key]')) as HTMLElement[]
+    const sections = Array.from(container.querySelectorAll('[data-section]')) as HTMLElement[]
 
     if (sections.length === 0) {
       setPages([[{ sections: sectionOrder, index: 0 }]])
@@ -29,7 +29,7 @@ export function usePagination(sectionOrder: string[]): { pages: Page[][]; contai
     let currentPageIndex = 0
 
     sections.forEach(section => {
-      const key = section.getAttribute('data-section-key') || ''
+      const key = section.getAttribute('data-section') || ''
       const height = section.offsetHeight
 
       if (currentPageHeight + height > USABLE_HEIGHT && currentPageHeight > 0) {

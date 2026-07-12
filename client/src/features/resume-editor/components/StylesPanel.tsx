@@ -6,6 +6,7 @@ import { IconTypography, IconPalette, IconLayout, IconTemplate } from '@tabler/i
 import type { TemplateId } from '../templates'
 import { TEMPLATE_CONFIGS } from '../templates/config/registry'
 import { getTemplateName, getTemplateCategory } from '../templates/registry'
+import TemplatePreview from '../templates/TemplatePreview'
 
 const HEADING_FONTS = ['DM Serif Display', 'Georgia', 'Garamond', 'Merriweather', 'EB Garamond', 'Lora', 'Libre Baskerville']
 const BODY_FONTS = ['Plus Jakarta Sans', 'Calibri', 'Helvetica Neue', 'Source Sans Pro', 'Open Sans', 'Roboto', 'Lato', 'Nunito']
@@ -89,7 +90,7 @@ export default function StylesPanel({ templateId, design, onTemplateChange, onDe
             <div className="grid grid-cols-2 gap-2">
               {filteredTemplates.map(tpl => {
                 const isActive = templateId === tpl.id
-                const svg = TEMPLATE_PREVIEWS[tpl.id] || TEMPLATE_PREVIEWS.minimal
+                const svg = TEMPLATE_PREVIEWS[tpl.id]
                 return (
                   <button
                     key={tpl.id}
@@ -100,12 +101,18 @@ export default function StylesPanel({ templateId, design, onTemplateChange, onDe
                     )}
                   >
                     <div className="h-[90px] p-1.5 bg-white flex items-center justify-center">
-                      {svg && (
+                      {svg ? (
                         <div
                           className="w-full h-full"
                           dangerouslySetInnerHTML={{
                             __html: svg.replace('currentColor', design.primaryColor),
                           }}
+                        />
+                      ) : (
+                        <TemplatePreview
+                          templateId={tpl.id}
+                          accentColor={design.primaryColor}
+                          className="w-full h-full"
                         />
                       )}
                     </div>
