@@ -34,21 +34,21 @@ export class AiController implements OnModuleInit {
     const model = process.env.OLLAMA_DEFAULT_MODEL || 'qwen2.5:7b';
     const baseUrl = process.env.OLLAMA_BASE_URL || 'http://localhost:11434/v1';
     this.logger.log(`[warmup] pre-loading Ollama model: ${model}`);
-    try {
-      const res = await fetch(`${baseUrl}/chat/completions`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          model,
-          messages: [{ role: 'user', content: 'hi' }],
-          options: { num_predict: 1 },
-          keep_alive: '30m',
-        }),
-      });
+    fetch(`${baseUrl}/chat/completions`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model,
+        messages: [{ role: 'user', content: 'hi' }],
+        options: { num_predict: 1 },
+        keep_alive: '30m',
+      }),
+      signal: AbortSignal.timeout(15_000),
+    }).then(res => {
       this.logger.log(`[warmup] Ollama model loaded: ${res.status}`);
-    } catch (e) {
+    }).catch(e => {
       this.logger.warn(`[warmup] Ollama not ready: ${(e as Error).message}`);
-    }
+    });
   }
 
   @Post('chat')
@@ -98,7 +98,7 @@ export class AiController implements OnModuleInit {
 
     try {
       const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 45_000);
+      const timeout = setTimeout(() => controller.abort(), 30_000);
 
       const ollamaRes = await fetch(`${ollamaUrl}/chat/completions`, {
         method: 'POST',
@@ -118,7 +118,7 @@ export class AiController implements OnModuleInit {
             top_k: 40,
             repeat_penalty: 1.1,
           },
-          keep_alive: '10m',
+          keep_alive: '5m',
         }),
       });
 

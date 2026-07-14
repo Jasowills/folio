@@ -224,9 +224,19 @@ export default function AiChatPanel({
         },
         (err) => {
           console.error('[ai-chat] stream error', err)
+          let errorMsg = 'Sorry, something went wrong. Please try again.'
+          if (err instanceof Error) {
+            if (err.message.includes('All streaming providers failed')) {
+              errorMsg = 'AI is temporarily unavailable. All providers are down.'
+            } else if (err.message.includes('fetch failed') || err.message.includes('network')) {
+              errorMsg = 'Cannot reach AI server. Check your connection.'
+            } else if (err.message) {
+              errorMsg = `Error: ${err.message}`
+            }
+          }
           updateLast(m => ({
             ...m,
-            content: m.content || 'Sorry, something went wrong. Please try again.',
+            content: m.content || errorMsg,
             actions: [],
             actionLabels: [],
             pending: false,
@@ -235,10 +245,20 @@ export default function AiChatPanel({
           loadingRef.current = false
         },
       )
-    } catch {
+    } catch (err) {
+      let errorMsg = 'Sorry, something went wrong. Please try again.'
+      if (err instanceof Error) {
+        if (err.message.includes('All streaming providers failed')) {
+          errorMsg = 'AI is temporarily unavailable. All providers are down.'
+        } else if (err.message.includes('fetch failed') || err.message.includes('network')) {
+          errorMsg = 'Cannot reach AI server. Check your connection.'
+        } else if (err.message) {
+          errorMsg = `Error: ${err.message}`
+        }
+      }
       updateLast(m => ({
         ...m,
-        content: m.content || 'Sorry, something went wrong. Please try again.',
+        content: m.content || errorMsg,
         actions: [],
         actionLabels: [],
         pending: false,
@@ -318,11 +338,11 @@ export default function AiChatPanel({
         {messages.map((m, idx) => (
           <div
             key={m.id}
-            className={`animate-message-in ${m.role === 'user' ? 'flex justify-end' : ''}`}
+            className={`animate-message-in flex ${m.role === 'user' ? 'justify-end' : 'gap-2.5'}`}
             style={{ animationDelay: `${Math.min(idx * 30, 150)}ms` }}
           >
             {m.role === 'assistant' && (
-              <div className={`w-7 h-7 rounded-full bg-teal/10 flex items-center justify-center shrink-0 mt-0.5 mr-2 transition-all duration-300 ${m.pending ? 'bg-teal/20 scale-110' : ''}`}>
+              <div className={`w-7 h-7 rounded-full bg-teal/10 flex items-center justify-center shrink-0 mt-0.5 transition-all duration-300 ${m.pending ? 'bg-teal/20 scale-110' : ''}`}>
                 {m.pending ? (
                   <span className="flex items-center gap-0.5">
                     <span className="w-1 h-1 bg-teal rounded-full animate-thinking-dot" style={{ animationDelay: '0ms' }} />

@@ -160,17 +160,6 @@ export default function EditorPage() {
   }, [saved])
 
   useEffect(() => {
-    function handleGlobalKey(e: KeyboardEvent) {
-      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
-        e.preventDefault()
-        setCommandPaletteOpen(o => !o)
-      }
-    }
-    window.addEventListener('keydown', handleGlobalKey)
-    return () => window.removeEventListener('keydown', handleGlobalKey)
-  }, [])
-
-  useEffect(() => {
     return () => {
       if (highlightTimerRef.current) clearTimeout(highlightTimerRef.current)
     }

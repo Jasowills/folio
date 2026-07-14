@@ -626,7 +626,7 @@ export class AiService {
   ): Promise<string> {
     const url = `${this.ollamaBaseUrl}/chat/completions`;
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 60_000);
+    const timeout = setTimeout(() => controller.abort(), 30_000);
 
     const finish = () => clearTimeout(timeout);
 
@@ -638,13 +638,13 @@ export class AiService {
         stream: false,
         messages,
         options: {
-          num_predict: maxTokens ?? this.maxTokens,
+          num_predict: Math.min(maxTokens ?? this.maxTokens, 256),
           temperature: 0.3,
           top_p: 0.9,
           top_k: 40,
           repeat_penalty: 1.1,
         },
-        keep_alive: '10m',
+        keep_alive: '5m',
       };
       if (format === 'json') {
         body.response_format = { type: 'json_object' };
