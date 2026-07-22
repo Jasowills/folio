@@ -24,11 +24,14 @@ export function validateEnv() {
   }
 
   if (missing.length > 0) {
-    console.error(
+    const msg =
       '\n❌ Missing required environment variables:\n  ' +
         missing.join('\n  ') +
-        '\n\nSet them in server/.env or export them.\n',
-    );
+        '\n\nSet them in server/.env or export them.\n';
+    if (process.env.NODE_ENV === 'production') {
+      throw new Error(msg);
+    }
+    console.error(msg);
     process.exit(1);
   }
 }

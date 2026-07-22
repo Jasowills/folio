@@ -5,6 +5,7 @@ import { IconLoader2, IconBug } from '@tabler/icons-react'
 import { useAuth } from '../../hooks/useAuth'
 import { useBuilderStore } from './hooks/useBuilderStore'
 import { showToast } from '../../components/ui/toast'
+import { exportResumePdf } from '../../lib/export-pdf'
 import type { TemplateId } from '../resume-editor/templates/types'
 import type { DesignSettings } from '../../pages/editor/types'
 import type { BasicsData, TargetRoleData, EducationEntry, OptionalData, ExperienceRole } from './types'
@@ -352,7 +353,7 @@ export default function BuilderPage() {
       <ExportPopover
         open={exportPopoverOpen}
         onClose={() => setExportPopoverOpen(false)}
-        onExportPdf={() => store.resumeId && window.open(`/export/${store.resumeId}`, '_blank')}
+        onExportPdf={() => store.resumeId && exportResumePdf(store.resumeId)}
         onExportDocx={async () => {}}
         onExportDrive={async () => {}}
       />

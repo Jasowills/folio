@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import PdfViewer from './PdfViewer'
 import { ScoreRing } from '../components/ScoreRing'
+import { exportGuestReportPdf } from '../lib/export-pdf'
 
 const _ISO_MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
 function toDisplayDate(iso?: string | null): string {
@@ -99,23 +100,9 @@ export default function GuestResult({
   const handleDownloadReport = useCallback(async () => {
     setDownloading(true)
     try {
-      const res = await fetch('/api/export/guest-report', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data),
-      })
-      if (!res.ok) throw new Error('Download failed')
-      const blob = await res.blob()
-      const url = URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = url
-      a.download = 'folio-report.pdf'
-      document.body.appendChild(a)
-      a.click()
-      document.body.removeChild(a)
-      URL.revokeObjectURL(url)
+      await exportGuestReportPdf(data)
     } catch (e) {
-      console.error('[GuestResult] download report failed:', e)
+      console.error('Download failed', e)
     } finally {
       setDownloading(false)
     }

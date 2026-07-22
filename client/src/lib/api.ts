@@ -6,8 +6,10 @@ export function onSessionExpired(handler: () => void) {
   sessionExpiredHandler = handler
 }
 
+const API_BASE = import.meta.env.VITE_API_URL || '/api'
+
 const api = axios.create({
-  baseURL: '/api',
+  baseURL: API_BASE,
   headers: { 'Content-Type': 'application/json' },
 })
 
@@ -27,7 +29,7 @@ api.interceptors.response.use(
       original._retry = true
       try {
         const { data } = await axios.post(
-          '/api/auth/refresh',
+          `${API_BASE}/auth/refresh`,
           {},
           { withCredentials: true },
         )

@@ -4,6 +4,7 @@ import { AnimatePresence } from 'framer-motion'
 import { useResume, useUpdateResume, useAnalyzeResume, useExtractLayout, useSaveLayoutDocument } from '../../lib/queries'
 import type { PdfLayoutDocument } from '../../lib/queries'
 import type { LocalData, DesignSettings } from '../../pages/editor/types'
+import { exportResumePdf } from '../../lib/export-pdf'
 import { DEFAULT_DESIGN } from '../../pages/editor/types'
 import type { TemplateId } from './templates/types'
 import { ALL_TEMPLATE_IDS } from './templates/types'
@@ -325,7 +326,7 @@ export default function EditorPage() {
         <ExportPopover
           open={exportPopoverOpen}
           onClose={() => setExportPopoverOpen(false)}
-          onExportPdf={() => window.open(`/api/export/${id}`, '_blank')}
+          onExportPdf={() => id && exportResumePdf(id)}
           onExportDocx={async () => {}}
           onExportDrive={async () => {}}
         />
@@ -443,7 +444,7 @@ export default function EditorPage() {
       <ExportPopover
         open={exportPopoverOpen}
         onClose={() => setExportPopoverOpen(false)}
-        onExportPdf={() => window.open(`/api/export/${id}`, '_blank')}
+        onExportPdf={() => id && exportResumePdf(id)}
         onExportDocx={async () => {}}
         onExportDrive={async () => {}}
       />

@@ -6,6 +6,7 @@ import { useResumes, useUploadResume, useDeleteResume, useAnalyzeResume, useCrea
 import api from '../lib/api'
 import type { Resume } from '../lib/queries'
 import { getScoreRingColor } from '../lib/utils'
+import { exportResumePdf } from '../lib/export-pdf'
 import { IconFileText, IconTrash, IconDownload, IconSearch, IconUpload, IconPlus, IconX, IconFilePlus, IconDots, IconAlertTriangle, IconCircleCheck, IconEye, IconChartBar, IconFilePencil, IconCopy, IconRefresh } from '@tabler/icons-react'
 
 const MAX_FILE_SIZE = 15 * 1024 * 1024
@@ -141,7 +142,7 @@ function ContextMenu({ x, y, resume, onClose, onNavigate, onDelete, onAnalyze, o
     ...(isAnalysed ? [{ icon: IconEye as typeof IconFileText, label: 'View review', action: () => onNavigate(`/resume/${resume._id}/review`) }] : []),
     { icon: IconChartBar, label: 'Run ATS check', action: () => onNavigate(`/ats?resume=${resume._id}`) },
     { icon: IconFileText, label: 'Generate cover letter', action: () => onNavigate(`/cover-letter/new?resume=${resume._id}`) },
-    { icon: IconDownload, label: 'Export PDF', action: () => onNavigate(`/export/${resume._id}`) },
+    { icon: IconDownload, label: 'Export PDF', action: () => exportResumePdf(resume._id) },
     { icon: IconCopy, label: 'Duplicate', action: () => onDuplicate(resume._id) },
     ...(isAnalysed ? [{ icon: IconRefresh as typeof IconFileText, label: 'Re-analyse', action: () => onAnalyze(resume._id) }] : []),
   ]
@@ -220,7 +221,7 @@ function MobileContextSheet({ resume, onClose, onNavigate, onDelete, onAnalyze, 
     ...(isAnalysed ? [{ icon: IconEye as typeof IconFileText, label: 'View review', action: () => onNavigate(`/resume/${resume._id}/review`) }] : []),
     { icon: IconChartBar, label: 'Run ATS check', action: () => onNavigate(`/ats?resume=${resume._id}`) },
     { icon: IconFileText, label: 'Generate cover letter', action: () => onNavigate(`/cover-letter/new?resume=${resume._id}`) },
-    { icon: IconDownload, label: 'Export PDF', action: () => onNavigate(`/export/${resume._id}`) },
+    { icon: IconDownload, label: 'Export PDF', action: () => exportResumePdf(resume._id) },
     { icon: IconCopy, label: 'Duplicate', action: () => onDuplicate(resume._id) },
     ...(isAnalysed ? [{ icon: IconRefresh as typeof IconFileText, label: 'Re-analyse', action: () => onAnalyze(resume._id) }] : []),
   ]
@@ -440,7 +441,7 @@ function ResumeCard({
                 ATS
               </button>
               <button
-                onClick={(e) => { e.stopPropagation(); onNavigate(`/export/${resume._id}`) }}
+                onClick={(e) => { e.stopPropagation(); exportResumePdf(resume._id) }}
                 className="flex-1 px-2 py-1 text-[10px] font-medium text-muted bg-transparent border border-border rounded-md hover:border-teal hover:text-teal transition-colors cursor-pointer"
               >
                 Export

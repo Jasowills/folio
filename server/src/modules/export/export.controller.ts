@@ -31,30 +31,29 @@ export class ExportController {
   ) {
     this.logger.log(`guestReport: generating PDF for guest analysis`);
 
-    const pdf = await this.exportService.guestReport(data as any);
+    const html = await this.exportService.guestReportHtml(data as any);
 
     res.set({
-      'Content-Type': 'application/pdf',
-      'Content-Disposition': `attachment; filename="folio-report.pdf"`,
-      'Content-Length': pdf.length,
+      'Content-Type': 'text/html',
+      'Content-Length': Buffer.byteLength(html),
     });
-    res.end(pdf);
+    res.end(html);
   }
 
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @Get(':resumeId')
-  @ApiOperation({ summary: 'Export resume as PDF' })
-  async exportPdf(
+  @ApiOperation({ summary: 'Export resume as HTML (client converts to PDF)' })
+  async exportHtml(
     @Param('resumeId') resumeId: string,
     @Query('template') template: string | undefined,
     @Query('color') color: string | undefined,
     @CurrentUser() user: UserDocument,
     @Res() res: Response,
   ) {
-    this.logger.log(`exportPdf: request for resume ${resumeId}, template=${template || 'default'}, color=${color || 'default'}`);
+    this.logger.log(`exportHtml: request for resume ${resumeId}, template=${template || 'default'}, color=${color || 'default'}`);
 
-    const pdf = await this.exportService.exportPdf(
+    const html = await this.exportService.exportHtml(
       resumeId,
       user._id.toString(),
       template,
@@ -62,10 +61,9 @@ export class ExportController {
     );
 
     res.set({
-      'Content-Type': 'application/pdf',
-      'Content-Disposition': `attachment; filename="resume.pdf"`,
-      'Content-Length': pdf.length,
+      'Content-Type': 'text/html',
+      'Content-Length': Buffer.byteLength(html),
     });
-    res.end(pdf);
+    res.end(html);
   }
 }

@@ -1,5 +1,4 @@
 import { Injectable, Logger, NotFoundException, BadRequestException } from '@nestjs/common';
-import { chromium } from 'playwright';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { Resume, ResumeDocument } from '../resumes/schemas/resume.schema';
@@ -12,29 +11,22 @@ export class ExportService {
     @InjectModel(Resume.name) private resumeModel: Model<ResumeDocument>,
   ) {}
 
-  async exportPdf(
+  async exportHtml(
     resumeId: string,
     userId: string,
     template?: string,
     primaryColor?: string,
-  ): Promise<Buffer> {
+  ): Promise<string> {
     const resume = await this.resumeModel.findOne({ _id: resumeId, userId }).exec();
     if (!resume) throw new NotFoundException('Resume not found');
 
-    this.logger.log(`exportPdf: generating PDF for resume ${resumeId}, template=${template || 'default'}, color=${primaryColor || 'default'}`);
+    this.logger.log(`exportHtml: generating HTML for resume ${resumeId}, template=${template || 'default'}, color=${primaryColor || 'default'}`);
 
     if (resume.layoutDocument) {
-      const html = this.buildLayoutHtml(resume.layoutDocument as Record<string, any>);
-      const pdf = await this.renderLayoutPdf(html);
-      this.logger.log(`exportPdf: layout PDF generated (${pdf.length} bytes)`);
-      return pdf;
+      return this.buildLayoutHtml(resume.layoutDocument as Record<string, any>);
     }
 
-    const html = this.buildHtml(resume, primaryColor || '#0F6E56');
-    const pdf = await this.renderPdf(html);
-
-    this.logger.log(`exportPdf: PDF generated (${pdf.length} bytes)`);
-    return pdf;
+    return this.buildHtml(resume, primaryColor || '#0F6E56');
   }
 
   private buildLayoutHtml(doc: Record<string, any>): string {
@@ -99,44 +91,6 @@ export class ExportService {
 </head>
 <body>${pagesHtml}</body>
 </html>`;
-  }
-
-  private async renderLayoutPdf(html: string): Promise<Buffer> {
-    let browser;
-    try {
-      browser = await chromium.launch({
-        channel: 'chromium',
-        headless: true,
-      });
-      const page = await browser.newPage();
-      await page.setContent(html, { waitUntil: 'networkidle' });
-
-      // Extract first page dimensions from the rendered page divs (in CSS pixels).
-      // pdfplumber returns points; the HTML uses pt units; offsetWidth returns CSS pixels.
-      // At 96 DPI: 1pt = 1.333px. We convert back: pt = px * 72/96.
-      const pageDims = await page.evaluate(() => {
-        const first = document.querySelector('body > div') as HTMLElement | undefined;
-        if (!first) return null;
-        return {
-          width: Math.round(first.offsetWidth * 72 / 96),
-          height: Math.round(first.offsetHeight * 72 / 96),
-        };
-      });
-
-      if (!pageDims) throw new Error('No pages to render');
-
-      // Use points for the PDF paper size — matches the @page rule.
-      // Each page div is exactly one paper-sized block, so Playwright paginates naturally.
-      const pdf = await page.pdf({
-        width: `${pageDims.width}pt`,
-        height: `${pageDims.height}pt`,
-        printBackground: true,
-        margin: { top: 0, right: 0, bottom: 0, left: 0 },
-      });
-      return Buffer.from(pdf);
-    } finally {
-      if (browser) await browser.close().catch(() => {});
-    }
   }
 
   private buildHtml(resume: ResumeDocument, color: string): string {
@@ -262,31 +216,11 @@ export class ExportService {
 </html>`;
   }
 
-  private async renderPdf(html: string): Promise<Buffer> {
-    let browser;
-    try {
-      browser = await chromium.launch({
-        channel: 'chromium',
-        headless: true,
-      });
-      const page = await browser.newPage();
-      await page.setContent(html, { waitUntil: 'networkidle' });
-      const pdf = await page.pdf({
-        format: 'Letter',
-        margin: { top: '0.75in', bottom: '0.75in', left: '0.75in', right: '0.75in' },
-        printBackground: true,
-      });
-      return Buffer.from(pdf);
-    } finally {
-      if (browser) await browser.close().catch(() => {});
-    }
-  }
-
   private esc(s: string): string {
     return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
   }
 
-  async guestReport(data: {
+  async guestReportHtml(data: {
     score: number;
     title: string;
     issues: string[];
@@ -302,7 +236,7 @@ export class ExportService {
     skills?: string[];
     certifications?: Array<{ name: string; issuer?: string | null; date?: string | null }>;
     languages?: string[];
-  }): Promise<Buffer> {
+  }): Promise<string> {
     if (!data || typeof data.score !== 'number') {
       throw new BadRequestException('Invalid analysis data');
     }
@@ -500,6 +434,6 @@ export class ExportService {
 </body>
 </html>`;
 
-    return this.renderPdf(html);
+    return html;
   }
 }
