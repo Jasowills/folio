@@ -6,8 +6,9 @@ import { JobMatch, JobMatchDocument } from './schemas/job-match.schema';
 import { JobApplication, JobApplicationDocument, ActivityLogEntry, ChecklistState } from './schemas/job-application.schema';
 import { DiscoverPreferences, DiscoverPreferencesDocument } from './schemas/discover-preferences.schema';
 import { CrawlMeta, CrawlMetaDocument } from './schemas/crawl-meta.schema';
+import { UserSignal, UserSignalDocument } from './schemas/user-signal.schema';
 import { DiscoverCrawlService } from './discover-crawl.service';
-import { FeedQueryDto, UpsertPreferencesDto, TrackJobDto, UpdateTrackerJobDto } from './dto';
+import { FeedQueryDto, UpsertPreferencesDto, TrackJobDto, UpdateTrackerJobDto, DismissJobDto } from './dto';
 import { normalizeCompanyName, cleanCompanyName, cleanLocation, decodeHtmlEntities, fixMojibake } from './extractors/job-extractor';
 import { ResumesService } from '../resumes/resumes.service';
 
@@ -48,6 +49,7 @@ export class DiscoverService {
     @InjectModel(JobApplication.name) private jobAppModel: Model<JobApplicationDocument>,
     @InjectModel(DiscoverPreferences.name) private prefsModel: Model<DiscoverPreferencesDocument>,
     @InjectModel(CrawlMeta.name) private crawlMetaModel: Model<CrawlMetaDocument>,
+    @InjectModel(UserSignal.name) private userSignalModel: Model<UserSignalDocument>,
     private crawlService: DiscoverCrawlService,
     private resumesService: ResumesService,
   ) {}
@@ -73,6 +75,8 @@ export class DiscoverService {
     if (dto.preferredLocations !== undefined) update.preferredLocations = dto.preferredLocations;
     if (dto.isRemoteOnly !== undefined) update.isRemoteOnly = dto.isRemoteOnly;
     if (dto.experienceLevels !== undefined) update.experienceLevels = dto.experienceLevels;
+    if (dto.excludedRoleFamilies !== undefined) update.excludedRoleFamilies = dto.excludedRoleFamilies;
+    if (dto.excludedSeniorities !== undefined) update.excludedSeniorities = dto.excludedSeniorities;
     if (dto.minimumMatchScore !== undefined) update.minimumMatchScore = dto.minimumMatchScore;
     if (dto.excludeApplied !== undefined) update.excludeApplied = dto.excludeApplied;
     if (dto.excludeRejected !== undefined) update.excludeRejected = dto.excludeRejected;
@@ -116,6 +120,22 @@ export class DiscoverService {
       filter.source = { $in: query.sources };
     } else if (prefs?.enabledSources && prefs.enabledSources.length > 0) {
       filter.source = { $in: prefs.enabledSources };
+    }
+
+    // Hard filters: exclude by role family
+    const excludedFamilies = query.excludedRoleFamilies?.length
+      ? query.excludedRoleFamilies
+      : prefs?.excludedRoleFamilies || [];
+    if (excludedFamilies.length > 0) {
+      filter['extractedFields.roleFamily'] = { $nin: excludedFamilies };
+    }
+
+    // Hard filters: exclude by seniority level
+    const excludedSeniorities = query.excludedSeniorities?.length
+      ? query.excludedSeniorities
+      : prefs?.excludedSeniorities || [];
+    if (excludedSeniorities.length > 0) {
+      filter['extractedFields.seniorityLevel'] = { $nin: excludedSeniorities };
     }
 
     if (query.remoteOnly) {
@@ -165,6 +185,11 @@ export class DiscoverService {
             filter._id = { $nin: hiddenObjIds };
           }
         }
+      }
+
+      // Filter by preferred experience levels
+      if (prefs.experienceLevels && prefs.experienceLevels.length > 0) {
+        filter['extractedFields.seniorityLevel'] = { $in: prefs.experienceLevels };
       }
     }
 
@@ -242,6 +267,25 @@ export class DiscoverService {
       jobsWithMatches = jobsWithMatches.filter((j) => !j.match || j.match.atsScore >= minScore);
     }
 
+    // Filter by target roles (not applied at DB level to avoid $or conflicts with cursor)
+    const targetRoles = prefs?.targetRoles?.filter(Boolean).map((r) => r.trim().toLowerCase()).filter((r) => r.length > 0) || [];
+    if (targetRoles.length > 0) {
+      jobsWithMatches = jobsWithMatches.filter((j) => {
+        const title = (j.roleTitle || '').toLowerCase();
+        const aiTitle = (j.aiEnhancedTitle || '').toLowerCase();
+        return targetRoles.some((role) => title.includes(role) || aiTitle.includes(role));
+      });
+    }
+
+    // Filter by preferred experience levels (if set)
+    const expLevels = prefs?.experienceLevels?.filter(Boolean) || [];
+    if (expLevels.length > 0) {
+      jobsWithMatches = jobsWithMatches.filter((j) => {
+        const level = j.extractedFields?.seniorityLevel;
+        return level && expLevels.includes(level);
+      });
+    }
+
     // Resume-based intelligence: skills + location from the user's resume
     let resumeLocation: string | null = null;
     let userSkills: string[] = [];
@@ -263,10 +307,16 @@ export class DiscoverService {
     if (userSkills.length > 0) {
       jobsWithMatches = jobsWithMatches.map((j) => {
         if (j.match) return j;
-        const text = `${j.roleTitle || ''} ${j.companyName || ''} ${j.descriptionRaw || ''}`.toLowerCase();
+        const title = (j.roleTitle || '').toLowerCase();
+        const text = `${title} ${j.companyName || ''} ${j.descriptionRaw || ''}`.toLowerCase();
         const matchedSkills = userSkills.filter((s: string) => text.includes(s));
-        return { ...j, skillMatch: matchedSkills.length } as any;
-      }).filter((j: any) => j.match || (j.skillMatch ?? 0) >= 2);
+        const titleSkills = userSkills.filter((s: string) => title.includes(s));
+        return { ...j, skillMatch: matchedSkills.length, titleSkillMatch: titleSkills.length } as any;
+      }).filter((j: any) => {
+        if (j.match) return true;
+        // Require at least 3 skill mentions overall AND at least one in the title
+        return (j.skillMatch ?? 0) >= 3 && (j.titleSkillMatch ?? 0) >= 1;
+      });
     }
 
     // Location filter: preferredLocations from prefs, or infer from resume location
@@ -320,6 +370,24 @@ export class DiscoverService {
       { userId: new Types.ObjectId(userId) },
       { $addToSet: { hiddenJobIds: jobId } },
     ).exec();
+  }
+
+  async dismissJob(userId: string, jobId: string, dto: DismissJobDto): Promise<void> {
+    const now = new Date();
+    await this.prefsModel.updateOne(
+      { userId: new Types.ObjectId(userId) },
+      { $addToSet: { hiddenJobIds: jobId } },
+    ).exec();
+
+    await this.userSignalModel.create({
+      userId: new Types.ObjectId(userId),
+      jobListingId: new Types.ObjectId(jobId),
+      dismissReason: dto.reason as any,
+      weight: 1.0,
+      dismissedAt: now,
+    }).catch((err) =>
+      this.logger.debug(`UserSignal save failed (duplicate?): ${(err as Error).message}`),
+    );
   }
 
   async updateLastVisited(userId: string): Promise<void> {
