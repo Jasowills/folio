@@ -1,3 +1,4 @@
+import { useNavigate } from 'react-router-dom'
 import { ScoreRing } from '../ScoreRing'
 import { IconX } from '@tabler/icons-react'
 
@@ -8,9 +9,25 @@ interface MiniPrepPanelProps {
 }
 
 export default function MiniPrepPanel({ job, match, onClose }: MiniPrepPanelProps) {
+  const navigate = useNavigate()
   const matchedKeywords = match?.matchedKeywords || []
   const missingKeywords = match?.missingKeywords || []
   const sectionScores = match?.sectionScores || {}
+
+  const handleCoverLetter = () => {
+    onClose()
+    navigate(`/cover-letter/new?company=${encodeURIComponent(job.companyName)}&role=${encodeURIComponent(job.roleTitle)}&jobId=${job._id}`)
+  }
+
+  const handlePracticeInterview = () => {
+    onClose()
+    navigate('/interview/new', { state: { roleTitle: job.roleTitle, company: job.companyName } })
+  }
+
+  const handleResearchCompany = () => {
+    onClose()
+    navigate(`/research?company=${encodeURIComponent(job.companyName)}&url=${encodeURIComponent(job.applicationUrl || '')}`)
+  }
 
   return (
     <div className="fixed inset-0 z-50 bg-black/30 flex items-end sm:items-center justify-center">
@@ -62,13 +79,13 @@ export default function MiniPrepPanel({ job, match, onClose }: MiniPrepPanelProp
           {/* Action buttons */}
           <div className="space-y-2">
             <p className="label-uppercase text-muted mb-1">Preparation</p>
-            <button className="w-full px-4 py-2.5 text-sm font-medium bg-teal-light text-teal rounded-lg hover:bg-teal hover:text-white transition-colors text-left">
+            <button onClick={handleCoverLetter} className="w-full px-4 py-2.5 text-sm font-medium bg-teal-light text-teal rounded-lg hover:bg-teal hover:text-white transition-colors text-left">
               Generate cover letter for {job.companyName}
             </button>
-            <button className="w-full px-4 py-2.5 text-sm font-medium text-ink border border-border rounded-lg hover:bg-paper-dark transition-colors text-left">
+            <button onClick={handlePracticeInterview} className="w-full px-4 py-2.5 text-sm font-medium text-ink border border-border rounded-lg hover:bg-paper-dark transition-colors text-left">
               Practice interview for this role
             </button>
-            <button className="w-full px-4 py-2.5 text-sm font-medium text-ink border border-border rounded-lg hover:bg-paper-dark transition-colors text-left">
+            <button onClick={handleResearchCompany} className="w-full px-4 py-2.5 text-sm font-medium text-ink border border-border rounded-lg hover:bg-paper-dark transition-colors text-left">
               Research {job.companyName}
             </button>
           </div>

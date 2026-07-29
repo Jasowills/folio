@@ -626,7 +626,7 @@ export class AiService {
   ): Promise<string> {
     const url = `${this.ollamaBaseUrl}/chat/completions`;
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 30_000);
+    const timeout = setTimeout(() => controller.abort(), 60_000);
 
     const finish = () => clearTimeout(timeout);
 
