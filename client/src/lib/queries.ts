@@ -509,6 +509,114 @@ export function useUpdateFollowUp() {
   })
 }
 
+export interface Connection {
+  _id: string
+  firstName: string
+  lastName?: string
+  email?: string
+  companyName?: string
+  position?: string
+  connectedOn?: string
+  status: string
+}
+
+export interface ReferralMatch {
+  connectionId: string
+  firstName: string
+  lastName?: string
+  position?: string
+  companyName?: string
+  matchedJobs: Array<{ jobId: string; roleTitle: string; companyName: string }>
+}
+
+export interface ReferralRequest {
+  _id: string
+  connectionId: string
+  jobListingId: string
+  draftMessage?: string
+  sentMessage?: string
+  status: 'draft' | 'sent' | 'replied' | 'declined'
+  sentAt?: string
+  createdAt: string
+}
+
+export function useImportConnections() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (file: File) => {
+      const form = new FormData()
+      form.append('file', file)
+      const { data } = await api.post('/referrals/import', form)
+      return data as { imported: number }
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['connections'] })
+    },
+  })
+}
+
+export function useConnections(company?: string, status?: string) {
+  const params = new URLSearchParams()
+  if (company) params.set('company', company)
+  if (status) params.set('status', status)
+  return useQuery({
+    queryKey: ['connections', company, status],
+    queryFn: async () => {
+      const { data } = await api.get(`/referrals/connections?${params}`)
+      return (data.data || data) as Connection[]
+    },
+  })
+}
+
+export function useFindReferrals(jobListingId?: string) {
+  const params = jobListingId ? `?jobListingId=${jobListingId}` : ''
+  return useQuery({
+    queryKey: ['referral-matches', jobListingId],
+    queryFn: async () => {
+      const { data } = await api.get(`/referrals/find${params}`)
+      return (data.data || data) as ReferralMatch[]
+    },
+  })
+}
+
+export function useGenerateReferralMessage() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (body: { connectionId: string; jobListingId: string }) => {
+      const { data } = await api.post('/referrals/requests/generate', body)
+      return (data.data || data) as ReferralRequest
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['referral-requests'] })
+    },
+  })
+}
+
+export function useReferralRequests(status?: string) {
+  const params = status ? `?status=${status}` : ''
+  return useQuery({
+    queryKey: ['referral-requests', status],
+    queryFn: async () => {
+      const { data } = await api.get(`/referrals/requests${params}`)
+      return (data.data || data) as ReferralRequest[]
+    },
+  })
+}
+
+export function useUpdateReferralRequest() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async ({ id, ...body }: { id: string; status?: string; sentMessage?: string; notes?: string }) => {
+      const { data } = await api.patch(`/referrals/requests/${id}`, body)
+      return (data.data || data) as ReferralRequest
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['referral-requests'] })
+      qc.invalidateQueries({ queryKey: ['referral-matches'] })
+    },
+  })
+}
+
 export interface CoverLetter {
   _id: string
   jobTitle: string

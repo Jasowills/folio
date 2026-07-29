@@ -19,6 +19,7 @@ import { BuilderModule } from './modules/builder/builder.module';
 import { AutoApplyModule } from './modules/auto-apply/auto-apply.module';
 import { JobsModule } from './modules/jobs/jobs.module';
 import { ResumeVariantsModule } from './modules/resumes/variants/resume-variants.module';
+import { ReferralsModule } from './modules/referrals/referrals.module';
 import { PerUserThrottlerGuard } from './common/guards/per-user-throttler.guard';
 
 @Module({
@@ -56,6 +57,7 @@ import { PerUserThrottlerGuard } from './common/guards/per-user-throttler.guard'
     AutoApplyModule,
     JobsModule,
     ResumeVariantsModule,
+    ReferralsModule,
   ],
   providers: [
     {
