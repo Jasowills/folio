@@ -1,9 +1,9 @@
-import { useState } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { ScoreRing } from '../ScoreRing'
-import { useTrackJob } from '../../lib/queries'
+import { useTrackJob, useDismissJob, useApplyOdds, type DismissReason } from '../../lib/queries'
 import MiniPrepPanel from './MiniPrepPanel'
 import { cn, decodeHtml, formatJobDescription, extractUrl } from '../../lib/utils'
-import { IconX, IconCircleCheck, IconExternalLink, IconMapPin, IconClock } from '@tabler/icons-react'
+import { IconX, IconCircleCheck, IconExternalLink, IconMapPin, IconClock, IconInfoCircle } from '@tabler/icons-react'
 
 const SOURCE_ABBREV: Record<string, string> = {
   greenhouse: 'GH',
@@ -27,15 +27,18 @@ const SOURCE_ABBREV: Record<string, string> = {
 
 interface JobCardProps {
   job: any
-  onHide: () => void
   onTracked: () => void
   onSelect?: () => void
 }
 
-export default function JobCard({ job, onHide, onTracked, onSelect }: JobCardProps) {
+export default function JobCard({ job, onTracked, onSelect }: JobCardProps) {
   const trackJob = useTrackJob()
+  const dismissJob = useDismissJob()
   const [showPrep, setShowPrep] = useState(false)
   const [hidden, setHidden] = useState(false)
+  const [showDismissOptions, setShowDismissOptions] = useState(false)
+  const [showExplanation, setShowExplanation] = useState(false)
+  const dismissRef = useRef<HTMLDivElement>(null)
 
   const match = job.match
   const score = match?.atsScore ?? 0
@@ -50,13 +53,33 @@ export default function JobCard({ job, onHide, onTracked, onSelect }: JobCardPro
   const domain = job.companyName?.toLowerCase().replace(/\s+/g, '') || ''
   const logoUrl = `https://logo.clearbit.com/${domain}.com`
 
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (dismissRef.current && !dismissRef.current.contains(e.target as Node)) {
+        setShowDismissOptions(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [])
+
+  const DISMISS_REASONS: { value: DismissReason; label: string }[] = [
+    { value: 'wrong_domain', label: 'Wrong domain' },
+    { value: 'bad_seniority', label: 'Wrong level' },
+    { value: 'wrong_location', label: 'Wrong location' },
+    { value: 'salary_too_low', label: 'Salary too low' },
+    { value: 'not_interested', label: 'Not interested' },
+    { value: 'other', label: 'Other' },
+  ]
+
   const handleTrack = () => {
     trackJob.mutate({ jobListingId: job._id }, { onSuccess: onTracked })
   }
 
-  const handleHide = () => {
+  const handleDismiss = (reason: DismissReason) => {
     setHidden(true)
-    onHide()
+    setShowDismissOptions(false)
+    dismissJob.mutate({ jobId: job._id, reason })
     setTimeout(() => setHidden(false), 5000)
   }
 
@@ -120,7 +143,25 @@ export default function JobCard({ job, onHide, onTracked, onSelect }: JobCardPro
               <p className="text-sm font-semibold text-ink leading-snug truncate">{job.roleTitle}</p>
             </div>
             {score > 0 ? (
-              <ScoreRing score={score} size={40} strokeWidth={4} scoreClassName="font-display font-bold text-[10px]" />
+              <div className="relative shrink-0">
+                <ScoreRing score={score} size={40} strokeWidth={4} scoreClassName="font-display font-bold text-[10px]" />
+                {match?.confidenceExplanation && (
+                  <button
+                    onClick={(e) => { e.stopPropagation(); setShowExplanation(!showExplanation) }}
+                    className="absolute -top-1 -right-1 text-muted hover:text-ink transition-colors"
+                  >
+                    <IconInfoCircle className="h-3 w-3" />
+                  </button>
+                )}
+                {showExplanation && match?.confidenceExplanation && (
+                  <div className="absolute top-full right-0 mt-1 z-20 bg-surface border border-border rounded-lg shadow-lg p-2.5 w-56 text-[11px] text-muted leading-relaxed"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    {match.confidenceExplanation}
+                    <div className="mt-1.5 text-teal font-medium">{match.matchIntelligenceLine}</div>
+                  </div>
+                )}
+              </div>
             ) : (
               <div className="h-10 w-10 rounded-full border-2 border-border flex items-center justify-center text-[10px] text-muted-light font-medium shrink-0">
                 ?
@@ -175,6 +216,11 @@ export default function JobCard({ job, onHide, onTracked, onSelect }: JobCardPro
           {isExpired && !job.isTracked && (
             <p className="text-[11px] text-muted mb-2">This listing may no longer be active</p>
           )}
+
+          {/* Apply odds badge */}
+          {job._id && (
+            <ApplyOddsBadge jobId={job._id} />
+          )}
         </div>
 
         {/* Action row */}
@@ -211,13 +257,30 @@ export default function JobCard({ job, onHide, onTracked, onSelect }: JobCardPro
             Prep
           </button>
 
-          <button
-            onClick={(e) => { e.stopPropagation(); handleHide() }}
-            className="ml-auto p-1.5 text-muted hover:text-ink transition-colors rounded-lg hover:bg-paper-dark"
-            title="Hide"
-          >
-            <IconX className="h-3.5 w-3.5" />
-          </button>
+          <div ref={dismissRef} className="relative ml-auto">
+            <button
+              onClick={(e) => { e.stopPropagation(); setShowDismissOptions(!showDismissOptions) }}
+              className="p-1.5 text-muted hover:text-ink transition-colors rounded-lg hover:bg-paper-dark"
+              title="Dismiss"
+            >
+              <IconX className="h-3.5 w-3.5" />
+            </button>
+            {showDismissOptions && (
+              <div className="absolute top-full right-0 mt-1 z-20 bg-surface border border-border rounded-lg shadow-lg py-1 min-w-[140px]"
+                onClick={(e) => e.stopPropagation()}
+              >
+                {DISMISS_REASONS.map((r) => (
+                  <button
+                    key={r.value}
+                    onClick={() => handleDismiss(r.value)}
+                    className="block w-full text-left px-3 py-1.5 text-xs text-ink hover:bg-paper-dark transition-colors"
+                  >
+                    {r.label}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
@@ -242,6 +305,27 @@ function getTimeSince(date: Date): string {
   const days = Math.floor(hours / 24)
   if (days < 7) return `${days}d ago`
   return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+}
+
+const RECOMMENDATION_STYLES: Record<string, { label: string; bg: string; text: string }> = {
+  strong_apply: { label: 'Strong Match', bg: 'bg-success-light', text: 'text-success' },
+  apply: { label: 'Apply', bg: 'bg-teal-light', text: 'text-teal' },
+  long_shot: { label: 'Long Shot', bg: 'bg-amber-light', text: 'text-amber' },
+  skip: { label: 'Skip', bg: 'bg-danger-light', text: 'text-danger' },
+}
+
+function ApplyOddsBadge({ jobId }: { jobId: string }) {
+  const { data: odds, isLoading } = useApplyOdds(jobId)
+  if (isLoading || !odds) return null
+
+  const style = RECOMMENDATION_STYLES[odds.recommendation]
+  if (!style) return null
+
+  return (
+    <div className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-semibold ${style.bg} ${style.text} mb-2`}>
+      {style.label}
+    </div>
+  )
 }
 
 function formatSalary(min: number, max: number | null, currency: string | null): string {

@@ -721,6 +721,7 @@ export interface DiscoverFeedJob {
     missingKeywords: string[]
     sectionScores: Record<string, number>
     matchIntelligenceLine: string
+    confidenceExplanation?: string
   } | null
   isTracked: boolean
 }
@@ -741,6 +742,8 @@ export interface FeedFilters {
   excludeRejected?: boolean
   sort?: 'relevance' | 'newest' | 'salary'
   techRelevance?: 'tech' | 'non-tech' | 'all'
+  excludedRoleFamilies?: string[]
+  excludedSeniorities?: string[]
 }
 
 export function useDiscoverFeed(filters: FeedFilters, cursor?: string) {
@@ -761,6 +764,28 @@ export function useDiscoverFeed(filters: FeedFilters, cursor?: string) {
       const { data } = await api.get(`/discover/feed?${params}`)
       return (data.data || data) as DiscoverFeedResponse
     },
+  })
+}
+
+export interface ApplyOddsAssessment {
+  _id: string
+  jobId: string
+  atsScore: number | null
+  listingAgeDays: number | null
+  estimatedCompetitionLevel: 'low' | 'medium' | 'high' | 'unknown'
+  recommendation: 'strong_apply' | 'apply' | 'long_shot' | 'skip'
+  reasoningNotes: string[]
+  generatedAt: string
+}
+
+export function useApplyOdds(jobId: string) {
+  return useQuery({
+    queryKey: ['apply-odds', jobId],
+    queryFn: async () => {
+      const { data } = await api.get(`/jobs/${jobId}/apply-odds`)
+      return (data.data || data) as ApplyOddsAssessment
+    },
+    staleTime: 5 * 60 * 1000,
   })
 }
 
@@ -787,6 +812,8 @@ export interface DiscoverPreferences {
   preferredLocations: string[]
   isRemoteOnly: boolean
   experienceLevels: string[]
+  excludedRoleFamilies: string[]
+  excludedSeniorities: string[]
   minimumMatchScore: number
   excludeApplied: boolean
   excludeRejected: boolean
@@ -824,6 +851,20 @@ export function useHideJob() {
   return useMutation({
     mutationFn: async (jobId: string) => {
       await api.post(`/discover/hide/${jobId}`)
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['discover-feed'] })
+    },
+  })
+}
+
+export type DismissReason = 'bad_seniority' | 'wrong_domain' | 'wrong_location' | 'not_interested' | 'salary_too_low' | 'other'
+
+export function useDismissJob() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async ({ jobId, reason }: { jobId: string; reason: DismissReason }) => {
+      await api.post(`/discover/dismiss/${jobId}`, { reason })
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['discover-feed'] })
@@ -923,6 +964,193 @@ export function useTrackerStats() {
     queryFn: async () => {
       const { data } = await api.get('/discover/tracker/stats')
       return (data.data || data) as TrackerStats
+    },
+  })
+}
+
+// ─── Auto-Apply ────────────────────────────────────────────
+
+export interface ApplyField {
+  fieldName: string
+  fieldValue: string
+  autoFilled: boolean
+  editable: boolean
+}
+
+export interface ActivityLogEntry {
+  action: string
+  timestamp: string
+}
+
+export interface ApplySubmission {
+  _id: string
+  userId: string
+  jobListingId: string | { _id: string; companyName: string; roleTitle: string; applicationUrl?: string }
+  resumeId: string
+  coverLetterId?: string
+  status: 'approved' | 'filling' | 'ready_for_review' | 'submitted' | 'failed'
+  atsPlatform: string
+  applicationUrl: string
+  filledFields?: ApplyField[]
+  failureReason?: string
+  submittedAt?: string
+  retryCount: number
+  activityLog: ActivityLogEntry[]
+  createdAt: string
+  updatedAt: string
+}
+
+export interface AnswersBankEntry {
+  _id: string
+  userId: string
+  normalizedQuestion: string
+  originalQuestion: string
+  answer: string
+  category: 'visa' | 'salary' | 'notice_period' | 'location' | 'sponsorship' | 'generic'
+  hitCount: number
+  lastUsedAt?: string
+}
+
+export interface AutoApplyConfig {
+  _id: string
+  userId: string
+  autoAttachCoverLetter: boolean
+  maxConcurrentSubmissions: number
+  requirePreviewApproval: boolean
+  defaultAnswers?: Record<string, string>
+}
+
+export function useAutoApplySubmissions() {
+  return useQuery({
+    queryKey: ['auto-apply-submissions'],
+    queryFn: async () => {
+      const { data } = await api.get('/auto-apply')
+      return (data.data || data) as ApplySubmission[]
+    },
+  })
+}
+
+export function useAutoApplySubmission(submissionId: string | undefined) {
+  return useQuery({
+    queryKey: ['auto-apply-submission', submissionId],
+    queryFn: async () => {
+      const { data } = await api.get(`/auto-apply/${submissionId}`)
+      return (data.data || data) as ApplySubmission
+    },
+    enabled: !!submissionId,
+  })
+}
+
+export function useApproveJobs() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (body: { jobIds: string[]; resumeId: string; coverLetter?: boolean }) => {
+      const { data } = await api.post('/auto-apply/approve', body)
+      return (data.data || data) as ApplySubmission[]
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['auto-apply-submissions'] })
+    },
+  })
+}
+
+export function useFillApplication() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (submissionId: string) => {
+      const { data } = await api.post(`/auto-apply/${submissionId}/fill`)
+      return (data.data || data) as ApplySubmission
+    },
+    onSuccess: (result) => {
+      qc.invalidateQueries({ queryKey: ['auto-apply-submission', result._id] })
+      qc.invalidateQueries({ queryKey: ['auto-apply-submissions'] })
+    },
+  })
+}
+
+export function useConfirmSubmission() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async ({ submissionId, updatedFields }: { submissionId: string; updatedFields?: { fieldName: string; fieldValue: string }[] }) => {
+      const { data } = await api.post(`/auto-apply/${submissionId}/confirm`, { updatedFields })
+      return (data.data || data) as ApplySubmission
+    },
+    onSuccess: (result) => {
+      qc.invalidateQueries({ queryKey: ['auto-apply-submission', result._id] })
+      qc.invalidateQueries({ queryKey: ['auto-apply-submissions'] })
+      qc.invalidateQueries({ queryKey: ['tracker'] })
+    },
+  })
+}
+
+export function useRetrySubmission() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (submissionId: string) => {
+      const { data } = await api.post(`/auto-apply/${submissionId}/retry`)
+      return (data.data || data) as ApplySubmission
+    },
+    onSuccess: (result) => {
+      qc.invalidateQueries({ queryKey: ['auto-apply-submission', result._id] })
+      qc.invalidateQueries({ queryKey: ['auto-apply-submissions'] })
+    },
+  })
+}
+
+export function useAnswersBank() {
+  return useQuery({
+    queryKey: ['answers-bank'],
+    queryFn: async () => {
+      const { data } = await api.get('/auto-apply/answers')
+      return (data.data || data) as AnswersBankEntry[]
+    },
+  })
+}
+
+export function useStoreAnswer() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (body: { question: string; answer: string; category: string }) => {
+      const { data } = await api.post('/auto-apply/answers', body)
+      return (data.data || data) as AnswersBankEntry
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['answers-bank'] })
+    },
+  })
+}
+
+export function useDeleteAnswer() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (answerId: string) => {
+      await api.delete(`/auto-apply/answers/${answerId}`)
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['answers-bank'] })
+    },
+  })
+}
+
+export function useAutoApplyConfig() {
+  return useQuery({
+    queryKey: ['auto-apply-config'],
+    queryFn: async () => {
+      const { data } = await api.get('/auto-apply/config')
+      return (data.data || data) as AutoApplyConfig | null
+    },
+  })
+}
+
+export function useUpdateAutoApplyConfig() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (body: Partial<AutoApplyConfig>) => {
+      const { data } = await api.patch('/auto-apply/config', body)
+      return (data.data || data) as AutoApplyConfig
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['auto-apply-config'] })
     },
   })
 }

@@ -16,6 +16,8 @@ import { InterviewsModule } from './modules/interviews/interviews.module';
 import { ResearchModule } from './modules/research/research.module';
 import { DiscoverModule } from './modules/discover/discover.module';
 import { BuilderModule } from './modules/builder/builder.module';
+import { AutoApplyModule } from './modules/auto-apply/auto-apply.module';
+import { JobsModule } from './modules/jobs/jobs.module';
 import { PerUserThrottlerGuard } from './common/guards/per-user-throttler.guard';
 
 @Module({
@@ -50,6 +52,8 @@ import { PerUserThrottlerGuard } from './common/guards/per-user-throttler.guard'
     ResearchModule,
     DiscoverModule,
     BuilderModule,
+    AutoApplyModule,
+    JobsModule,
   ],
   providers: [
     {
