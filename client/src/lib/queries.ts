@@ -617,6 +617,158 @@ export function useUpdateReferralRequest() {
   })
 }
 
+export interface Offer {
+  _id: string
+  companyName: string
+  roleTitle: string
+  location?: string
+  baseSalary?: number
+  equityValue?: number
+  bonusPercent?: number
+  benefits?: string[]
+  deadline?: string
+  status: string
+  targetBaseSalary?: number
+  notes?: string
+  createdAt: string
+}
+
+export interface Negotiation {
+  _id: string
+  offerId: string
+  strategy?: string
+  script?: string
+  fallbackScript?: string
+  benchmarkData?: {
+    baseSalaryP10?: number
+    baseSalaryP25?: number
+    baseSalaryP50?: number
+    baseSalaryP75?: number
+    baseSalaryP90?: number
+    equityRange?: string
+  }
+  pitchPoints?: string
+  confidence?: string
+  stage: string
+  outcome?: string
+  createdAt: string
+}
+
+export function useOffers() {
+  return useQuery({
+    queryKey: ['offers'],
+    queryFn: async () => {
+      const { data } = await api.get('/salary/offers')
+      return (data.data || data) as Offer[]
+    },
+  })
+}
+
+export function useOffer(id: string | null) {
+  return useQuery({
+    queryKey: ['offer', id],
+    queryFn: async () => {
+      const { data } = await api.get(`/salary/offers/${id}`)
+      return (data.data || data) as Offer
+    },
+    enabled: !!id,
+  })
+}
+
+export function useCreateOffer() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (body: {
+      companyName: string
+      roleTitle: string
+      location?: string
+      baseSalary?: number
+      equityValue?: number
+      bonusPercent?: number
+      benefits?: string[]
+      deadline?: string
+      targetBaseSalary?: number
+    }) => {
+      const { data } = await api.post('/salary/offers', body)
+      return (data.data || data) as Offer
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['offers'] }),
+  })
+}
+
+export function useUpdateOffer() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async ({ id, ...body }: { id: string } & Partial<Offer>) => {
+      const { data } = await api.patch(`/salary/offers/${id}`, body)
+      return (data.data || data) as Offer
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['offers'] })
+      qc.invalidateQueries({ queryKey: ['offer'] })
+    },
+  })
+}
+
+export function useDeleteOffer() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (id: string) => {
+      await api.delete(`/salary/offers/${id}`)
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['offers'] }),
+  })
+}
+
+export function useGenerateStrategy() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (offerId: string) => {
+      const { data } = await api.post(`/salary/offers/${offerId}/strategy`)
+      return (data.data || data) as Negotiation
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['negotiation'] })
+      qc.invalidateQueries({ queryKey: ['negotiations'] })
+    },
+  })
+}
+
+export function useNegotiation(offerId: string | null) {
+  return useQuery({
+    queryKey: ['negotiation', offerId],
+    queryFn: async () => {
+      const { data } = await api.get(`/salary/offers/${offerId}/negotiation`)
+      return (data.data || data) as Negotiation | null
+    },
+    enabled: !!offerId,
+  })
+}
+
+export function useUpdateNegotiation() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async ({ offerId, ...body }: { offerId: string; script?: string; stage?: string; outcome?: string }) => {
+      const { data } = await api.patch(`/salary/offers/${offerId}/negotiation`, body)
+      return (data.data || data) as Negotiation
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['negotiation'] })
+      qc.invalidateQueries({ queryKey: ['negotiations'] })
+    },
+  })
+}
+
+export function useAllNegotiations() {
+  return useQuery({
+    queryKey: ['negotiations'],
+    queryFn: async () => {
+      const { data } = await api.get('/salary/negotiations')
+      return (data.data || data) as Negotiation[]
+    },
+  })
+}
+
 export interface CoverLetter {
   _id: string
   jobTitle: string
