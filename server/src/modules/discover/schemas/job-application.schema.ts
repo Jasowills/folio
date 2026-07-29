@@ -28,7 +28,9 @@ export class JobApplication {
   resumeId!: Types.ObjectId;
 
   @Prop({ required: true, enum: [
-    'saved', 'tailoring', 'applied', 'phone_screen',
+    'saved', 'tailoring', 'approved', 'filling',
+    'ready_for_review', 'submitted', 'failed',
+    'applied', 'phone_screen',
     'technical', 'final_round', 'offer', 'accepted',
     'rejected', 'ghosted',
   ], default: 'saved' })
@@ -42,6 +44,9 @@ export class JobApplication {
 
   @Prop()
   researchBriefId?: string;
+
+  @Prop()
+  resumeVariantId?: string;
 
   @Prop()
   appliedAt?: Date;

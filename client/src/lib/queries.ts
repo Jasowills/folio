@@ -304,6 +304,104 @@ export function useDeleteResume() {
   })
 }
 
+export interface ResumeContentDiff {
+  addedSections?: string[]
+  removedSections?: string[]
+  reorderedSections?: string[]
+  modifiedBullets?: Array<{ sectionId: string; bulletIndex: number; before: string; after: string }>
+  summaryChange?: { before: string; after: string }
+  skillsChange?: { added: string[]; removed: string[]; reordered: boolean }
+}
+
+export interface ResumeVariant {
+  _id: string
+  baseResumeId: string
+  templateId: string
+  contentDiff: ResumeContentDiff
+  tailoredForJobId?: string
+  label?: string
+  createdAt: string
+}
+
+export function useCreateVariant() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async ({
+      baseResumeId, tailoredData, templateId, tailoredForJobId, label,
+    }: {
+      baseResumeId: string
+      tailoredData: Record<string, unknown>
+      templateId: string
+      tailoredForJobId?: string
+      label?: string
+    }) => {
+      const { data } = await api.post(`/resumes/${baseResumeId}/variants`, {
+        tailoredData, templateId, tailoredForJobId, label,
+      })
+      return (data.data || data) as ResumeVariant
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['resume-variants'] })
+    },
+  })
+}
+
+export function useVariants(baseResumeId: string) {
+  return useQuery({
+    queryKey: ['resume-variants', baseResumeId],
+    queryFn: async () => {
+      const { data } = await api.get(`/resumes/${baseResumeId}/variants`)
+      return (data.data || data) as ResumeVariant[]
+    },
+    enabled: !!baseResumeId,
+  })
+}
+
+export function useVariantRender(variantId: string | null) {
+  return useQuery({
+    queryKey: ['variant-render', variantId],
+    queryFn: async () => {
+      const { data } = await api.get(`/resume-variants/${variantId}/render`)
+      return (data.data || data) as Record<string, unknown>
+    },
+    enabled: !!variantId,
+  })
+}
+
+export function useVariantDiff(variantId: string | null, compareToId: string) {
+  return useQuery({
+    queryKey: ['variant-diff', variantId, compareToId],
+    queryFn: async () => {
+      const { data } = await api.get(`/resume-variants/${variantId}/diff/${compareToId}`)
+      return (data.data || data) as {
+        before: Record<string, unknown>
+        after: Record<string, unknown>
+        diff: ResumeContentDiff
+      }
+    },
+    enabled: !!variantId,
+  })
+}
+
+export function useVariantPerformance() {
+  return useQuery({
+    queryKey: ['variant-performance'],
+    queryFn: async () => {
+      const { data } = await api.get('/resume-variants/performance')
+      return (data.data || data) as Array<{
+        variantId: string
+        label?: string
+        templateId: string
+        totalSent: number
+        responseCount: number
+        interviewCount: number
+        responseRate: number
+        sampleSizeWarning: boolean
+      }>
+    },
+  })
+}
+
 export interface AtsResult {
   _id: string
   score: number
