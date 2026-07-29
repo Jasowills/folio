@@ -12,6 +12,9 @@ import { InterviewSession, InterviewSessionSchema } from './schemas/interview-se
 import { InterviewTranscript, InterviewTranscriptSchema } from './schemas/interview-transcript.schema'
 import { InterviewProctoring, InterviewProctoringSchema } from './schemas/interview-proctoring.schema'
 import { InterviewResult, InterviewResultSchema } from './schemas/interview-result.schema'
+import { FollowUp, FollowUpSchema } from './schemas/follow-up.schema'
+import { FollowUpController } from './follow-up.controller'
+import { FollowUpService } from './follow-up.service'
 import { Resume, ResumeSchema } from '../resumes/schemas/resume.schema'
 
 @Module({
@@ -21,13 +24,14 @@ import { Resume, ResumeSchema } from '../resumes/schemas/resume.schema'
       { name: InterviewTranscript.name, schema: InterviewTranscriptSchema },
       { name: InterviewProctoring.name, schema: InterviewProctoringSchema },
       { name: InterviewResult.name, schema: InterviewResultSchema },
+      { name: FollowUp.name, schema: FollowUpSchema },
       { name: Resume.name, schema: ResumeSchema },
     ]),
     AiModule,
     ResumesModule,
   ],
-  controllers: [InterviewsController],
-  providers: [InterviewsService, InterviewsGateway, DeepgramService, CompanyResearchService, PistonService],
+  controllers: [InterviewsController, FollowUpController],
+  providers: [InterviewsService, InterviewsGateway, DeepgramService, CompanyResearchService, PistonService, FollowUpService],
   exports: [InterviewsService],
 })
 export class InterviewsModule {}

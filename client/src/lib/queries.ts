@@ -451,6 +451,64 @@ export function useAtsResult(id: string | null) {
   })
 }
 
+export interface FollowUp {
+  _id: string
+  sessionId: string
+  recipientName?: string
+  companyName?: string
+  role?: string
+  status: 'draft' | 'generated' | 'edited' | 'sent' | 'replied'
+  draftContent?: string
+  sentContent?: string
+  sentAt?: string
+  repliedAt?: string
+  createdAt: string
+}
+
+export function useFollowUps(sessionId: string | null) {
+  return useQuery({
+    queryKey: ['follow-ups', sessionId],
+    queryFn: async () => {
+      const { data } = await api.get(`/interviews/sessions/${sessionId}/follow-ups`)
+      return (data.data || data) as FollowUp[]
+    },
+    enabled: !!sessionId,
+  })
+}
+
+export function useGenerateFollowUp() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (sessionId: string) => {
+      const { data } = await api.post(`/interviews/sessions/${sessionId}/follow-ups/generate`)
+      return (data.data || data) as FollowUp
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['follow-ups'] })
+    },
+  })
+}
+
+export function useUpdateFollowUp() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async ({
+      id, draftContent, status, sentContent,
+    }: {
+      id: string
+      draftContent?: string
+      status?: string
+      sentContent?: string
+    }) => {
+      const { data } = await api.patch(`/interviews/follow-ups/${id}`, { draftContent, status, sentContent })
+      return (data.data || data) as FollowUp
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['follow-ups'] })
+    },
+  })
+}
+
 export interface CoverLetter {
   _id: string
   jobTitle: string
