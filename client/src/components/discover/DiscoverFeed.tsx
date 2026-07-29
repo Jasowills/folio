@@ -1,5 +1,5 @@
 import { useState, useRef } from 'react'
-import { useDiscoverFeed, useDiscoverFeedStats, useDiscoverPreferences, useHideJob, useResumes, useUploadResume } from '../../lib/queries'
+import { useDiscoverFeed, useDiscoverFeedStats, useDiscoverPreferences, useResumes, useUploadResume, useApproveJobs } from '../../lib/queries'
 import JobCard from './JobCard'
 import EmptyStates from './EmptyStates'
 import FeedJobDetailsPanel from './FeedJobDetailsPanel'
@@ -21,13 +21,15 @@ const SOURCE_OPTIONS = [
   { value: 'wellfound', label: 'Wellfound' },
   { value: 'builtin', label: 'Built In' },
   { value: 'techtree', label: 'TechTree' },
+  { value: 'ashby', label: 'Ashby' },
+  { value: 'icims', label: 'iCIMS' },
+  { value: 'smartrecruiters', label: 'SmartRecruiters' },
 ]
 
 export default function DiscoverFeed() {
   const { data: prefs } = useDiscoverPreferences()
   const { data: feedStats } = useDiscoverFeedStats()
   const { data: resumes } = useResumes()
-  const hideJob = useHideJob()
   const uploadResume = useUploadResume()
   const fileInputRef = useRef<HTMLInputElement>(null)
 
@@ -46,9 +48,15 @@ export default function DiscoverFeed() {
   const selectedResume = resumes?.find((r) => r._id === prefs?.resumeId) || resumes?.[0]
   const detectedRole = selectedResume?.detectedRole?.role ? decodeHtml(selectedResume.detectedRole.role).trim() : null
   const hasNoResume = resumes?.length === 0 || (!prefs?.resumeId && resumes?.length === 0)
+  const approveJobs = useApproveJobs()
 
   const handleUploadResume = () => {
     fileInputRef.current?.click()
+  }
+
+  const handleApproveJob = (jobId: string) => {
+    if (!selectedResume) return
+    approveJobs.mutate({ jobIds: [jobId], resumeId: selectedResume._id })
   }
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -226,9 +234,10 @@ export default function DiscoverFeed() {
           <JobCard
             key={job._id}
             job={job}
-            onHide={() => hideJob.mutate(job._id)}
             onTracked={() => {}}
             onSelect={() => setSelectedJob(job)}
+            onApprove={selectedResume ? handleApproveJob : undefined}
+            approvePending={approveJobs.isPending}
           />
         )))}
 

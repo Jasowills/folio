@@ -3,7 +3,7 @@ import { ScoreRing } from '../ScoreRing'
 import { useTrackJob, useDismissJob, useApplyOdds, type DismissReason } from '../../lib/queries'
 import MiniPrepPanel from './MiniPrepPanel'
 import { cn, decodeHtml, formatJobDescription, extractUrl } from '../../lib/utils'
-import { IconX, IconCircleCheck, IconExternalLink, IconMapPin, IconClock, IconInfoCircle } from '@tabler/icons-react'
+import { IconX, IconCircleCheck, IconExternalLink, IconMapPin, IconClock, IconInfoCircle, IconSend } from '@tabler/icons-react'
 
 const SOURCE_ABBREV: Record<string, string> = {
   greenhouse: 'GH',
@@ -29,9 +29,11 @@ interface JobCardProps {
   job: any
   onTracked: () => void
   onSelect?: () => void
+  onApprove?: (jobId: string) => void
+  approvePending?: boolean
 }
 
-export default function JobCard({ job, onTracked, onSelect }: JobCardProps) {
+export default function JobCard({ job, onTracked, onSelect, onApprove, approvePending }: JobCardProps) {
   const trackJob = useTrackJob()
   const dismissJob = useDismissJob()
   const [showPrep, setShowPrep] = useState(false)
@@ -256,6 +258,17 @@ export default function JobCard({ job, onTracked, onSelect }: JobCardProps) {
           >
             Prep
           </button>
+
+          {onApprove && (
+            <button
+              onClick={(e) => { e.stopPropagation(); onApprove(job._id) }}
+              disabled={approvePending}
+              className="px-3 py-1.5 text-xs font-medium bg-ink text-paper rounded-lg hover:opacity-80 transition-opacity flex items-center gap-1 disabled:opacity-50"
+            >
+              <IconSend className="h-3 w-3" />
+              {approvePending ? '...' : 'Auto-Apply'}
+            </button>
+          )}
 
           <div ref={dismissRef} className="relative ml-auto">
             <button
