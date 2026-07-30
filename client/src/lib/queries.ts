@@ -1194,13 +1194,14 @@ export interface ApplyOddsAssessment {
   generatedAt: string
 }
 
-export function useApplyOdds(jobId: string) {
+export function useApplyOdds(jobId: string | undefined) {
   return useQuery({
     queryKey: ['apply-odds', jobId],
     queryFn: async () => {
       const { data } = await api.get(`/jobs/${jobId}/apply-odds`)
       return (data.data || data) as ApplyOddsAssessment
     },
+    enabled: !!jobId,
     staleTime: 5 * 60 * 1000,
   })
 }
@@ -1434,6 +1435,18 @@ export interface AutoApplyConfig {
   maxConcurrentSubmissions: number
   requirePreviewApproval: boolean
   defaultAnswers?: Record<string, string>
+  applicationStyle?: 'professional' | 'enthusiastic' | 'concise' | 'detailed' | 'technical'
+  availableFrom?: string
+  needsVisaSponsorship?: boolean
+  salaryExpectations?: string
+  preferredLocation?: string
+  willingToRelocate?: boolean
+  willingToTravel?: boolean
+  personalSummary?: string
+  linkedInUrl?: string
+  portfolioUrl?: string
+  githubUrl?: string
+  websiteUrl?: string
 }
 
 export function useAutoApplySubmissions() {
@@ -1567,6 +1580,189 @@ export function useUpdateAutoApplyConfig() {
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['auto-apply-config'] })
+    },
+  })
+}
+
+// ─── Auto-Apply Profile (Phase 2a) ───
+
+export interface AutoApplyProfile {
+  _id: string
+  userId: string
+  logisticsAnswers: {
+    availabilityToStart: 'immediately' | 'two_weeks' | 'one_month' | 'custom'
+    availabilityCustomNote?: string
+    visaSponsorshipNeeded: boolean
+    workAuthorizationStatus: string
+    willingToRelocate: boolean
+    relocationNotes?: string
+    desiredSalaryMin?: number
+    desiredSalaryMax?: number
+    salaryCurrency: string
+    remotePreference: 'remote_only' | 'hybrid_ok' | 'onsite_ok' | 'flexible'
+    noticePeriod?: string
+    hasNonCompete: boolean
+    nonCompeteNotes?: string
+  }
+  customQA: CustomQAEntry[]
+  applicationStyle: {
+    tone: 'formal' | 'professional_warm' | 'concise_direct' | 'enthusiastic'
+    lengthPreference: 'brief' | 'standard' | 'detailed'
+    writeInFirstPerson: boolean
+    avoidPhrases?: string[]
+    sampleAnswer?: string
+  }
+  completedRequiredSetup: boolean
+  lastUpdatedAt: string
+  wizardStep: number
+  createdAt: string
+  updatedAt: string
+}
+
+export interface CustomQAEntry {
+  _id: string
+  questionPattern: string
+  answerTemplate: string
+  isSensitive: boolean
+  createdAt: string
+}
+
+export interface CompletionStatus {
+  complete: boolean
+  missingFields: string[]
+}
+
+export function useAutoApplyProfile() {
+  return useQuery({
+    queryKey: ['auto-apply-profile'],
+    queryFn: async () => {
+      const { data } = await api.get('/auto-apply-profile')
+      return (data.data || data) as AutoApplyProfile
+    },
+  })
+}
+
+export function useUpdateLogistics() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (body: AutoApplyProfile['logisticsAnswers']) => {
+      const { data } = await api.put('/auto-apply-profile/logistics', body)
+      return (data.data || data) as AutoApplyProfile
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['auto-apply-profile'] })
+    },
+  })
+}
+
+export function useUpdateStyle() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (body: AutoApplyProfile['applicationStyle']) => {
+      const { data } = await api.put('/auto-apply-profile/style', body)
+      return (data.data || data) as AutoApplyProfile
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['auto-apply-profile'] })
+    },
+  })
+}
+
+export function useCreateCustomQa() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (body: { questionPattern: string; answerTemplate: string; isSensitive?: boolean }) => {
+      const { data } = await api.post('/auto-apply-profile/custom-qa', body)
+      return (data.data || data) as AutoApplyProfile
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['auto-apply-profile'] })
+    },
+  })
+}
+
+export function useUpdateCustomQa() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async ({ qaId, ...body }: { qaId: string; questionPattern?: string; answerTemplate?: string; isSensitive?: boolean }) => {
+      const { data } = await api.patch(`/auto-apply-profile/custom-qa/${qaId}`, body)
+      return (data.data || data) as AutoApplyProfile
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['auto-apply-profile'] })
+    },
+  })
+}
+
+export function useDeleteCustomQa() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (qaId: string) => {
+      await api.delete(`/auto-apply-profile/custom-qa/${qaId}`)
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['auto-apply-profile'] })
+    },
+  })
+}
+
+export function useCompletionStatus() {
+  return useQuery({
+    queryKey: ['auto-apply-profile', 'completion-status'],
+    queryFn: async () => {
+      const { data } = await api.get('/auto-apply-profile/completion-status')
+      return (data.data || data) as CompletionStatus
+    },
+  })
+}
+
+export function useUpdateWizardStep() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (step: number) => {
+      const { data } = await api.put('/auto-apply-profile/wizard-step', { step })
+      return (data.data || data) as AutoApplyProfile
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['auto-apply-profile'] })
+    },
+  })
+}
+
+// ─── Company Verification ──────────────────────────────────
+
+export interface CompanyVerificationInput {
+  companyName: string
+  roleTitle: string
+  recruiterEmail?: string
+  recruiterName?: string
+  sourcePlatform?: string
+  emailBody?: string
+  claimedLocation?: string
+}
+
+export interface VerificationEvidence {
+  claim: string
+  source: string
+}
+
+export interface VerificationFlag {
+  type: 'identity_mismatch' | 'known_scam_pattern' | 'location_mismatch' | 'presence_check' | 'other'
+  summary: string
+  evidence: VerificationEvidence[]
+}
+
+export interface CompanyVerificationResult {
+  riskLevel: 'low' | 'medium' | 'high' | 'unknown'
+  flags: VerificationFlag[]
+  recommendation: string
+}
+
+export function useVerifyCompany() {
+  return useMutation({
+    mutationFn: async (input: CompanyVerificationInput) => {
+      const { data } = await api.post('/company-verification/verify', input)
+      return (data.data || data) as CompanyVerificationResult
     },
   })
 }

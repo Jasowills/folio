@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { NavLink, useLocation, useNavigate } from 'react-router-dom'
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu'
-import { IconLayoutDashboard, IconFileText, IconTargetArrow, IconMail, IconGlobe, IconMessage, IconFlask, IconChevronDown, IconSettings, IconLogout, IconMenu2, IconX, IconCompass } from '@tabler/icons-react'
+import { IconLayoutDashboard, IconFileText, IconTargetArrow, IconMail, IconGlobe, IconMessage, IconFlask, IconChevronDown, IconSettings, IconLogout, IconMenu2, IconX, IconCompass, IconSend } from '@tabler/icons-react'
 import { useAuth } from '../../hooks/useAuth'
 import { useResumes, useDiscoverFeedStats } from '../../lib/queries'
 import { cn } from '../../lib/utils'
@@ -17,6 +17,7 @@ const navGroups = [
     label: 'Jobs',
     items: [
       { to: '/discover/feed', label: 'Discover', icon: IconCompass },
+      { to: '/auto-apply', label: 'Auto-Apply', icon: IconSend },
       { to: '/research', label: 'Research', icon: IconFlask },
     ],
   },

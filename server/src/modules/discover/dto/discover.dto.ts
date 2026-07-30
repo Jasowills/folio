@@ -1,5 +1,5 @@
 import { Type, Transform } from 'class-transformer';
-import { IsArray, IsBoolean, IsNumber, IsObject, IsOptional, IsString, Min, Max } from 'class-validator';
+import { IsArray, IsBoolean, IsNumber, IsObject, IsOptional, IsString, Min, Max, IsIn } from 'class-validator';
 
 export class UpsertPreferencesDto {
   @IsArray()
@@ -25,6 +25,16 @@ export class UpsertPreferencesDto {
   @IsOptional()
   experienceLevels?: string[];
 
+  @IsArray()
+  @IsString({ each: true })
+  @IsOptional()
+  excludedRoleFamilies?: string[];
+
+  @IsArray()
+  @IsString({ each: true })
+  @IsOptional()
+  excludedSeniorities?: string[];
+
   @IsNumber()
   @Min(0)
   @Max(100)
@@ -47,6 +57,12 @@ export class UpsertPreferencesDto {
   @IsString({ each: true })
   @IsOptional()
   enabledSources?: string[];
+}
+
+export class DismissJobDto {
+  @IsString()
+  @IsIn(['bad_seniority', 'wrong_domain', 'wrong_location', 'not_interested', 'salary_too_low', 'other'])
+  reason!: string;
 }
 
 export class TrackJobDto {
@@ -131,4 +147,16 @@ export class FeedQueryDto {
   @IsString()
   @IsOptional()
   techRelevance?: 'tech' | 'non-tech' | 'all';
+
+  @Transform(({ value }) => (typeof value === 'string' ? value.split(',').filter(Boolean) : value))
+  @IsArray()
+  @IsString({ each: true })
+  @IsOptional()
+  excludedRoleFamilies?: string[];
+
+  @Transform(({ value }) => (typeof value === 'string' ? value.split(',').filter(Boolean) : value))
+  @IsArray()
+  @IsString({ each: true })
+  @IsOptional()
+  excludedSeniorities?: string[];
 }

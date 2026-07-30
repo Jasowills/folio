@@ -263,27 +263,42 @@ export class DiscoverService {
     });
 
     const minScore = query.minScore ?? prefs?.minimumMatchScore;
+    let stage = jobsWithMatches.length;
     if (minScore !== undefined) {
+      const scoredCount = jobsWithMatches.filter((j) => j.match).length;
       jobsWithMatches = jobsWithMatches.filter((j) => !j.match || j.match.atsScore >= minScore);
+      console.log('[DiscoverService] afterScore filter', { before: stage, after: jobsWithMatches.length, minScore, scoredCount, passingScored: jobsWithMatches.filter((j) => j.match).length, exampleScores: jobsWithMatches.filter((j) => j.match).slice(0, 3).map((j) => ({ title: j.roleTitle, score: j.match.atsScore })) });
     }
 
-    // Filter by target roles (not applied at DB level to avoid $or conflicts with cursor)
+    // Filter by target roles — match on individual tokens, not just the full phrase
+    // e.g. "software engineer" matches "Backend Software Engineer" or "Full Stack Engineer"
     const targetRoles = prefs?.targetRoles?.filter(Boolean).map((r) => r.trim().toLowerCase()).filter((r) => r.length > 0) || [];
     if (targetRoles.length > 0) {
+      stage = jobsWithMatches.length;
+      const before = jobsWithMatches.length;
+      const roleTokens = targetRoles.flatMap((r) => r.split(/\s+/));
       jobsWithMatches = jobsWithMatches.filter((j) => {
         const title = (j.roleTitle || '').toLowerCase();
         const aiTitle = (j.aiEnhancedTitle || '').toLowerCase();
-        return targetRoles.some((role) => title.includes(role) || aiTitle.includes(role));
+        // Pass if whole phrase matches OR if most tokens appear in the title
+        const passesExact = targetRoles.some((role) => title.includes(role) || aiTitle.includes(role));
+        if (passesExact) return true;
+        const matches = roleTokens.filter((t) => title.includes(t) || aiTitle.includes(t)).length;
+        // Pass if at least half of the tokens appear in the title
+        return roleTokens.length > 0 && matches / roleTokens.length >= 0.5;
       });
+      console.log('[DiscoverService] afterRole filter', { before, after: jobsWithMatches.length, targetRoles, roleTokens });
     }
 
     // Filter by preferred experience levels (if set)
     const expLevels = prefs?.experienceLevels?.filter(Boolean) || [];
     if (expLevels.length > 0) {
+      stage = jobsWithMatches.length;
       jobsWithMatches = jobsWithMatches.filter((j) => {
         const level = j.extractedFields?.seniorityLevel;
         return level && expLevels.includes(level);
       });
+      console.log('[DiscoverService] afterExpLevel filter', { before: stage, after: jobsWithMatches.length, expLevels });
     }
 
     // Resume-based intelligence: skills + location from the user's resume
@@ -303,8 +318,10 @@ export class DiscoverService {
       }
     }
 
-    // Skill-based relevance for unscored jobs
+    // Annotate unscored jobs with skill-match info for relevance sorting, but don't hard-filter
     if (userSkills.length > 0) {
+      const beforeSkill = jobsWithMatches.length;
+      const unscoredBefore = jobsWithMatches.filter((j) => !j.match).length;
       jobsWithMatches = jobsWithMatches.map((j) => {
         if (j.match) return j;
         const title = (j.roleTitle || '').toLowerCase();
@@ -312,19 +329,14 @@ export class DiscoverService {
         const matchedSkills = userSkills.filter((s: string) => text.includes(s));
         const titleSkills = userSkills.filter((s: string) => title.includes(s));
         return { ...j, skillMatch: matchedSkills.length, titleSkillMatch: titleSkills.length } as any;
-      }).filter((j: any) => {
-        if (j.match) return true;
-        // Require at least 3 skill mentions overall AND at least one in the title
-        return (j.skillMatch ?? 0) >= 3 && (j.titleSkillMatch ?? 0) >= 1;
       });
+      const unscoredAfter = jobsWithMatches.filter((j) => !j.match).length;
+      console.log('[DiscoverService] afterSkill annotate', { before: beforeSkill, after: jobsWithMatches.length, unscoredBefore, unscoredAfter, userSkillsCount: userSkills.length });
     }
 
-    // Location filter: preferredLocations from prefs, or infer from resume location
-    let preferredLocs = prefs?.preferredLocations || [];
-    if (preferredLocs.length === 0 && resumeLocation && !query.remoteOnly) {
-      const inferred = inferLocationTerms(resumeLocation);
-      if (inferred.length > 0) preferredLocs = inferred;
-    }
+    // Location filter: only use preferredLocations when user explicitly set them
+    // Don't infer from resume — that overfilters (e.g. "Lagos, Nigeria" → ["nigeria"])
+    const preferredLocs = prefs?.preferredLocations || [];
     if (preferredLocs.length > 0 && !query.remoteOnly) {
       const lowerLocs = preferredLocs.map((l) => l.toLowerCase());
       jobsWithMatches = jobsWithMatches.filter((j) =>
@@ -335,9 +347,27 @@ export class DiscoverService {
     const resultJobs = jobsWithMatches.slice(0, limit);
     hasMore = hasMore || jobsWithMatches.length > limit;
 
+    console.log('[DiscoverService.getFeed] pipeline', JSON.stringify({
+      userId,
+      rawDb: jobs.length,
+      hasMoreDb: hasMore,
+      minScore,
+      targetRoles,
+      expLevels,
+      userSkillsCount: userSkills.length,
+      resumeLocation,
+      preferredLocs,
+      final: resultJobs.length,
+      hasMoreFinal: hasMore || jobsWithMatches.length > limit,
+    }));
+
+    const lastJob = resultJobs[resultJobs.length - 1];
+    if (lastJob && !lastJob._id) {
+      console.warn('[DiscoverService.getFeed] lastJob missing _id:', JSON.stringify(lastJob, null, 2));
+    }
     return {
       jobs: resultJobs,
-      cursor: hasMore ? (resultJobs[resultJobs.length - 1]?._id as Types.ObjectId).toString() : null,
+      cursor: hasMore && lastJob && lastJob._id ? (lastJob._id as Types.ObjectId).toString() : null,
       hasMore,
     };
   }

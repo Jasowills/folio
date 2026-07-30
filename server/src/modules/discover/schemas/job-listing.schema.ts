@@ -8,7 +8,8 @@ export class JobListing {
   @Prop({ required: true, enum: [
     'greenhouse', 'lever', 'workday', 'weworkremotely', 'remoteok',
     'otta', 'hn', 'cryptojobslist', 'bitcoinerjobs', 'ycombinator',
-    'twitter', 'linkedin', 'manual', 'remotive', 'arc', 'wellfound', 'builtin', 'techtree',
+    'twitter', 'linkedin', 'manual', 'remotive', 'arc', 'wellfound',
+    'builtin', 'techtree', 'ashby', 'icims', 'smartrecruiters',
   ]})
   source!: string;
 
@@ -47,6 +48,8 @@ export class JobListing {
     requiredSkills?: string[];
     niceToHaveSkills?: string[];
     experienceLevel?: string;
+    seniorityLevel?: string;
+    roleFamily?: string;
     salaryMin?: number | null;
     salaryMax?: number | null;
     salaryCurrency?: string | null;

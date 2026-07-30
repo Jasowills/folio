@@ -8,6 +8,7 @@ import { JobMatch, JobMatchSchema } from './schemas/job-match.schema';
 import { JobApplication, JobApplicationSchema } from './schemas/job-application.schema';
 import { DiscoverPreferences, DiscoverPreferencesSchema } from './schemas/discover-preferences.schema';
 import { CrawlMeta, CrawlMetaSchema } from './schemas/crawl-meta.schema';
+import { UserSignal, UserSignalSchema } from './schemas/user-signal.schema';
 import { RemoteOkCrawler } from './crawlers/remoteok.crawler';
 import { WeWorkRemotelyCrawler } from './crawlers/weworkremotely.crawler';
 import { GreenhouseCrawler } from './crawlers/greenhouse.crawler';
@@ -24,6 +25,9 @@ import { ArcCrawler } from './crawlers/arc.crawler';
 import { WellfoundCrawler } from './crawlers/wellfound.crawler';
 import { BuiltInCrawler } from './crawlers/builtin.crawler';
 import { TechTreeCrawler } from './crawlers/techtree.crawler';
+import { AshbyCrawler } from './crawlers/ashby.crawler';
+import { ICIMSCrawler } from './crawlers/icims.crawler';
+import { SmartRecruitersCrawler } from './crawlers/smartrecruiters.crawler';
 import { AtsModule } from '../ats/ats.module';
 import { AiModule } from '../ai/ai.module';
 import { ResumesModule } from '../resumes/resumes.module';
@@ -36,6 +40,7 @@ import { ResumesModule } from '../resumes/resumes.module';
       { name: JobApplication.name, schema: JobApplicationSchema },
       { name: DiscoverPreferences.name, schema: DiscoverPreferencesSchema },
       { name: CrawlMeta.name, schema: CrawlMetaSchema },
+      { name: UserSignal.name, schema: UserSignalSchema },
     ]),
     AtsModule,
     AiModule,
@@ -62,6 +67,9 @@ import { ResumesModule } from '../resumes/resumes.module';
     WellfoundCrawler,
     BuiltInCrawler,
     TechTreeCrawler,
+    AshbyCrawler,
+    ICIMSCrawler,
+    SmartRecruitersCrawler,
   ],
 })
 export class DiscoverModule implements OnModuleInit {

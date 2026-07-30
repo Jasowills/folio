@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect, useCallback } from 'react'
 import { useDiscoverFeed, useDiscoverFeedStats, useDiscoverPreferences, useResumes, useUploadResume, useApproveJobs } from '../../lib/queries'
 import JobCard from './JobCard'
 import EmptyStates from './EmptyStates'
@@ -34,7 +34,7 @@ export default function DiscoverFeed() {
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const [selectedSources, setSelectedSources] = useState<string[]>([])
-  const [postedWithin, setPostedWithin] = useState<'24h' | '3d' | 'week' | undefined>('24h')
+  const [postedWithin, setPostedWithin] = useState<'24h' | '3d' | 'week' | undefined>(undefined)
   const [minScore, setMinScore] = useState(prefs?.minimumMatchScore ?? 60)
   const [remoteOnly, setRemoteOnly] = useState(false)
   const [hasSalary, setHasSalary] = useState(false)
@@ -78,17 +78,47 @@ export default function DiscoverFeed() {
 
   const { data, isLoading, isFetching, error } = useDiscoverFeed(filters, cursor)
 
+  console.log('[DiscoverFeed] state:', {
+    filters,
+    cursor,
+    data,
+    isLoading,
+    isFetching,
+    error: error ? (error as Error).message : null,
+    hasResume: !!selectedResume,
+    hasPrefs: !!prefs,
+  })
+
   const jobs = data?.jobs || []
   const hasMore = data?.hasMore || false
 
   const displayJobs = cursor ? [...allJobs, ...jobs] : jobs
 
-  const handleLoadMore = () => {
-    if (data?.cursor) {
+  const loadMoreRef = useRef<() => void>()
+  const handleLoadMore = useCallback(() => {
+    if (data?.cursor && !isFetching) {
       setAllJobs(displayJobs)
       setCursor(data.cursor)
     }
-  }
+  }, [data?.cursor, isFetching, displayJobs])
+
+  loadMoreRef.current = handleLoadMore
+
+  const sentinelRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!sentinelRef.current) return
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting && hasMore && !isFetching) {
+          loadMoreRef.current?.()
+        }
+      },
+      { rootMargin: '400px' },
+    )
+    observer.observe(sentinelRef.current)
+    return () => observer.disconnect()
+  }, [hasMore, isFetching])
 
   const toggleSource = (source: string) => {
     setSelectedSources((prev) =>
@@ -96,179 +126,196 @@ export default function DiscoverFeed() {
     )
     setCursor(undefined)
     setAllJobs([])
+    setSelectedJob(null)
   }
 
   const resetFilters = () => {
     setCursor(undefined)
     setAllJobs([])
+    setSelectedJob(null)
+  }
+
+  const handleSelectJob = (job: any) => {
+    setSelectedJob(job)
   }
 
   const timeSinceLastCrawledAt = feedStats?.lastCrawledAt
     ? getTimeSince(new Date(feedStats.lastCrawledAt))
     : null
 
-
   return (
-    <div className="max-w-4xl mx-auto space-y-8">
-      {/* Header */}
-      <div>
-        <h1 className="font-display text-h2 text-ink text-wrap-balance">Discover</h1>
-        {hasNoResume ? (
-          <p className="text-sm text-muted mt-1">Upload a resume to see match scores and recommendations</p>
-        ) : (
-          <p className="text-sm text-muted mt-1">
-            {feedStats?.totalJobs ?? 0} roles matched
-            {detectedRole ? <span> &middot; Search results for &ldquo;{detectedRole}&rdquo;</span> : ''}
-            {timeSinceLastCrawledAt && <span> &middot; Updated {timeSinceLastCrawledAt}</span>}
-          </p>
-        )}
-      </div>
+    <div className="flex-1 flex overflow-hidden min-h-0">
+      {/* Left pane: job list */}
+      <div className="w-[440px] shrink-0 flex flex-col bg-surface border-r border-border min-h-0">
+        {/* Sticky header with stats */}
+        <div className="shrink-0 border-b border-border">
+          <div className="px-4 pt-3 pb-2">
+            <h1 className="font-display text-h5 text-ink">Discover</h1>
+            {hasNoResume ? (
+              <p className="text-xs text-muted mt-0.5">Upload a resume to see match scores</p>
+            ) : (
+              <p className="text-xs text-muted mt-0.5">
+                {feedStats?.totalJobs ?? 0} roles matched
+                {detectedRole && <span> for &ldquo;{detectedRole}&rdquo;</span>}
+                {timeSinceLastCrawledAt && <span> · Updated {timeSinceLastCrawledAt}</span>}
+              </p>
+            )}
+          </div>
 
-      {!hasNoResume && (
-        <>
-          {/* Primary filters */}
-          <div className="flex flex-wrap items-end gap-4">
-            {/* Match score */}
-            <div className="flex flex-col gap-1.5">
-              <span className="text-[11px] font-medium text-muted uppercase tracking-wider">Minimum match</span>
-              <div className="flex items-center gap-3">
-                <input
-                  type="range"
-                  min={0}
-                  max={100}
-                  value={minScore}
-                  onChange={(e) => { setMinScore(Number(e.target.value)); resetFilters() }}
-                  className="w-28 accent-teal h-1.5"
+          {!hasNoResume && (
+            <>
+              {/* Primary filters */}
+              <div className="px-4 pb-2 space-y-2">
+                <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-[10px] font-medium text-muted uppercase tracking-wider">Match</span>
+                    <input
+                      type="range"
+                      min={0}
+                      max={100}
+                      value={minScore}
+                      onChange={(e) => { setMinScore(Number(e.target.value)); resetFilters() }}
+                      className="w-16 accent-teal h-1"
+                    />
+                    <span className="text-[11px] font-semibold text-ink tabular-nums w-6">{minScore}%</span>
+                  </div>
+
+                  <select
+                    value={sort}
+                    onChange={(e) => { setSort(e.target.value as any); resetFilters() }}
+                    className="text-xs bg-transparent border border-border rounded px-1.5 py-1 text-ink outline-none"
+                  >
+                    <option value="relevance">Most relevant</option>
+                    <option value="newest">Newest</option>
+                    <option value="salary">Highest salary</option>
+                  </select>
+
+                  <select
+                    value={postedWithin || '24h'}
+                    onChange={(e) => { setPostedWithin(e.target.value as any); resetFilters() }}
+                    className="text-xs bg-transparent border border-border rounded px-1.5 py-1 text-ink outline-none"
+                  >
+                    <option value="24h">Past 24h</option>
+                    <option value="3d">Past 3 days</option>
+                    <option value="week">Past week</option>
+                  </select>
+                </div>
+
+                {/* Toggles row */}
+                <div className="flex items-center gap-3 text-xs">
+                  <label className="flex items-center gap-1.5 text-muted cursor-pointer select-none">
+                    <input type="checkbox" checked={remoteOnly} onChange={(e) => { setRemoteOnly(e.target.checked); resetFilters() }} className="accent-teal h-3 w-3 rounded border-border" />
+                    Remote
+                  </label>
+                  <label className="flex items-center gap-1.5 text-muted cursor-pointer select-none">
+                    <input type="checkbox" checked={hasSalary} onChange={(e) => { setHasSalary(e.target.checked); resetFilters() }} className="accent-teal h-3 w-3 rounded border-border" />
+                    Salary
+                  </label>
+                  <label className="flex items-center gap-1.5 text-muted cursor-pointer select-none">
+                    <input type="checkbox" checked={excludeApplied} onChange={(e) => { setExcludeApplied(e.target.checked); resetFilters() }} className="accent-teal h-3 w-3 rounded border-border" />
+                    Hide applied
+                  </label>
+                  <label className="flex items-center gap-1.5 text-muted cursor-pointer select-none">
+                    <input type="checkbox" checked={excludeRejected} onChange={(e) => { setExcludeRejected(e.target.checked); resetFilters() }} className="accent-teal h-3 w-3 rounded border-border" />
+                    Hide rejected
+                  </label>
+                </div>
+              </div>
+
+              {/* Source pills */}
+              <div className="px-4 pb-2.5">
+                <div className="flex gap-1 overflow-x-auto scrollbar-none">
+                  <button
+                    onClick={() => { setSelectedSources([]); resetFilters() }}
+                    className={cn(
+                      'shrink-0 text-[11px] font-medium px-2 py-1 rounded transition-colors whitespace-nowrap',
+                      selectedSources.length === 0 ? 'bg-teal text-white' : 'bg-paper-dark text-muted hover:text-ink',
+                    )}
+                  >
+                    All
+                  </button>
+                  {SOURCE_OPTIONS.map((s) => (
+                    <button
+                      key={s.value}
+                      onClick={() => toggleSource(s.value)}
+                      className={cn(
+                        'shrink-0 text-[11px] font-medium px-2 py-1 rounded transition-colors whitespace-nowrap',
+                        selectedSources.includes(s.value) ? 'bg-teal text-white' : 'bg-paper-dark text-muted hover:text-ink',
+                      )}
+                    >
+                      {s.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </>
+          )}
+        </div>
+
+        {/* Scrollable job list */}
+        <div className="flex-1 overflow-y-auto">
+          {hasNoResume ? (
+            <div className="p-4">
+              <EmptyStates type="no-resume" onUploadResume={handleUploadResume} />
+            </div>
+          ) : isLoading && displayJobs.length === 0 ? (
+            <div className="p-4">
+              <EmptyStates type="loading" />
+            </div>
+          ) : error && !isLoading ? (
+            <div className="p-4">
+              <EmptyStates type="error" lastCrawledAt={feedStats?.lastCrawledAt} />
+            </div>
+          ) : !isLoading && !error && displayJobs.length === 0 ? (
+            <div className="p-4">
+              <EmptyStates
+                type="no-results"
+                onLowerScore={() => setMinScore(50)}
+                onExtendRange={() => setPostedWithin('week')}
+              />
+            </div>
+          ) : (
+            <>
+              {displayJobs.map((job: any) => (
+                <JobCard
+                  key={job._id}
+                  job={job}
+                  selected={selectedJob?._id === job._id}
+                  onSelect={() => handleSelectJob(job)}
+                  onTracked={() => {}}
                 />
-                <span className="text-sm font-semibold text-ink tabular-nums w-8">{minScore}%</span>
-              </div>
-            </div>
-
-            {/* Sort + Period as a group */}
-            <div className="flex items-center gap-2">
-              <div className="flex flex-col gap-1.5">
-                <span className="text-[11px] font-medium text-muted uppercase tracking-wider">Sort</span>
-                <select
-                  value={sort}
-                  onChange={(e) => { setSort(e.target.value as any); resetFilters() }}
-                  className="input-field w-auto text-xs py-1.5 pr-7"
-                >
-                  <option value="relevance">Most relevant</option>
-                  <option value="newest">Newest</option>
-                  <option value="salary">Highest salary</option>
-                </select>
-              </div>
-              <div className="flex flex-col gap-1.5">
-                <span className="text-[11px] font-medium text-muted uppercase tracking-wider">Posted</span>
-                <select
-                  value={postedWithin || '24h'}
-                  onChange={(e) => { setPostedWithin(e.target.value as any); resetFilters() }}
-                  className="input-field w-auto text-xs py-1.5 pr-7"
-                >
-                  <option value="24h">Last 24h</option>
-                  <option value="3d">Last 3 days</option>
-                  <option value="week">Last week</option>
-                </select>
-              </div>
-            </div>
-          </div>
-
-          {/* Toggles row */}
-          <div className="flex flex-wrap items-center gap-4">
-            <label className="flex items-center gap-2 text-sm text-ink cursor-pointer select-none">
-              <input type="checkbox" checked={remoteOnly} onChange={(e) => { setRemoteOnly(e.target.checked); resetFilters() }} className="accent-teal h-4 w-4 rounded border-border" />
-              Remote only
-            </label>
-            <label className="flex items-center gap-2 text-sm text-ink cursor-pointer select-none">
-              <input type="checkbox" checked={hasSalary} onChange={(e) => { setHasSalary(e.target.checked); resetFilters() }} className="accent-teal h-4 w-4 rounded border-border" />
-              Has salary
-            </label>
-            <label className="flex items-center gap-2 text-sm text-muted cursor-pointer select-none">
-              <input type="checkbox" checked={excludeApplied} onChange={(e) => { setExcludeApplied(e.target.checked); resetFilters() }} className="accent-teal h-4 w-4 rounded border-border" />
-              Exclude applied
-            </label>
-            <label className="flex items-center gap-2 text-sm text-muted cursor-pointer select-none">
-              <input type="checkbox" checked={excludeRejected} onChange={(e) => { setExcludeRejected(e.target.checked); resetFilters() }} className="accent-teal h-4 w-4 rounded border-border" />
-              Exclude rejected
-            </label>
-          </div>
-
-          {/* Source filters */}
-          <div>
-            <span className="text-[11px] font-medium text-muted uppercase tracking-wider block mb-2">Sources</span>
-            <div className="pill-group">
-              <button
-                onClick={() => { setSelectedSources([]); resetFilters() }}
-                className={cn('pill', selectedSources.length === 0 ? 'pill-active' : 'pill-inactive')}
-              >
-                All
-              </button>
-              {SOURCE_OPTIONS.map((s) => (
-                <button
-                  key={s.value}
-                  onClick={() => toggleSource(s.value)}
-                  className={cn('pill', selectedSources.includes(s.value) ? 'pill-active' : 'pill-inactive')}
-                >
-                  {s.label}
-                </button>
               ))}
-            </div>
-          </div>
+              {/* Infinite scroll sentinel */}
+              {hasMore && <div ref={sentinelRef} className="h-4" />}
+              {!isLoading && !hasMore && displayJobs.length > 0 && (
+                <p className="text-center text-xs text-muted py-4">All matched roles loaded</p>
+              )}
+              {isFetching && (
+                <div className="flex justify-center py-3">
+                  <div className="h-4 w-4 rounded-full border-2 border-teal/30 border-t-teal animate-spin" />
+                </div>
+              )}
+            </>
+          )}
+        </div>
 
-          <hr className="border-border" />
-        </>
-      )}
-
-      {/* Job cards */}
-      <div className="space-y-3">
-        {hasNoResume ? (
-          <EmptyStates type="no-resume" onUploadResume={handleUploadResume} />
-        ) : isLoading && displayJobs.length === 0 ? (
-          <EmptyStates type="loading" />
-        ) : error && !isLoading ? (
-          <EmptyStates type="error" lastCrawledAt={feedStats?.lastCrawledAt} />
-        ) : !isLoading && !error && displayJobs.length === 0 ? (
-          <EmptyStates type="no-results" onLowerScore={() => setMinScore(50)} onExtendRange={() => setPostedWithin('week')} />
-        ) : (
-          displayJobs.map((job: any) => (
-          <JobCard
-            key={job._id}
-            job={job}
-            onTracked={() => {}}
-            onSelect={() => setSelectedJob(job)}
-            onApprove={selectedResume ? handleApproveJob : undefined}
-            approvePending={approveJobs.isPending}
-          />
-        )))}
-
-        {hasMore && (
-          <div className="flex justify-center pt-2 pb-6">
-            <button
-              onClick={handleLoadMore}
-              disabled={isFetching}
-              className="px-8 py-2.5 text-sm font-medium text-teal bg-teal-light rounded-lg hover:bg-teal hover:text-white transition-all duration-150 disabled:opacity-50"
-            >
-              {isFetching ? 'Loading...' : 'Load more results'}
-            </button>
-          </div>
-        )}
-
-        {!isLoading && displayJobs.length > 0 && !hasMore && (
-          <p className="text-center text-sm text-muted pt-2 pb-6">All matched roles loaded</p>
-        )}
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept=".pdf,.doc,.docx"
+          className="hidden"
+          onChange={handleFileChange}
+        />
       </div>
 
-      {selectedJob && (
-        <FeedJobDetailsPanel job={selectedJob} onClose={() => setSelectedJob(null)} />
-      )}
-
-      <input
-        ref={fileInputRef}
-        type="file"
-        accept=".pdf,.doc,.docx"
-        className="hidden"
-        onChange={handleFileChange}
-      />
+      {/* Right pane: detail panel */}
+      <div className="flex-1 flex flex-col bg-surface overflow-hidden min-h-0">
+        <FeedJobDetailsPanel
+          job={selectedJob}
+          onApprove={selectedResume ? handleApproveJob : undefined}
+          approvePending={approveJobs.isPending}
+        />
+      </div>
     </div>
   )
 }

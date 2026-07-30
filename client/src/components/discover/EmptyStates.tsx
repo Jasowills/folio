@@ -10,31 +10,16 @@ interface EmptyStatesProps {
 
 function SkeletonCard() {
   return (
-    <div className="bg-surface border border-border rounded-xl overflow-hidden animate-pulse">
-      <div className="p-4">
-        <div className="flex items-center justify-between mb-2">
-          <div className="h-3 w-32 bg-paper-dark rounded" />
-          <div className="h-3 w-16 bg-paper-dark rounded" />
+    <div className="flex gap-3 p-3.5 border-b border-border animate-pulse">
+      <div className="h-12 w-12 rounded-lg bg-paper-dark shrink-0" />
+      <div className="flex-1 min-w-0 space-y-2">
+        <div className="h-3.5 w-3/5 bg-paper-dark rounded" />
+        <div className="h-3 w-2/5 bg-paper-dark rounded" />
+        <div className="h-3 w-1/3 bg-paper-dark rounded" />
+        <div className="flex items-center gap-2 mt-1">
+          <div className="h-6 w-20 bg-teal-light/50 rounded-lg" />
+          <div className="h-4 w-12 bg-paper-dark rounded" />
         </div>
-        <div className="flex items-start gap-3 mb-3">
-          <div className="h-10 w-10 rounded-lg bg-paper-dark shrink-0" />
-          <div className="flex-1">
-            <div className="h-4 w-3/4 bg-paper-dark rounded" />
-          </div>
-          <div className="h-10 w-10 rounded-full bg-paper-dark shrink-0" />
-        </div>
-        <div className="flex gap-1.5 mb-3">
-          <div className="h-5 w-16 bg-paper-dark rounded" />
-          <div className="h-5 w-14 bg-paper-dark rounded" />
-          <div className="h-5 w-12 bg-paper-dark rounded" />
-        </div>
-        <div className="h-3 w-full bg-paper-dark rounded mb-1" />
-        <div className="h-3 w-2/3 bg-paper-dark rounded" />
-      </div>
-      <div className="flex items-center gap-2 px-4 pb-4 pt-0">
-        <div className="h-7 w-20 bg-paper-dark rounded-lg" />
-        <div className="h-7 w-16 bg-paper-dark rounded-lg" />
-        <div className="h-7 w-14 bg-paper-dark rounded-lg ml-auto" />
       </div>
     </div>
   )
@@ -43,9 +28,9 @@ function SkeletonCard() {
 export default function EmptyStates({ type, lastCrawledAt, onLowerScore, onExtendRange, onUploadResume }: EmptyStatesProps) {
   if (type === 'loading') {
     return (
-      <div className="space-y-4">
-        <p className="text-sm text-muted animate-pulse">Finding roles that match your resume...</p>
-        {Array.from({ length: 6 }).map((_, i) => (
+      <div>
+        <p className="text-xs text-muted px-3.5 py-2">Finding roles that match your resume...</p>
+        {Array.from({ length: 3 }).map((_, i) => (
           <SkeletonCard key={i} />
         ))}
       </div>

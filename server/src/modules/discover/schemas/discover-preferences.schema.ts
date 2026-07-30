@@ -23,6 +23,12 @@ export class DiscoverPreferences {
   @Prop({ type: [String], default: [] })
   experienceLevels!: string[];
 
+  @Prop({ type: [String], default: [] })
+  excludedRoleFamilies!: string[];
+
+  @Prop({ type: [String], default: [] })
+  excludedSeniorities!: string[];
+
   @Prop({ default: 60 })
   minimumMatchScore!: number;
 

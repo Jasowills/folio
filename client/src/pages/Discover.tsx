@@ -6,6 +6,7 @@ import DiscoverTracker from '../components/discover/DiscoverTracker'
 import SetupCard from '../components/discover/SetupCard'
 import PreferencesPanel from '../components/discover/PreferencesPanel'
 import { IconSettings } from '@tabler/icons-react'
+import { cn } from '../lib/utils'
 
 export default function Discover() {
   const location = useLocation()
@@ -33,10 +34,18 @@ export default function Discover() {
     navigate(t === 'tracker' ? '/discover/tracker' : '/discover/feed', { replace: true })
   }
 
+  const isFeed = tab === 'feed'
+
   return (
-    <div className="page-container">
+    <div className={cn(
+      'flex flex-col min-h-0',
+      isFeed ? 'flex-1 max-h-screen overflow-hidden' : 'page-container',
+    )}>
       {/* Tab strip */}
-      <div className="flex items-center justify-between mb-6">
+      <div className={cn(
+        'flex items-center justify-between shrink-0',
+        isFeed ? 'px-4 sm:px-6 pt-3 sm:pt-4 pb-2' : 'mb-6',
+      )}>
         <div className="flex items-center gap-1 bg-paper border border-border rounded-lg p-1">
           <button
             onClick={() => switchTab('feed')}
@@ -59,7 +68,7 @@ export default function Discover() {
             Tracker
           </button>
         </div>
-        {tab === 'feed' && (
+        {isFeed && (
           <button
             onClick={() => setShowPrefs(true)}
             className="p-2 text-muted hover:text-ink transition-colors rounded-lg hover:bg-paper-dark/50"
@@ -70,11 +79,13 @@ export default function Discover() {
         )}
       </div>
 
-      {tab === 'feed' ? (
-        <DiscoverFeed />
-      ) : (
-        <DiscoverTracker />
-      )}
+      <div className={cn(isFeed ? 'flex-1 min-h-0 flex flex-col overflow-hidden' : '')}>
+        {isFeed ? (
+          <DiscoverFeed />
+        ) : (
+          <DiscoverTracker />
+        )}
+      </div>
 
       {/* Setup overlay */}
       {showSetup && (

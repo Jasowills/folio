@@ -468,6 +468,55 @@ export function classifyTechRelevance(title: string, description: string): TechC
   return { relevance: 'unknown', confidence: Math.round(Math.min(techRatio, 1 - techRatio) * 50) };
 }
 
+const SENIORITY_PATTERNS: Array<{ regex: RegExp; level: string }> = [
+  { regex: /\b(Intern|Trainee|Apprentice)\b/i, level: 'intern' },
+  { regex: /\b(Junior|Jr[.\s]|Entry[\s-]Level|Entry|Graduate|Associate|L1|L2)\b/i, level: 'entry' },
+  { regex: /\b(Mid[\s-]Level|Mid|II\b|L3)\b/i, level: 'mid' },
+  { regex: /\b(Senior|Sr[.\s]|III\b|L4|L5)\b/i, level: 'senior' },
+  { regex: /\b(Staff|Principal|L6)\b/i, level: 'staff' },
+  { regex: /\b(Lead|Manager|Head of|L7)\b/i, level: 'lead' },
+  { regex: /\b(Director|VP\b|Vice President|C[\- ]?Level|C-suite|Chief)\b/i, level: 'executive' },
+];
+
+export function detectSeniorityLevel(title: string, description: string): string | null {
+  const combined = `${title} ${description}`;
+  for (const { regex, level } of SENIORITY_PATTERNS) {
+    if (regex.test(combined)) return level;
+  }
+  return null;
+}
+
+const ROLE_FAMILY_PATTERNS: Array<{ regex: RegExp; family: string }> = [
+  { regex: /\b(software engineer|software developer|swe|full[\s-]?stack|backend|frontend|back[\s-]?end|front[\s-]?end)\b/i, family: 'software_engineering' },
+  { regex: /\b(devops|site reliability|sre|platform engineer|infrastructure engineer|cloud engineer|reliability)\b/i, family: 'devops_infrastructure' },
+  { regex: /\b(data scientist|data engineer|data analyst|machine learning|ml engineer|ml ops|ai engineer|ai researcher)\b/i, family: 'data_ai_ml' },
+  { regex: /\b(product manager|product owner|technical product manager|pdm)\b/i, family: 'product_management' },
+  { regex: /\b(designer|ux designer|ui designer|product designer|design engineer|creative)\b/i, family: 'design_ux' },
+  { regex: /\b(engineering manager|tech lead|technology lead|vp engineering|cto)\b/i, family: 'engineering_leadership' },
+  { regex: /\b(sales engineer|solutions architect|customer engineer|field engineer)\b/i, family: 'sales_engineering' },
+  { regex: /\b(consultant|management consultant|business analyst|strategy|operations)\b/i, family: 'consulting_business' },
+  { regex: /\b(quality assurance|qa engineer|test engineer|sdet|automation engineer)\b/i, family: 'qa_testing' },
+  { regex: /\b(security engineer|cybersecurity|infosec|soc analyst|penetration tester)\b/i, family: 'security' },
+  { regex: /\b(mobile engineer|ios engineer|android engineer)\b/i, family: 'mobile' },
+  { regex: /\b(data analyst|business intelligence|bi engineer|analytics engineer)\b/i, family: 'data_analytics' },
+  { regex: /\b(support engineer|technical support|customer support engineer)\b/i, family: 'support' },
+  { regex: /\b(hardware engineer|embedded engineer|firmware engineer|fpga)\b/i, family: 'hardware_embedded' },
+  { regex: /\b(research scientist|applied scientist|research engineer)\b/i, family: 'research' },
+  { regex: /\b(marketing|growth|seo|content|social media|brand)\b/i, family: 'marketing' },
+  { regex: /\b(sales|account executive|account manager|business development|bdr|sdr)\b/i, family: 'sales' },
+  { regex: /\b(hr|human resources|people|talent|recruiter|recruiting)\b/i, family: 'hr_people' },
+  { regex: /\b(finance|accountant|accounting|controller|financial analyst|fp&a)\b/i, family: 'finance' },
+  { regex: /\b(legal|counsel|paralegal|compliance)\b/i, family: 'legal_compliance' },
+];
+
+export function detectRoleFamily(title: string, description: string): string | null {
+  const combined = `${title} ${description}`;
+  for (const { regex, family } of ROLE_FAMILY_PATTERNS) {
+    if (regex.test(combined)) return family;
+  }
+  return null;
+}
+
 export function extractField(text: string, fieldName: string): string | null {
   const patterns: Record<string, RegExp[]> = {
     roleTitle: [

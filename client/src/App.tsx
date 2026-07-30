@@ -23,6 +23,9 @@ import InterviewPrep from './pages/InterviewPrep'
 import InterviewLive from './pages/InterviewLive'
 import InterviewResults from './pages/InterviewResults'
 import BuilderPage from './features/builder/BuilderPage'
+import AutoApplyDashboard from './pages/AutoApplyDashboard'
+import AutoApplySetupWizard from './features/auto-apply/components/AutoApplySetupWizard'
+import ApplyReview from './pages/ApplyReview'
 
 class ErrorBoundary extends Component<
   { children: React.ReactNode },
@@ -102,6 +105,9 @@ function AppRoutes() {
         <Route path="/discover/feed" element={<ProtectedRoute><Discover /></ProtectedRoute>} />
         <Route path="/discover/tracker" element={<ProtectedRoute><Discover /></ProtectedRoute>} />
         <Route path="/discover" element={<Navigate to="/discover/feed" replace />} />
+        <Route path="/auto-apply" element={<ProtectedRoute><AutoApplyDashboard /></ProtectedRoute>} />
+        <Route path="/auto-apply/setup" element={<ProtectedRoute><AutoApplySetupWizard /></ProtectedRoute>} />
+        <Route path="/apply/:submissionId/review" element={<FullScreenRoute><ApplyReview /></FullScreenRoute>} />
         <Route path="/research" element={<ProtectedRoute><Research /></ProtectedRoute>} />
         <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
         <Route path="/interview/new" element={<ProtectedRoute><InterviewNew /></ProtectedRoute>} />

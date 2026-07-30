@@ -7,7 +7,7 @@ import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { DiscoverService } from './discover.service';
 import { DiscoverCrawlService } from './discover-crawl.service';
 import {
-  UpsertPreferencesDto, TrackJobDto, UpdateTrackerJobDto, FeedQueryDto,
+  UpsertPreferencesDto, TrackJobDto, UpdateTrackerJobDto, FeedQueryDto, DismissJobDto,
 } from './dto';
 import type { ActivityLogEntry, ChecklistState } from './schemas/job-application.schema';
 
@@ -36,6 +36,12 @@ export class DiscoverController {
   @Post('hide/:jobId')
   async hideJob(@Req() req: any, @Param('jobId') jobId: string) {
     await this.discoverService.hideJob(req.user._id, jobId);
+    return { success: true };
+  }
+
+  @Post('dismiss/:jobId')
+  async dismissJob(@Req() req: any, @Param('jobId') jobId: string, @Body() dto: DismissJobDto) {
+    await this.discoverService.dismissJob(req.user._id, jobId, dto);
     return { success: true };
   }
 

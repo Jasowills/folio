@@ -1,59 +1,40 @@
 import { useState, useRef, useEffect } from 'react'
-import { ScoreRing } from '../ScoreRing'
 import { useTrackJob, useDismissJob, useApplyOdds, type DismissReason } from '../../lib/queries'
-import MiniPrepPanel from './MiniPrepPanel'
-import { cn, decodeHtml, formatJobDescription, extractUrl } from '../../lib/utils'
-import { IconX, IconCircleCheck, IconExternalLink, IconMapPin, IconClock, IconInfoCircle, IconSend } from '@tabler/icons-react'
-
-const SOURCE_ABBREV: Record<string, string> = {
-  greenhouse: 'GH',
-  lever: 'LV',
-  workday: 'WD',
-  weworkremotely: 'WR',
-  remoteok: 'RO',
-  otta: 'OT',
-  hn: 'HN',
-  ycombinator: 'YC',
-  twitter: 'TW',
-  linkedin: 'LI',
-  cryptojobslist: 'CR',
-  bitcoinerjobs: 'BJ',
-  remotive: 'RM',
-  arc: 'AR',
-  wellfound: 'WF',
-  builtin: 'BI',
-  techtree: 'TT',
-}
+import { cn, decodeHtml, extractUrl } from '../../lib/utils'
+import { IconX, IconBookmark, IconBookmarkFilled, IconExternalLink } from '@tabler/icons-react'
 
 interface JobCardProps {
   job: any
-  onTracked: () => void
+  selected?: boolean
   onSelect?: () => void
-  onApprove?: (jobId: string) => void
-  approvePending?: boolean
+  onTracked?: () => void
 }
 
-export default function JobCard({ job, onTracked, onSelect, onApprove, approvePending }: JobCardProps) {
+export default function JobCard({ job, selected, onSelect, onTracked }: JobCardProps) {
   const trackJob = useTrackJob()
   const dismissJob = useDismissJob()
-  const [showPrep, setShowPrep] = useState(false)
   const [hidden, setHidden] = useState(false)
   const [showDismissOptions, setShowDismissOptions] = useState(false)
-  const [showExplanation, setShowExplanation] = useState(false)
   const dismissRef = useRef<HTMLDivElement>(null)
 
   const match = job.match
   const score = match?.atsScore ?? 0
-
   const postedDate = job.postedAt ? new Date(job.postedAt) : null
   const timeAgo = postedDate ? getTimeSince(postedDate) : ''
-  const isExpired = postedDate && (Date.now() - postedDate.getTime()) > 7 * 86400000
   const ef = job.extractedFields || {}
-
-  const applyUrl = job.applicationUrl || extractUrl(job.descriptionRaw || '')
   const logoFallback = job.companyName?.charAt(0)?.toUpperCase() || '?'
   const domain = job.companyName?.toLowerCase().replace(/\s+/g, '') || ''
   const logoUrl = `https://logo.clearbit.com/${domain}.com`
+
+  const { data: odds } = useApplyOdds(job._id)
+
+  const scoreColor =
+    score >= 80 ? 'text-success bg-success-light' :
+    score >= 60 ? 'text-amber bg-amber-light' :
+    score >= 40 ? 'text-danger bg-danger-light' :
+    'text-muted bg-paper-dark'
+
+  const isTracked = job.isTracked
 
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
@@ -65,247 +46,162 @@ export default function JobCard({ job, onTracked, onSelect, onApprove, approvePe
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [])
 
-  const DISMISS_REASONS: { value: DismissReason; label: string }[] = [
-    { value: 'wrong_domain', label: 'Wrong domain' },
-    { value: 'bad_seniority', label: 'Wrong level' },
-    { value: 'wrong_location', label: 'Wrong location' },
-    { value: 'salary_too_low', label: 'Salary too low' },
-    { value: 'not_interested', label: 'Not interested' },
-    { value: 'other', label: 'Other' },
-  ]
-
-  const handleTrack = () => {
+  const handleTrack = (e: React.MouseEvent) => {
+    e.stopPropagation()
     trackJob.mutate({ jobListingId: job._id }, { onSuccess: onTracked })
   }
 
-  const handleDismiss = (reason: DismissReason) => {
+  const handleDismiss = (e: React.MouseEvent, reason: DismissReason) => {
+    e.stopPropagation()
     setHidden(true)
     setShowDismissOptions(false)
     dismissJob.mutate({ jobId: job._id, reason })
     setTimeout(() => setHidden(false), 5000)
   }
 
-  const handleApply = () => {
-    if (applyUrl) {
-      window.open(applyUrl, '_blank', 'noopener,noreferrer')
-    }
-  }
-
   if (hidden) return null
 
   return (
-    <>
-      <div
-        className={cn(
-          'relative bg-surface border border-border rounded-xl transition-all duration-200',
-          isExpired && !job.isTracked && 'opacity-50',
-          'hover:border-teal/30 hover:shadow-sm',
+    <div
+      onClick={onSelect}
+      className={cn(
+        'p-3.5 flex gap-3 cursor-pointer transition-all duration-150 border-b border-border',
+        'hover:bg-paper-dark/40',
+        selected && 'bg-teal-light/20 border-l-2 border-l-teal',
+        !selected && 'border-l-2 border-l-transparent',
+      )}
+    >
+      {/* Logo */}
+      <div className="h-12 w-12 rounded-lg bg-paper-dark flex items-center justify-center text-sm font-semibold text-ink shrink-0 overflow-hidden">
+        {logoUrl ? (
+          <img
+            src={logoUrl}
+            alt={job.companyName}
+            className="h-full w-full object-contain"
+            onError={(e) => {
+              (e.target as HTMLImageElement).style.display = 'none'
+              ;(e.target as HTMLImageElement).parentElement!.textContent = logoFallback
+            }}
+          />
+        ) : (
+          logoFallback
         )}
-      >
-        {/* Tracked indicator */}
-        {job.isTracked && (
-          <span className="absolute top-3 right-3 text-[10px] font-medium bg-teal-light text-teal px-2 py-0.5 rounded-full z-10">
-            Tracked
-          </span>
-        )}
+      </div>
 
-        <div className="p-4 cursor-pointer" onClick={onSelect}>
-          {/* Company + Source + Time */}
-          <div className="flex items-center justify-between mb-1">
-            <span className="text-xs font-medium text-muted">{job.companyName}</span>
-            <div className="flex items-center gap-2">
-              <span className="text-[10px] font-medium bg-paper-dark text-muted px-1.5 py-0.5 rounded">
-                {SOURCE_ABBREV[job.source] || job.source}
+      {/* Info */}
+      <div className="flex-1 min-w-0">
+        {/* Top row: title + score + actions */}
+        <div className="flex items-start justify-between gap-2">
+          <p className="text-sm font-semibold text-ink leading-snug line-clamp-1">{job.roleTitle}</p>
+          <div className="flex items-center gap-1 shrink-0 ml-1">
+            {score > 0 && (
+              <span className={cn('text-[10px] font-semibold px-1.5 py-0.5 rounded leading-none', scoreColor)}>
+                {score}%
               </span>
-              <span className="text-[10px] text-muted flex items-center gap-0.5">
-                <IconClock className="h-2.5 w-2.5" />
-                {timeAgo}
-              </span>
-            </div>
-          </div>
-
-          {/* Logo + Title + Score */}
-          <div className="flex items-start gap-3 mb-2.5">
-            <div className="h-10 w-10 rounded-lg bg-paper-dark flex items-center justify-center text-sm font-semibold text-ink shrink-0 overflow-hidden">
-              {logoUrl ? (
-                <img
-                  src={logoUrl}
-                  alt={job.companyName}
-                  className="h-full w-full object-contain"
-                  onError={(e) => {
-                    (e.target as HTMLImageElement).style.display = 'none'
-                    ;(e.target as HTMLImageElement).parentElement!.textContent = logoFallback
-                  }}
-                />
-              ) : (
-                logoFallback
+            )}
+            <button
+              onClick={handleTrack}
+              className={cn(
+                'p-1 rounded transition-colors',
+                isTracked ? 'text-teal' : 'text-muted hover:text-teal'
               )}
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-semibold text-ink leading-snug truncate">{job.roleTitle}</p>
-            </div>
-            {score > 0 ? (
-              <div className="relative shrink-0">
-                <ScoreRing score={score} size={40} strokeWidth={4} scoreClassName="font-display font-bold text-[10px]" />
-                {match?.confidenceExplanation && (
-                  <button
-                    onClick={(e) => { e.stopPropagation(); setShowExplanation(!showExplanation) }}
-                    className="absolute -top-1 -right-1 text-muted hover:text-ink transition-colors"
-                  >
-                    <IconInfoCircle className="h-3 w-3" />
-                  </button>
-                )}
-                {showExplanation && match?.confidenceExplanation && (
-                  <div className="absolute top-full right-0 mt-1 z-20 bg-surface border border-border rounded-lg shadow-lg p-2.5 w-56 text-[11px] text-muted leading-relaxed"
-                    onClick={(e) => e.stopPropagation()}
-                  >
-                    {match.confidenceExplanation}
-                    <div className="mt-1.5 text-teal font-medium">{match.matchIntelligenceLine}</div>
-                  </div>
-                )}
-              </div>
-            ) : (
-              <div className="h-10 w-10 rounded-full border-2 border-border flex items-center justify-center text-[10px] text-muted-light font-medium shrink-0">
-                ?
-              </div>
-            )}
+              title={isTracked ? 'Saved' : 'Save'}
+            >
+              {isTracked ? <IconBookmarkFilled className="h-3.5 w-3.5" /> : <IconBookmark className="h-3.5 w-3.5" />}
+            </button>
           </div>
-
-          {/* Meta row */}
-          <div className="flex flex-wrap items-center gap-1.5 mb-2">
-            {(job.isRemote || job.location) && (
-              <span className="text-[11px] text-muted flex items-center gap-0.5 bg-paper-dark px-1.5 py-0.5 rounded">
-                <IconMapPin className="h-2.5 w-2.5" />
-                {job.isRemote ? 'Remote' : job.location}
-              </span>
-            )}
-            {ef.experienceLevel && (
-              <span className="text-[11px] text-muted bg-paper-dark px-1.5 py-0.5 rounded">
-                {ef.experienceLevel}
-              </span>
-            )}
-            {ef.languages?.length > 0 && ef.languages.slice(0, 2).map((lang: string) => (
-              <span key={lang} className="text-[11px] text-teal bg-teal-light px-1.5 py-0.5 rounded">
-                {lang}
-              </span>
-            ))}
-            {ef.languages?.length > 2 && (
-              <span className="text-[11px] text-teal bg-teal-light px-1.5 py-0.5 rounded">
-                +{ef.languages.length - 2}
-              </span>
-            )}
-          </div>
-
-          {/* Salary */}
-          {ef.salaryMin && (
-            <p className="text-sm font-semibold text-amber mb-2">
-              {formatSalary(ef.salaryMin, ef.salaryMax, ef.salaryCurrency)}
-            </p>
-          )}
-
-          {/* Match intelligence or description preview */}
-          {match?.matchIntelligenceLine ? (
-            <p className="text-xs text-muted mb-2 leading-relaxed line-clamp-2">
-              {decodeHtml(match.matchIntelligenceLine)}
-            </p>
-          ) : job.descriptionRaw ? (
-            <p className="text-xs text-muted leading-relaxed line-clamp-2">
-              {decodeHtml(formatJobDescription(job.descriptionRaw)).slice(0, 250)}
-            </p>
-          ) : null}
-
-          {/* Expired notice */}
-          {isExpired && !job.isTracked && (
-            <p className="text-[11px] text-muted mb-2">This listing may no longer be active</p>
-          )}
-
-          {/* Apply odds badge */}
-          {job._id && (
-            <ApplyOddsBadge jobId={job._id} />
-          )}
         </div>
 
-        {/* Action row */}
-        <div className="flex items-center gap-2 px-4 pb-4">
-          {!job.isTracked ? (
-            <button
-              onClick={(e) => { e.stopPropagation(); handleTrack() }}
-              disabled={trackJob.isPending}
-              className="px-3 py-1.5 text-xs font-medium bg-teal-light text-teal rounded-lg hover:bg-teal hover:text-white transition-colors"
-            >
-              {trackJob.isPending ? '...' : 'Track this'}
-            </button>
-          ) : (
-            <button className="px-3 py-1.5 text-xs font-medium bg-success-light text-success rounded-lg flex items-center gap-1">
-              <IconCircleCheck className="h-3 w-3" />
-              Tracked
-            </button>
-          )}
+        {/* Company */}
+        <p className="text-xs text-muted mt-0.5 truncate">{job.companyName}</p>
 
-          {applyUrl && (
-            <button
-              onClick={(e) => { e.stopPropagation(); handleApply() }}
-              className="px-3 py-1.5 text-xs font-medium bg-teal text-white rounded-lg hover:bg-teal-dark transition-colors flex items-center gap-1"
-            >
-              <IconExternalLink className="h-3 w-3" />
-              Apply
-            </button>
-          )}
+        {/* Location + Date */}
+        <p className="text-xs text-muted/70 mt-0.5 truncate">
+          {job.isRemote ? 'Remote' : job.location || ''}
+          {postedDate && <> · {timeAgo}</>}
+        </p>
 
-          <button
-            onClick={(e) => { e.stopPropagation(); setShowPrep(true) }}
-            className="px-3 py-1.5 text-xs font-medium text-ink border border-border rounded-lg hover:bg-paper-dark transition-colors"
-          >
-            Prep
-          </button>
+        {/* Salary */}
+        {ef.salaryMin && (
+          <p className="text-xs font-semibold text-amber mt-1">
+            {formatSalary(ef.salaryMin, ef.salaryMax, ef.salaryCurrency)}
+          </p>
+        )}
 
-          {onApprove && (
-            <button
-              onClick={(e) => { e.stopPropagation(); onApprove(job._id) }}
-              disabled={approvePending}
-              className="px-3 py-1.5 text-xs font-medium bg-ink text-paper rounded-lg hover:opacity-80 transition-opacity flex items-center gap-1 disabled:opacity-50"
-            >
-              <IconSend className="h-3 w-3" />
-              {approvePending ? '...' : 'Auto-Apply'}
-            </button>
-          )}
-
-          <div ref={dismissRef} className="relative ml-auto">
-            <button
-              onClick={(e) => { e.stopPropagation(); setShowDismissOptions(!showDismissOptions) }}
-              className="p-1.5 text-muted hover:text-ink transition-colors rounded-lg hover:bg-paper-dark"
-              title="Dismiss"
-            >
-              <IconX className="h-3.5 w-3.5" />
-            </button>
-            {showDismissOptions && (
-              <div className="absolute top-full right-0 mt-1 z-20 bg-surface border border-border rounded-lg shadow-lg py-1 min-w-[140px]"
-                onClick={(e) => e.stopPropagation()}
-              >
-                {DISMISS_REASONS.map((r) => (
-                  <button
-                    key={r.value}
-                    onClick={() => handleDismiss(r.value)}
-                    className="block w-full text-left px-3 py-1.5 text-xs text-ink hover:bg-paper-dark transition-colors"
-                  >
-                    {r.label}
-                  </button>
-                ))}
-              </div>
+        {/* Badges row */}
+        {(job.isRemote || ef.experienceLevel) && (
+          <div className="flex flex-wrap items-center gap-1 mt-1.5">
+            {job.isRemote && (
+              <span className="text-[10px] text-muted bg-paper-dark px-1.5 py-0.5 rounded">Remote</span>
             )}
+            {ef.experienceLevel && (
+              <span className="text-[10px] text-muted bg-paper-dark px-1.5 py-0.5 rounded">{ef.experienceLevel}</span>
+            )}
+            {ef.languages?.slice(0, 2).map((lang: string) => (
+              <span key={lang} className="text-[10px] text-teal bg-teal-light px-1.5 py-0.5 rounded">{lang}</span>
+            ))}
           </div>
+        )}
+
+        {/* Bottom row: odds badge */}
+        <div className="flex items-center gap-2 mt-2">
+          {odds?.recommendation && odds.recommendation !== 'skip' && (
+            <span className="text-[10px] font-medium text-muted bg-paper-dark px-1.5 py-0.5 rounded leading-none">
+              {RECOMMENDATION_LABELS[odds.recommendation] || odds.recommendation}
+            </span>
+          )}
+          {match?.matchIntelligenceLine && (
+            <span className="text-[10px] text-muted/60 truncate max-w-[120px]">
+              {decodeHtml(match.matchIntelligenceLine)}
+            </span>
+          )}
         </div>
       </div>
 
-      {showPrep && (
-        <MiniPrepPanel
-          job={job}
-          match={match}
-          onClose={() => setShowPrep(false)}
-        />
-      )}
-    </>
+      {/* Dismiss */}
+      <div ref={dismissRef} className="relative shrink-0 self-start">
+        <button
+          onClick={(e) => { e.stopPropagation(); setShowDismissOptions(!showDismissOptions) }}
+          className="p-0.5 text-muted-light hover:text-muted transition-colors rounded"
+          title="Dismiss"
+        >
+          <IconX className="h-3.5 w-3.5" />
+        </button>
+        {showDismissOptions && (
+          <div
+            className="absolute top-full right-0 mt-1 z-30 bg-surface border border-border rounded-lg shadow-lg py-1 min-w-[140px]"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {DISMISS_REASONS.map((r) => (
+              <button
+                key={r.value}
+                onClick={(e) => handleDismiss(e, r.value)}
+                className="block w-full text-left px-3 py-1.5 text-xs text-ink hover:bg-paper-dark transition-colors"
+              >
+                {r.label}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
   )
+}
+
+const DISMISS_REASONS: { value: DismissReason; label: string }[] = [
+  { value: 'wrong_domain', label: 'Wrong domain' },
+  { value: 'bad_seniority', label: 'Wrong level' },
+  { value: 'wrong_location', label: 'Wrong location' },
+  { value: 'salary_too_low', label: 'Salary too low' },
+  { value: 'not_interested', label: 'Not interested' },
+  { value: 'other', label: 'Other' },
+]
+
+const RECOMMENDATION_LABELS: Record<string, string> = {
+  strong_apply: 'Strong Match',
+  apply: 'Apply',
+  long_shot: 'Long Shot',
+  skip: 'Skip',
 }
 
 function getTimeSince(date: Date): string {
@@ -318,27 +214,6 @@ function getTimeSince(date: Date): string {
   const days = Math.floor(hours / 24)
   if (days < 7) return `${days}d ago`
   return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
-}
-
-const RECOMMENDATION_STYLES: Record<string, { label: string; bg: string; text: string }> = {
-  strong_apply: { label: 'Strong Match', bg: 'bg-success-light', text: 'text-success' },
-  apply: { label: 'Apply', bg: 'bg-teal-light', text: 'text-teal' },
-  long_shot: { label: 'Long Shot', bg: 'bg-amber-light', text: 'text-amber' },
-  skip: { label: 'Skip', bg: 'bg-danger-light', text: 'text-danger' },
-}
-
-function ApplyOddsBadge({ jobId }: { jobId: string }) {
-  const { data: odds, isLoading } = useApplyOdds(jobId)
-  if (isLoading || !odds) return null
-
-  const style = RECOMMENDATION_STYLES[odds.recommendation]
-  if (!style) return null
-
-  return (
-    <div className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-semibold ${style.bg} ${style.text} mb-2`}>
-      {style.label}
-    </div>
-  )
 }
 
 function formatSalary(min: number, max: number | null, currency: string | null): string {

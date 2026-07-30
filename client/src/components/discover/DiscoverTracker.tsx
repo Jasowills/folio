@@ -9,6 +9,11 @@ import { IconPlus } from '@tabler/icons-react'
 const PIPELINE_STAGES = [
   { key: 'saved', label: 'Saved' },
   { key: 'tailoring', label: 'Tailoring' },
+  { key: 'approved', label: 'Approved' },
+  { key: 'filling', label: 'Filling' },
+  { key: 'ready_for_review', label: 'Ready' },
+  { key: 'submitted', label: 'Submitted' },
+  { key: 'failed', label: 'Failed' },
   { key: 'applied', label: 'Applied' },
   { key: 'phone_screen', label: 'Phone Screen' },
   { key: 'technical', label: 'Technical' },

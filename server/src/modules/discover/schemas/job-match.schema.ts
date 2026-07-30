@@ -30,6 +30,9 @@ export class JobMatch {
   matchIntelligenceLine?: string;
 
   @Prop()
+  confidenceExplanation?: string;
+
+  @Prop()
   scoredAt?: Date;
 }
 

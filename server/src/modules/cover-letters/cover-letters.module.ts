@@ -16,5 +16,6 @@ import { ResumesModule } from '../resumes/resumes.module';
   ],
   controllers: [CoverLettersController],
   providers: [CoverLettersService],
+  exports: [CoverLettersService],
 })
 export class CoverLettersModule {}

@@ -23,9 +23,13 @@ import { ArcCrawler } from './crawlers/arc.crawler';
 import { WellfoundCrawler } from './crawlers/wellfound.crawler';
 import { BuiltInCrawler } from './crawlers/builtin.crawler';
 import { TechTreeCrawler } from './crawlers/techtree.crawler';
+import { AshbyCrawler } from './crawlers/ashby.crawler';
+import { ICIMSCrawler } from './crawlers/icims.crawler';
+import { SmartRecruitersCrawler } from './crawlers/smartrecruiters.crawler';
 import { AtsService } from '../ats/ats.service';
 import { AiService } from '../ai/ai.service';
-import { normalizeCompanyName, cleanCompanyName, cleanLocation, decodeHtmlEntities, normalizePostedDate, parseSalary, detectExperienceLevel, extractLocation, extractLanguages, fixMojibake, classifyTechRelevance } from './extractors/job-extractor';
+import { ResumesService } from '../resumes/resumes.service';
+import { normalizeCompanyName, cleanCompanyName, cleanLocation, decodeHtmlEntities, normalizePostedDate, parseSalary, detectExperienceLevel, detectSeniorityLevel, detectRoleFamily, extractLocation, extractLanguages, fixMojibake, classifyTechRelevance } from './extractors/job-extractor';
 
 const JOB_CLASSIFICATION_SYSTEM = `You are a job listing analyst. Given a raw job title and description, determine:
 1. isTechRole: Is this role in software engineering, technology, or a closely related technical field? Security and IT roles count as tech.
@@ -64,8 +68,12 @@ export class DiscoverCrawlService {
     private wellfoundCrawler: WellfoundCrawler,
     private builtInCrawler: BuiltInCrawler,
     private techTreeCrawler: TechTreeCrawler,
+    private ashbyCrawler: AshbyCrawler,
+    private icimsCrawler: ICIMSCrawler,
+    private smartRecruitersCrawler: SmartRecruitersCrawler,
     private atsService: AtsService,
     private aiService: AiService,
+    private resumesService: ResumesService,
   ) {}
 
   startScheduledCrawl(): void {
@@ -112,6 +120,9 @@ export class DiscoverCrawlService {
       this.wellfoundCrawler,
       this.builtInCrawler,
       this.techTreeCrawler,
+      this.ashbyCrawler,
+      this.icimsCrawler,
+      this.smartRecruitersCrawler,
     ];
 
     const sourceStatus: Record<string, any> = {};
@@ -192,6 +203,9 @@ export class DiscoverCrawlService {
     if (url.includes('weworkremotely.com')) return this.weWorkRemotelyCrawler;
     if (url.includes('otta.com')) return this.ottaCrawler;
     if (url.includes('linkedin.com')) return this.linkedInCrawler;
+    if (url.includes('ashbyhq.com')) return this.ashbyCrawler;
+    if (url.includes('icims.com')) return this.icimsCrawler;
+    if (url.includes('smartrecruiters.com')) return this.smartRecruitersCrawler;
     return null;
   }
 
@@ -219,6 +233,8 @@ export class DiscoverCrawlService {
     const { location: extractedLocation, isRemote } = extractLocation(locationRaw);
     const salary = parseSalary(rawDescription);
     const experienceLevel = detectExperienceLevel(roleTitle, rawDescription) ?? undefined;
+    const seniorityLevel = detectSeniorityLevel(roleTitle, rawDescription) ?? undefined;
+    const roleFamily = detectRoleFamily(roleTitle, rawDescription) ?? undefined;
 
     const { relevance, confidence } = classifyTechRelevance(roleTitle, rawDescription);
 
@@ -236,6 +252,8 @@ export class DiscoverCrawlService {
       techRelevance: relevance,
       extractedFields: {
         experienceLevel,
+        seniorityLevel,
+        roleFamily,
         salaryMin: salary.min ?? undefined,
         salaryMax: salary.max ?? undefined,
         salaryCurrency: salary.currency ?? undefined,
@@ -247,18 +265,44 @@ export class DiscoverCrawlService {
   }
 
   async scoreJobsForUser(userId: string, resumeId: string): Promise<void> {
-    const newJobs = await this.jobListingModel.find({
-      _id: { $nin: await this.getScoredJobIds(userId) },
+    const unscoredIds = await this.getScoredJobIds(userId);
+    let candidates = await this.jobListingModel.find({
+      _id: { $nin: unscoredIds },
       isExpired: { $ne: true },
-    }).sort({ postedAt: -1 }).limit(50).exec();
+    }).sort({ postedAt: -1 }).limit(200).exec();
 
-    if (newJobs.length === 0) {
+    if (candidates.length === 0) {
       this.logger.log(`No unscored jobs for user ${userId}`);
       return;
     }
 
-    this.logger.log(`Scoring ${newJobs.length} jobs for user ${userId}`);
-    for (const job of newJobs) {
+    this.logger.log(`Prefiltering ${candidates.length} jobs for user ${userId}`);
+
+    const resume = await this.resumesService.findById(resumeId, userId).catch(() => null);
+    const userSkills = (resume?.skills || []).map((s: string) => s.toLowerCase());
+    const userRole = resume?.detectedRole?.role?.toLowerCase() || '';
+    const userSeniority = resume?.detectedRole?.seniority?.toLowerCase() || '';
+
+    const scored: Array<{ job: any; preScore: number }> = [];
+    for (const job of candidates) {
+      const preScore = this.computePrefilterScore(job, userSkills, userRole, userSeniority);
+      scored.push({ job, preScore });
+    }
+
+    scored.sort((a, b) => b.preScore - a.preScore);
+    const topJobs = scored.filter((s) => s.preScore >= 5).slice(0, 50);
+
+    if (topJobs.length === 0) {
+      this.logger.log(`No jobs passed prefilter for user ${userId} — saving minimal scores for first ${Math.min(candidates.length, 50)}`);
+      const fallback = scored.slice(0, 50);
+      for (const { job, preScore } of fallback) {
+        await this.saveMinimalMatch(userId, resumeId, job, preScore);
+      }
+      return;
+    }
+
+    this.logger.log(`Stage 2 — LLM scoring ${topJobs.length} jobs for user ${userId}`);
+    for (const { job, preScore } of topJobs) {
       try {
         const atsResult = await this.atsService.score(
           userId,
@@ -271,8 +315,8 @@ export class DiscoverCrawlService {
 
         const matched = (atsResult.matchedKeywords || []).map((k: any) => k.keyword || k);
         const missing = (atsResult.missingKeywords || []).map((k: any) => k.keyword || k);
-
         const line = this.generateIntelligenceLine(atsResult.score, matched, missing);
+        const explanation = this.generateConfidenceExplanation(atsResult.score, matched, missing, preScore);
 
         await this.jobMatchModel.create({
           userId: new Types.ObjectId(userId),
@@ -283,12 +327,105 @@ export class DiscoverCrawlService {
           missingKeywords: missing,
           sectionScores: atsResult.sectionScores || {},
           matchIntelligenceLine: line,
+          confidenceExplanation: explanation,
           scoredAt: new Date(),
         });
       } catch (err) {
-        this.logger.error(`Scoring failed for job ${job._id}:`, err);
+        this.logger.error(`LLM scoring failed for job ${job._id}, saving prefilter score:`, err);
+        await this.saveMinimalMatch(userId, resumeId, job, preScore);
       }
     }
+  }
+
+  private computePrefilterScore(job: any, userSkills: string[], userRole: string, userSeniority: string): number {
+    let score = 0;
+    const title = (job.roleTitle || '').toLowerCase();
+    const description = (job.descriptionRaw || '').toLowerCase();
+    const combined = `${title} ${description}`;
+    const extracted = job.extractedFields || {};
+
+    // Role family hard match: +30 if the job's role family matches user's detected role
+    const jobRoleFamily = extracted.roleFamily || '';
+    if (jobRoleFamily && userRole) {
+      if (combined.includes(userRole)) score += 30;
+      const userRoleTerm = userRole.split(/\s+/)[0];
+      if (userRoleTerm && combined.includes(userRoleTerm)) score += 15;
+    } else if (userRole && combined.includes(userRole)) {
+      score += 20;
+    }
+
+    // Seniority alignment: +10 if same seniority, -5 if mismatch
+    const jobSeniority = extracted.seniorityLevel || '';
+    if (jobSeniority && userSeniority) {
+      if (jobSeniority === userSeniority) {
+        score += 10;
+      } else if (
+        (userSeniority === 'senior' && ['staff', 'lead'].includes(jobSeniority)) ||
+        (userSeniority === 'mid' && ['entry', 'senior'].includes(jobSeniority))
+      ) {
+        score += 2; // adjacent levels are okay
+      } else {
+        score -= 5;
+      }
+    }
+
+    // Skill overlap: +2 per matching skill
+    if (userSkills.length > 0) {
+      for (const skill of userSkills) {
+        if (combined.includes(skill)) {
+          score += 2;
+          if (title.includes(skill)) score += 3;
+        }
+      }
+    }
+
+    // Title keyword bonus: tech-related terms boost score
+    const techKeywords = ['engineer', 'developer', 'software', 'scientist', 'architect', 'analyst', 'manager'];
+    for (const kw of techKeywords) {
+      if (title.includes(kw)) {
+        score += 5;
+        break;
+      }
+    }
+
+    // Salary present: +3 (generally indicates a more serious posting)
+    if (extracted.salaryMin || extracted.salaryMax) score += 3;
+
+    return score;
+  }
+
+  private async saveMinimalMatch(userId: string, resumeId: string, job: any, preScore: number): Promise<void> {
+    try {
+      await this.jobMatchModel.create({
+        userId: new Types.ObjectId(userId),
+        jobListingId: job._id as Types.ObjectId,
+        resumeId: new Types.ObjectId(resumeId),
+        atsScore: Math.min(Math.round(preScore * 1.5), 40),
+        matchedKeywords: [],
+        missingKeywords: [],
+        sectionScores: {},
+        matchIntelligenceLine: 'Prefilter score only — job did not meet LLM scoring threshold.',
+        confidenceExplanation: `Quick match score: ${preScore}. Your resume has limited overlap with this role's requirements.`,
+        scoredAt: new Date(),
+      });
+    } catch (err) {
+      this.logger.debug(`Minimal match save failed for job ${job._id}:`, (err as Error).message);
+    }
+  }
+
+  private generateConfidenceExplanation(score: number, matched: string[], missing: string[], preScore: number): string {
+    const parts: string[] = [];
+    if (matched.length > 0) {
+      const top = matched.slice(0, 4).join(', ');
+      parts.push(`Skills overlap: ${top}`);
+    }
+    if (missing.length > 0) {
+      const top = missing.slice(0, 3).join(', ');
+      parts.push(`Missing: ${top}`);
+    }
+    parts.push(`Score: ${score}%`);
+    if (parts.length === 0) return `Prefilter score: ${preScore}. Limited data for detailed analysis.`;
+    return parts.join('. ') + '.';
   }
 
   async backfillClassification(): Promise<void> {
