@@ -41,7 +41,9 @@ export class AuthService {
     const user = await this.usersService.findById(userId);
     if (!user) throw new NotFoundException('User not found');
     if (user.email !== profile.email) {
-      throw new ConflictException('Google account email must match your Folio account email');
+      throw new ConflictException(
+        'Google account email must match your Folio account email',
+      );
     }
     if (user.googleId) {
       return { googleId: user.googleId, linked: true };
@@ -88,10 +90,7 @@ export class AuthService {
       if (!user || !user.refreshTokenHash) {
         throw new UnauthorizedException();
       }
-      const isValid = await bcrypt.compare(
-        refreshToken,
-        user.refreshTokenHash,
-      );
+      const isValid = await bcrypt.compare(refreshToken, user.refreshTokenHash);
       if (!isValid) throw new UnauthorizedException();
       return this.generateTokens(user);
     } catch {

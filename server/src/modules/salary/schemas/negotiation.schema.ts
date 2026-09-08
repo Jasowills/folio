@@ -1,57 +1,57 @@
-import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose'
-import { Document, Types, Schema as MongooseSchema } from 'mongoose'
+import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
+import { Document, Types, Schema as MongooseSchema } from 'mongoose';
 
-export type NegotiationDocument = Negotiation & Document
+export type NegotiationDocument = Negotiation & Document;
 
 @Schema({ timestamps: true })
 export class Negotiation {
   @Prop({ required: true, type: MongooseSchema.Types.ObjectId, ref: 'Offer' })
-  offerId!: Types.ObjectId
+  offerId!: Types.ObjectId;
 
   @Prop({ required: true, type: MongooseSchema.Types.ObjectId, ref: 'User' })
-  userId!: Types.ObjectId
+  userId!: Types.ObjectId;
 
   @Prop({ default: 'drafting' })
-  stage!: 'drafting' | 'ready' | 'sent' | 'countered' | 'resolved'
+  stage!: 'drafting' | 'ready' | 'sent' | 'countered' | 'resolved';
 
   @Prop()
-  strategy?: string
+  strategy?: string;
 
   @Prop()
-  script?: string
+  script?: string;
 
   @Prop()
-  fallbackScript?: string
+  fallbackScript?: string;
 
   @Prop({ type: Object })
   benchmarkData?: {
-    roleTitle: string
-    location: string
-    baseSalaryP10?: number
-    baseSalaryP25?: number
-    baseSalaryP50?: number
-    baseSalaryP75?: number
-    baseSalaryP90?: number
-    equityRange?: string
-    sources?: string[]
-  }
+    roleTitle: string;
+    location: string;
+    baseSalaryP10?: number;
+    baseSalaryP25?: number;
+    baseSalaryP50?: number;
+    baseSalaryP75?: number;
+    baseSalaryP90?: number;
+    equityRange?: string;
+    sources?: string[];
+  };
 
   @Prop()
-  pitchPoints?: string
+  pitchPoints?: string;
 
   @Prop()
-  confidence?: 'low' | 'medium' | 'high'
+  confidence?: 'low' | 'medium' | 'high';
 
   @Prop()
-  sentAt?: Date
+  sentAt?: Date;
 
   @Prop()
-  resolvedAt?: Date
+  resolvedAt?: Date;
 
   @Prop()
-  outcome?: string
+  outcome?: string;
 }
 
-export const NegotiationSchema = SchemaFactory.createForClass(Negotiation)
+export const NegotiationSchema = SchemaFactory.createForClass(Negotiation);
 
-NegotiationSchema.index({ offerId: 1 }, { unique: true })
+NegotiationSchema.index({ offerId: 1 }, { unique: true });

@@ -1,6 +1,9 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { AtsRouterService, ATSPlatform } from './ats-router.service';
-import { GreenhouseAdapter, type FillResult } from './ats-adapters/greenhouse.adapter';
+import {
+  GreenhouseAdapter,
+  type FillResult,
+} from './ats-adapters/greenhouse.adapter';
 import { LeverAdapter } from './ats-adapters/lever.adapter';
 import { WorkdayAdapter } from './ats-adapters/workday.adapter';
 import { ICIMSAdapter } from './ats-adapters/icims.adapter';
@@ -43,21 +46,57 @@ export class FieldMappingService {
     screeningQuestions: { question: string; inputType: string }[];
     error?: string;
   }> {
-    const { applicationUrl, atsPlatform, resumeUrl, coverLetterContent, userData } = params;
+    const {
+      applicationUrl,
+      atsPlatform,
+      resumeUrl,
+      coverLetterContent,
+      userData,
+    } = params;
 
     switch (atsPlatform) {
       case 'greenhouse':
-        return this.greenhouseAdapter.fillApplication(applicationUrl, resumeUrl, coverLetterContent, userData);
+        return this.greenhouseAdapter.fillApplication(
+          applicationUrl,
+          resumeUrl,
+          coverLetterContent,
+          userData,
+        );
       case 'lever':
-        return this.leverAdapter.fillApplication(applicationUrl, resumeUrl, coverLetterContent, userData);
+        return this.leverAdapter.fillApplication(
+          applicationUrl,
+          resumeUrl,
+          coverLetterContent,
+          userData,
+        );
       case 'workday':
-        return this.workdayAdapter.fillApplication(applicationUrl, resumeUrl, coverLetterContent, userData);
+        return this.workdayAdapter.fillApplication(
+          applicationUrl,
+          resumeUrl,
+          coverLetterContent,
+          userData,
+        );
       case 'icims':
-        return this.icimsAdapter.fillApplication(applicationUrl, resumeUrl, coverLetterContent, userData);
+        return this.icimsAdapter.fillApplication(
+          applicationUrl,
+          resumeUrl,
+          coverLetterContent,
+          userData,
+        );
       case 'ashby':
-        return this.ashbyAdapter.fillApplication(applicationUrl, resumeUrl, coverLetterContent, userData);
+        return this.ashbyAdapter.fillApplication(
+          applicationUrl,
+          resumeUrl,
+          coverLetterContent,
+          userData,
+        );
       case 'smartrecruiters':
-        return this.smartRecruitersAdapter.fillApplication(applicationUrl, resumeUrl, coverLetterContent, userData);
+        return this.smartRecruitersAdapter.fillApplication(
+          applicationUrl,
+          resumeUrl,
+          coverLetterContent,
+          userData,
+        );
       default:
         return {
           success: false,
@@ -70,13 +109,20 @@ export class FieldMappingService {
 
   getAdapter(platform: ATSPlatform): any {
     switch (platform) {
-      case 'greenhouse': return this.greenhouseAdapter;
-      case 'lever': return this.leverAdapter;
-      case 'workday': return this.workdayAdapter;
-      case 'icims': return this.icimsAdapter;
-      case 'ashby': return this.ashbyAdapter;
-      case 'smartrecruiters': return this.smartRecruitersAdapter;
-      default: return null;
+      case 'greenhouse':
+        return this.greenhouseAdapter;
+      case 'lever':
+        return this.leverAdapter;
+      case 'workday':
+        return this.workdayAdapter;
+      case 'icims':
+        return this.icimsAdapter;
+      case 'ashby':
+        return this.ashbyAdapter;
+      case 'smartrecruiters':
+        return this.smartRecruitersAdapter;
+      default:
+        return null;
     }
   }
 }

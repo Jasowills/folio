@@ -84,15 +84,19 @@ export class LeverCrawler extends BaseCrawler {
 
   private extractJobsFromBoard(html: string, company: LeverCompany): RawJob[] {
     const jobs: RawJob[] = [];
-    const postingsRegex = /<a[^>]*href=["']([^"']*\/[a-f0-9-]{36})["'][^>]*>([\s\S]*?)<\/a>/gi;
+    const postingsRegex =
+      /<a[^>]*href=["']([^"']*\/[a-f0-9-]{36})["'][^>]*>([\s\S]*?)<\/a>/gi;
     let match: RegExpExecArray | null;
     const seenIds = new Set<string>();
 
     while ((match = postingsRegex.exec(html)) !== null) {
       const url = match[1];
       const inner = match[2];
-      const titleMatch = inner.match(/<h4[^>]*>([^<]+)<\/h4>/i)
-        || inner.match(/class=["'][^"']*(?:title|posting-title)["'][^>]*>([^<]+)</i);
+      const titleMatch =
+        inner.match(/<h4[^>]*>([^<]+)<\/h4>/i) ||
+        inner.match(
+          /class=["'][^"']*(?:title|posting-title)["'][^>]*>([^<]+)</i,
+        );
       const title = titleMatch ? titleMatch[1].trim() : '';
       if (!title) continue;
 
@@ -100,7 +104,9 @@ export class LeverCrawler extends BaseCrawler {
       if (seenIds.has(id)) continue;
       seenIds.add(id);
 
-      const locationMatch = inner.match(/(?:Remote|(?:San Francisco|New York|London|Berlin|Austin|Seattle|Chicago|Los Angeles|Toronto|Sydney|Singapore|Dublin|Amsterdam|Paris|Tokyo|Bangalore|Austin|Denver|Portland|Miami|Boston|Washington|Philadelphia|Atlanta|Dallas|Houston|Phoenix|Minneapolis|Detroit|Seattle|Portland|Vancouver|Montreal|Melbourne))\s*(?:,\s*[A-Z]{2})?/gi);
+      const locationMatch = inner.match(
+        /(?:Remote|(?:San Francisco|New York|London|Berlin|Austin|Seattle|Chicago|Los Angeles|Toronto|Sydney|Singapore|Dublin|Amsterdam|Paris|Tokyo|Bangalore|Austin|Denver|Portland|Miami|Boston|Washington|Philadelphia|Atlanta|Dallas|Houston|Phoenix|Minneapolis|Detroit|Seattle|Portland|Vancouver|Montreal|Melbourne))\s*(?:,\s*[A-Z]{2})?/gi,
+      );
       const locationText = locationMatch ? locationMatch[0] : null;
 
       jobs.push({
@@ -109,10 +115,14 @@ export class LeverCrawler extends BaseCrawler {
         roleTitle: title,
         companyName: company.name,
         location: locationText,
-        isRemote: locationText ? locationText.toLowerCase().includes('remote') : false,
+        isRemote: locationText
+          ? locationText.toLowerCase().includes('remote')
+          : false,
         postedAt: null,
         descriptionRaw: '',
-        applicationUrl: url.startsWith('http') ? url : `https://jobs.lever.co${url}`,
+        applicationUrl: url.startsWith('http')
+          ? url
+          : `https://jobs.lever.co${url}`,
         isVerified: true,
       });
     }

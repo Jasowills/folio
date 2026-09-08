@@ -49,7 +49,8 @@ export class TechTreeCrawler extends BaseCrawler {
           location: card.location,
           isRemote,
           postedAt: new Date(),
-          descriptionRaw: descParts.length > 0 ? descParts.join('. ') + '.' : '',
+          descriptionRaw:
+            descParts.length > 0 ? descParts.join('. ') + '.' : '',
           applicationUrl: `https://jobs.techtree.dev/job/${card.uuid}`,
           isVerified: false,
         });
@@ -62,7 +63,8 @@ export class TechTreeCrawler extends BaseCrawler {
 
   private parseCards(html: string): CardData[] {
     const cards: CardData[] = [];
-    const cardRegex = /<a\s+href="\/job\/([a-f0-9-]+)"[^>]*class="group block rounded-xl[^"]*"[^>]*>([\s\S]*?)<\/a>/gi;
+    const cardRegex =
+      /<a\s+href="\/job\/([a-f0-9-]+)"[^>]*class="group block rounded-xl[^"]*"[^>]*>([\s\S]*?)<\/a>/gi;
     let match: RegExpExecArray | null;
 
     while ((match = cardRegex.exec(html)) !== null) {
@@ -71,25 +73,38 @@ export class TechTreeCrawler extends BaseCrawler {
 
       const title = this.extract(inner, /<h3[^>]*>([\s\S]*?)<\/h3>/);
 
-      const company = this.extract(inner, /<p[^>]*class="mt-1 flex items-center[^"]*"[^>]*>([\s\S]*?)<\/p>/);
+      const company = this.extract(
+        inner,
+        /<p[^>]*class="mt-1 flex items-center[^"]*"[^>]*>([\s\S]*?)<\/p>/,
+      );
 
-      const logoSrc = this.extract(inner, /<img[^>]*src="([^"]*)"[^>]*alt="[^"]*"[^>]*\/>/);
+      const logoSrc = this.extract(
+        inner,
+        /<img[^>]*src="([^"]*)"[^>]*alt="[^"]*"[^>]*\/>/,
+      );
 
       let location: string | null = null;
-      const locMatch = /<span[^>]*class="min-w-0 truncate text-foreground"[^>]*>([\s\S]*?)<\/span>/.exec(inner);
+      const locMatch =
+        /<span[^>]*class="min-w-0 truncate text-foreground"[^>]*>([\s\S]*?)<\/span>/.exec(
+          inner,
+        );
       if (locMatch) {
         location = locMatch[1].trim();
       }
 
       const skills: string[] = [];
-      const skillRegex = /<span[^>]*data-skill="true"[^>]*>([\s\S]*?)<\/span>/gi;
+      const skillRegex =
+        /<span[^>]*data-skill="true"[^>]*>([\s\S]*?)<\/span>/gi;
       let skillMatch: RegExpExecArray | null;
       while ((skillMatch = skillRegex.exec(inner)) !== null) {
         skills.push(skillMatch[1].trim());
       }
 
       let salary: string | null = null;
-      const salMatch = /<span[^>]*class="text-base font-bold text-foreground[^"]*"[^>]*>([\s\S]*?)<\/span>/.exec(inner);
+      const salMatch =
+        /<span[^>]*class="text-base font-bold text-foreground[^"]*"[^>]*>([\s\S]*?)<\/span>/.exec(
+          inner,
+        );
       if (salMatch) {
         salary = salMatch[1].trim();
       }
@@ -123,6 +138,8 @@ export class TechTreeCrawler extends BaseCrawler {
       .replace(/&lt;/g, '<')
       .replace(/&gt;/g, '>')
       .replace(/&quot;/g, '"')
-      .replace(/&#(\d+);/g, (_, code) => String.fromCharCode(parseInt(code, 10)));
+      .replace(/&#(\d+);/g, (_, code) =>
+        String.fromCharCode(parseInt(code, 10)),
+      );
   }
 }

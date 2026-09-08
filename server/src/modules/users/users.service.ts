@@ -20,10 +20,7 @@ export class UsersService {
     return this.userModel.create(data);
   }
 
-  async updateRefreshToken(
-    userId: string,
-    hash: string | null,
-  ): Promise<void> {
+  async updateRefreshToken(userId: string, hash: string | null): Promise<void> {
     await this.userModel.findByIdAndUpdate(userId, {
       refreshTokenHash: hash,
     });

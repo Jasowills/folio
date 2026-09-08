@@ -3,9 +3,15 @@ import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { JobListing, JobListingDocument } from './schemas/job-listing.schema';
 import { JobMatch, JobMatchDocument } from './schemas/job-match.schema';
-import { JobApplication, JobApplicationDocument } from './schemas/job-application.schema';
+import {
+  JobApplication,
+  JobApplicationDocument,
+} from './schemas/job-application.schema';
 import { CrawlMeta, CrawlMetaDocument } from './schemas/crawl-meta.schema';
-import { DiscoverPreferences, DiscoverPreferencesDocument } from './schemas/discover-preferences.schema';
+import {
+  DiscoverPreferences,
+  DiscoverPreferencesDocument,
+} from './schemas/discover-preferences.schema';
 import { BaseCrawler, RawJob } from './crawlers/base.crawler';
 import { RemoteOkCrawler } from './crawlers/remoteok.crawler';
 import { WeWorkRemotelyCrawler } from './crawlers/weworkremotely.crawler';
@@ -17,7 +23,10 @@ import { HNCrawler } from './crawlers/hn.crawler';
 import { YCombinatorCrawler } from './crawlers/ycombinator.crawler';
 import { TwitterCrawler } from './crawlers/twitter.crawler';
 import { LinkedInCrawler } from './crawlers/linkedin.crawler';
-import { CryptoJobsListCrawler, BitcoinerJobsCrawler } from './crawlers/crypto.crawler';
+import {
+  CryptoJobsListCrawler,
+  BitcoinerJobsCrawler,
+} from './crawlers/crypto.crawler';
 import { RemotiveCrawler } from './crawlers/remotive.crawler';
 import { ArcCrawler } from './crawlers/arc.crawler';
 import { WellfoundCrawler } from './crawlers/wellfound.crawler';
@@ -29,7 +38,21 @@ import { SmartRecruitersCrawler } from './crawlers/smartrecruiters.crawler';
 import { AtsService } from '../ats/ats.service';
 import { AiService } from '../ai/ai.service';
 import { ResumesService } from '../resumes/resumes.service';
-import { normalizeCompanyName, cleanCompanyName, cleanLocation, decodeHtmlEntities, normalizePostedDate, parseSalary, detectExperienceLevel, detectSeniorityLevel, detectRoleFamily, extractLocation, extractLanguages, fixMojibake, classifyTechRelevance } from './extractors/job-extractor';
+import {
+  normalizeCompanyName,
+  cleanCompanyName,
+  cleanLocation,
+  decodeHtmlEntities,
+  normalizePostedDate,
+  parseSalary,
+  detectExperienceLevel,
+  detectSeniorityLevel,
+  detectRoleFamily,
+  extractLocation,
+  extractLanguages,
+  fixMojibake,
+  classifyTechRelevance,
+} from './extractors/job-extractor';
 
 const JOB_CLASSIFICATION_SYSTEM = `You are a job listing analyst. Given a raw job title and description, determine:
 1. isTechRole: Is this role in software engineering, technology, or a closely related technical field? Security and IT roles count as tech.
@@ -46,11 +69,15 @@ export class DiscoverCrawlService {
   private crawlTimer: ReturnType<typeof setInterval> | null = null;
 
   constructor(
-    @InjectModel(JobListing.name) private jobListingModel: Model<JobListingDocument>,
+    @InjectModel(JobListing.name)
+    private jobListingModel: Model<JobListingDocument>,
     @InjectModel(JobMatch.name) private jobMatchModel: Model<JobMatchDocument>,
-    @InjectModel(JobApplication.name) private jobAppModel: Model<JobApplicationDocument>,
-    @InjectModel(CrawlMeta.name) private crawlMetaModel: Model<CrawlMetaDocument>,
-    @InjectModel(DiscoverPreferences.name) private prefsModel: Model<DiscoverPreferencesDocument>,
+    @InjectModel(JobApplication.name)
+    private jobAppModel: Model<JobApplicationDocument>,
+    @InjectModel(CrawlMeta.name)
+    private crawlMetaModel: Model<CrawlMetaDocument>,
+    @InjectModel(DiscoverPreferences.name)
+    private prefsModel: Model<DiscoverPreferencesDocument>,
     private remoteOkCrawler: RemoteOkCrawler,
     private weWorkRemotelyCrawler: WeWorkRemotelyCrawler,
     private greenhouseCrawler: GreenhouseCrawler,
@@ -80,7 +107,10 @@ export class DiscoverCrawlService {
     if (this.crawlTimer) return;
     this.logger.log('Starting scheduled crawl (every 6 hours)');
     this.runCrawlCycle();
-    this.crawlTimer = setInterval(() => this.runCrawlCycle(), 6 * 60 * 60 * 1000);
+    this.crawlTimer = setInterval(
+      () => this.runCrawlCycle(),
+      6 * 60 * 60 * 1000,
+    );
     // Backfill classification on startup so existing jobs get classified
     this.backfillClassification().catch((err) =>
       this.logger.error('Startup backfill failed:', err),
@@ -127,14 +157,16 @@ export class DiscoverCrawlService {
 
     const sourceStatus: Record<string, any> = {};
 
-    const results = await Promise.allSettled(crawlers.map(async (crawler) => {
-      try {
-        const rawJobs = await crawler.crawl();
-        return { source: crawler.source, rawJobs };
-      } catch (err) {
-        throw { source: crawler.source, message: (err as Error).message };
-      }
-    }));
+    const results = await Promise.allSettled(
+      crawlers.map(async (crawler) => {
+        try {
+          const rawJobs = await crawler.crawl();
+          return { source: crawler.source, rawJobs };
+        } catch (err) {
+          throw { source: crawler.source, message: (err as Error).message };
+        }
+      }),
+    );
 
     for (const result of results) {
       if (result.status === 'fulfilled') {
@@ -145,21 +177,32 @@ export class DiscoverCrawlService {
           await this.processRawJobs(rawJobs, source);
         } catch (err) {
           this.logger.error(`${source} processing failed:`, err);
-          sourceStatus[source] = { status: 'error', error: (err as Error).message };
+          sourceStatus[source] = {
+            status: 'error',
+            error: (err as Error).message,
+          };
         }
       } else {
-        const source = (result.reason as any)?.source || 'unknown';
-        sourceStatus[source] = { status: 'error', error: result.reason?.message || String(result.reason) };
+        const source = result.reason?.source || 'unknown';
+        sourceStatus[source] = {
+          status: 'error',
+          error: result.reason?.message || String(result.reason),
+        };
         this.logger.error(`${source} crawl failed:`, result.reason);
       }
     }
 
     const now = new Date();
-    await this.crawlMetaModel.updateOne(
-      { key: 'singleton' },
-      { $set: { lastCrawledAt: now, sourceStatus }, $setOnInsert: { key: 'singleton' } },
-      { upsert: true },
-    ).exec();
+    await this.crawlMetaModel
+      .updateOne(
+        { key: 'singleton' },
+        {
+          $set: { lastCrawledAt: now, sourceStatus },
+          $setOnInsert: { key: 'singleton' },
+        },
+        { upsert: true },
+      )
+      .exec();
 
     this.crawling = false;
     this.logger.log('Crawl cycle complete');
@@ -189,7 +232,9 @@ export class DiscoverCrawlService {
     if (rawJobs.length === 0) return null;
 
     const rawJob = rawJobs[0];
-    const existing = await this.jobListingModel.findOne({ sourceId: rawJob.sourceId }).exec();
+    const existing = await this.jobListingModel
+      .findOne({ sourceId: rawJob.sourceId })
+      .exec();
     if (existing) return existing;
 
     return this.insertJob(rawJob);
@@ -209,10 +254,15 @@ export class DiscoverCrawlService {
     return null;
   }
 
-  private async processRawJobs(rawJobs: RawJob[], source: string): Promise<void> {
+  private async processRawJobs(
+    rawJobs: RawJob[],
+    source: string,
+  ): Promise<void> {
     let newCount = 0;
     for (const raw of rawJobs) {
-      const existing = await this.jobListingModel.findOne({ sourceId: raw.sourceId }).exec();
+      const existing = await this.jobListingModel
+        .findOne({ sourceId: raw.sourceId })
+        .exec();
       if (existing) continue;
       await this.insertJob(raw);
       newCount++;
@@ -223,20 +273,28 @@ export class DiscoverCrawlService {
   }
 
   private async insertJob(raw: RawJob): Promise<JobListingDocument> {
-    const companyName = cleanCompanyName(decodeHtmlEntities(normalizeCompanyName(raw.companyName)));
+    const companyName = cleanCompanyName(
+      decodeHtmlEntities(normalizeCompanyName(raw.companyName)),
+    );
     const roleTitle = decodeHtmlEntities(raw.roleTitle);
     const rawDescription = fixMojibake(decodeHtmlEntities(raw.descriptionRaw));
     const locationRaw = cleanLocation(decodeHtmlEntities(raw.location || ''));
 
     const postedAt = raw.postedAt || new Date();
     const expiresAt = new Date(postedAt.getTime() + 7 * 24 * 60 * 60 * 1000);
-    const { location: extractedLocation, isRemote } = extractLocation(locationRaw);
+    const { location: extractedLocation, isRemote } =
+      extractLocation(locationRaw);
     const salary = parseSalary(rawDescription);
-    const experienceLevel = detectExperienceLevel(roleTitle, rawDescription) ?? undefined;
-    const seniorityLevel = detectSeniorityLevel(roleTitle, rawDescription) ?? undefined;
+    const experienceLevel =
+      detectExperienceLevel(roleTitle, rawDescription) ?? undefined;
+    const seniorityLevel =
+      detectSeniorityLevel(roleTitle, rawDescription) ?? undefined;
     const roleFamily = detectRoleFamily(roleTitle, rawDescription) ?? undefined;
 
-    const { relevance, confidence } = classifyTechRelevance(roleTitle, rawDescription);
+    const { relevance, confidence } = classifyTechRelevance(
+      roleTitle,
+      rawDescription,
+    );
 
     return this.jobListingModel.create({
       source: raw.source,
@@ -266,26 +324,41 @@ export class DiscoverCrawlService {
 
   async scoreJobsForUser(userId: string, resumeId: string): Promise<void> {
     const unscoredIds = await this.getScoredJobIds(userId);
-    let candidates = await this.jobListingModel.find({
-      _id: { $nin: unscoredIds },
-      isExpired: { $ne: true },
-    }).sort({ postedAt: -1 }).limit(200).exec();
+    const candidates = await this.jobListingModel
+      .find({
+        _id: { $nin: unscoredIds },
+        isExpired: { $ne: true },
+      })
+      .sort({ postedAt: -1 })
+      .limit(200)
+      .exec();
 
     if (candidates.length === 0) {
       this.logger.log(`No unscored jobs for user ${userId}`);
       return;
     }
 
-    this.logger.log(`Prefiltering ${candidates.length} jobs for user ${userId}`);
+    this.logger.log(
+      `Prefiltering ${candidates.length} jobs for user ${userId}`,
+    );
 
-    const resume = await this.resumesService.findById(resumeId, userId).catch(() => null);
-    const userSkills = (resume?.skills || []).map((s: string) => s.toLowerCase());
+    const resume = await this.resumesService
+      .findById(resumeId, userId)
+      .catch(() => null);
+    const userSkills = (resume?.skills || []).map((s: string) =>
+      s.toLowerCase(),
+    );
     const userRole = resume?.detectedRole?.role?.toLowerCase() || '';
     const userSeniority = resume?.detectedRole?.seniority?.toLowerCase() || '';
 
     const scored: Array<{ job: any; preScore: number }> = [];
     for (const job of candidates) {
-      const preScore = this.computePrefilterScore(job, userSkills, userRole, userSeniority);
+      const preScore = this.computePrefilterScore(
+        job,
+        userSkills,
+        userRole,
+        userSeniority,
+      );
       scored.push({ job, preScore });
     }
 
@@ -293,7 +366,9 @@ export class DiscoverCrawlService {
     const topJobs = scored.filter((s) => s.preScore >= 5).slice(0, 50);
 
     if (topJobs.length === 0) {
-      this.logger.log(`No jobs passed prefilter for user ${userId} — saving minimal scores for first ${Math.min(candidates.length, 50)}`);
+      this.logger.log(
+        `No jobs passed prefilter for user ${userId} — saving minimal scores for first ${Math.min(candidates.length, 50)}`,
+      );
       const fallback = scored.slice(0, 50);
       for (const { job, preScore } of fallback) {
         await this.saveMinimalMatch(userId, resumeId, job, preScore);
@@ -301,7 +376,9 @@ export class DiscoverCrawlService {
       return;
     }
 
-    this.logger.log(`Stage 2 — LLM scoring ${topJobs.length} jobs for user ${userId}`);
+    this.logger.log(
+      `Stage 2 — LLM scoring ${topJobs.length} jobs for user ${userId}`,
+    );
     for (const { job, preScore } of topJobs) {
       try {
         const atsResult = await this.atsService.score(
@@ -313,10 +390,23 @@ export class DiscoverCrawlService {
           job.companyName,
         );
 
-        const matched = (atsResult.matchedKeywords || []).map((k: any) => k.keyword || k);
-        const missing = (atsResult.missingKeywords || []).map((k: any) => k.keyword || k);
-        const line = this.generateIntelligenceLine(atsResult.score, matched, missing);
-        const explanation = this.generateConfidenceExplanation(atsResult.score, matched, missing, preScore);
+        const matched = (atsResult.matchedKeywords || []).map(
+          (k: any) => k.keyword || k,
+        );
+        const missing = (atsResult.missingKeywords || []).map(
+          (k: any) => k.keyword || k,
+        );
+        const line = this.generateIntelligenceLine(
+          atsResult.score,
+          matched,
+          missing,
+        );
+        const explanation = this.generateConfidenceExplanation(
+          atsResult.score,
+          matched,
+          missing,
+          preScore,
+        );
 
         await this.jobMatchModel.create({
           userId: new Types.ObjectId(userId),
@@ -331,13 +421,21 @@ export class DiscoverCrawlService {
           scoredAt: new Date(),
         });
       } catch (err) {
-        this.logger.error(`LLM scoring failed for job ${job._id}, saving prefilter score:`, err);
+        this.logger.error(
+          `LLM scoring failed for job ${job._id}, saving prefilter score:`,
+          err,
+        );
         await this.saveMinimalMatch(userId, resumeId, job, preScore);
       }
     }
   }
 
-  private computePrefilterScore(job: any, userSkills: string[], userRole: string, userSeniority: string): number {
+  private computePrefilterScore(
+    job: any,
+    userSkills: string[],
+    userRole: string,
+    userSeniority: string,
+  ): number {
     let score = 0;
     const title = (job.roleTitle || '').toLowerCase();
     const description = (job.descriptionRaw || '').toLowerCase();
@@ -360,7 +458,8 @@ export class DiscoverCrawlService {
       if (jobSeniority === userSeniority) {
         score += 10;
       } else if (
-        (userSeniority === 'senior' && ['staff', 'lead'].includes(jobSeniority)) ||
+        (userSeniority === 'senior' &&
+          ['staff', 'lead'].includes(jobSeniority)) ||
         (userSeniority === 'mid' && ['entry', 'senior'].includes(jobSeniority))
       ) {
         score += 2; // adjacent levels are okay
@@ -380,7 +479,15 @@ export class DiscoverCrawlService {
     }
 
     // Title keyword bonus: tech-related terms boost score
-    const techKeywords = ['engineer', 'developer', 'software', 'scientist', 'architect', 'analyst', 'manager'];
+    const techKeywords = [
+      'engineer',
+      'developer',
+      'software',
+      'scientist',
+      'architect',
+      'analyst',
+      'manager',
+    ];
     for (const kw of techKeywords) {
       if (title.includes(kw)) {
         score += 5;
@@ -394,7 +501,12 @@ export class DiscoverCrawlService {
     return score;
   }
 
-  private async saveMinimalMatch(userId: string, resumeId: string, job: any, preScore: number): Promise<void> {
+  private async saveMinimalMatch(
+    userId: string,
+    resumeId: string,
+    job: any,
+    preScore: number,
+  ): Promise<void> {
     try {
       await this.jobMatchModel.create({
         userId: new Types.ObjectId(userId),
@@ -404,16 +516,25 @@ export class DiscoverCrawlService {
         matchedKeywords: [],
         missingKeywords: [],
         sectionScores: {},
-        matchIntelligenceLine: 'Prefilter score only — job did not meet LLM scoring threshold.',
+        matchIntelligenceLine:
+          'Prefilter score only — job did not meet LLM scoring threshold.',
         confidenceExplanation: `Quick match score: ${preScore}. Your resume has limited overlap with this role's requirements.`,
         scoredAt: new Date(),
       });
     } catch (err) {
-      this.logger.debug(`Minimal match save failed for job ${job._id}:`, (err as Error).message);
+      this.logger.debug(
+        `Minimal match save failed for job ${job._id}:`,
+        (err as Error).message,
+      );
     }
   }
 
-  private generateConfidenceExplanation(score: number, matched: string[], missing: string[], preScore: number): string {
+  private generateConfidenceExplanation(
+    score: number,
+    matched: string[],
+    missing: string[],
+    preScore: number,
+  ): string {
     const parts: string[] = [];
     if (matched.length > 0) {
       const top = matched.slice(0, 4).join(', ');
@@ -424,29 +545,39 @@ export class DiscoverCrawlService {
       parts.push(`Missing: ${top}`);
     }
     parts.push(`Score: ${score}%`);
-    if (parts.length === 0) return `Prefilter score: ${preScore}. Limited data for detailed analysis.`;
+    if (parts.length === 0)
+      return `Prefilter score: ${preScore}. Limited data for detailed analysis.`;
     return parts.join('. ') + '.';
   }
 
   async backfillClassification(): Promise<void> {
-    const unclassified = await this.jobListingModel.find({
-      techRelevance: { $exists: false },
-      isExpired: { $ne: true },
-    }).exec();
+    const unclassified = await this.jobListingModel
+      .find({
+        techRelevance: { $exists: false },
+        isExpired: { $ne: true },
+      })
+      .exec();
 
     if (unclassified.length === 0) {
       this.logger.log('Backfill: all jobs already classified');
       return;
     }
 
-    this.logger.log(`Backfill: classifying ${unclassified.length} existing jobs with keyword classifier`);
+    this.logger.log(
+      `Backfill: classifying ${unclassified.length} existing jobs with keyword classifier`,
+    );
     const bulk = this.jobListingModel.collection.initializeUnorderedBulkOp();
     let count = 0;
 
     for (const job of unclassified) {
-      const { relevance } = classifyTechRelevance(job.roleTitle, job.descriptionRaw || '');
+      const { relevance } = classifyTechRelevance(
+        job.roleTitle,
+        job.descriptionRaw || '',
+      );
       if (relevance) {
-        bulk.find({ _id: job._id }).updateOne({ $set: { techRelevance: relevance } });
+        bulk
+          .find({ _id: job._id })
+          .updateOne({ $set: { techRelevance: relevance } });
         count++;
       }
     }
@@ -458,40 +589,55 @@ export class DiscoverCrawlService {
   }
 
   private async runJobEnrichment(): Promise<void> {
-    const candidates = await this.jobListingModel.find({
-      $or: [
-        { techRelevance: 'unknown' },
-        { techRelevance: { $exists: false } },
-      ],
-      isExpired: { $ne: true },
-    }).sort({ postedAt: -1 }).limit(100).exec();
+    const candidates = await this.jobListingModel
+      .find({
+        $or: [
+          { techRelevance: 'unknown' },
+          { techRelevance: { $exists: false } },
+        ],
+        isExpired: { $ne: true },
+      })
+      .sort({ postedAt: -1 })
+      .limit(100)
+      .exec();
 
     if (candidates.length === 0) return;
-    this.logger.log(`Enriching ${candidates.length} jobs with AI classification`);
+    this.logger.log(
+      `Enriching ${candidates.length} jobs with AI classification`,
+    );
 
     let enriched = 0;
     for (const job of candidates) {
       try {
-        const result = await this.aiService.chat(
+        const result = (await this.aiService.chat(
           JOB_CLASSIFICATION_SYSTEM,
           `Title: ${job.roleTitle}\n\nDescription:\n${(job.descriptionRaw || '').slice(0, 1500)}`,
-        ) as { isTechRole?: boolean; cleanedTitle?: string | null; techCategory?: string; confidence?: number };
+        )) as {
+          isTechRole?: boolean;
+          cleanedTitle?: string | null;
+          techCategory?: string;
+          confidence?: number;
+        };
 
         const isTech = result.isTechRole === true;
         const confidence = result.confidence ?? 0;
 
         const update: Record<string, unknown> = {
           techRelevance: isTech ? 'tech' : 'non-tech',
-        }
+        };
 
         if (result.cleanedTitle && result.cleanedTitle !== job.roleTitle) {
-          update.aiEnhancedTitle = result.cleanedTitle
+          update.aiEnhancedTitle = result.cleanedTitle;
         }
 
-        await this.jobListingModel.updateOne({ _id: job._id }, { $set: update }).exec()
+        await this.jobListingModel
+          .updateOne({ _id: job._id }, { $set: update })
+          .exec();
         enriched++;
       } catch (err) {
-        this.logger.debug(`AI enrichment failed for job ${job._id}: ${(err as Error).message}`);
+        this.logger.debug(
+          `AI enrichment failed for job ${job._id}: ${(err as Error).message}`,
+        );
       }
     }
 
@@ -504,20 +650,28 @@ export class DiscoverCrawlService {
     const prefs = await this.prefsModel.find({}).populate('resumeId').exec();
     for (const pref of prefs) {
       if (!pref.resumeId) continue;
-      const userId = (pref.userId as Types.ObjectId).toString();
-      const resumeId = (pref.resumeId as Types.ObjectId).toString();
+      const userId = pref.userId.toString();
+      const resumeId = pref.resumeId.toString();
       await this.scoreJobsForUser(userId, resumeId);
     }
   }
 
   private async getScoredJobIds(userId: string): Promise<Types.ObjectId[]> {
-    const matches = await this.jobMatchModel.find({ userId: new Types.ObjectId(userId) }).select('jobListingId').exec();
+    const matches = await this.jobMatchModel
+      .find({ userId: new Types.ObjectId(userId) })
+      .select('jobListingId')
+      .exec();
     return matches.map((m) => m.jobListingId);
   }
 
-  private generateIntelligenceLine(score: number, matched: string[], missing: string[]): string {
+  private generateIntelligenceLine(
+    score: number,
+    matched: string[],
+    missing: string[],
+  ): string {
     if (score >= 75) {
-      if (missing.length === 0) return 'Your resume is an excellent match for this role.';
+      if (missing.length === 0)
+        return 'Your resume is an excellent match for this role.';
       return `Strong match — your resume matches ${matched.length} of ${matched.length + missing.length} key requirements.`;
     }
     if (score >= 50) {
@@ -544,15 +698,20 @@ export class DiscoverCrawlService {
   private async runAutoGhosting(): Promise<void> {
     const fourteenDaysAgo = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000);
     try {
-      const stale = await this.jobAppModel.find({
-        stage: 'applied',
-        lastActivityAt: { $lt: fourteenDaysAgo },
-        isDeleted: { $ne: true },
-      }).populate('jobListingId', 'roleTitle companyName').exec();
+      const stale = await this.jobAppModel
+        .find({
+          stage: 'applied',
+          lastActivityAt: { $lt: fourteenDaysAgo },
+          isDeleted: { $ne: true },
+        })
+        .populate('jobListingId', 'roleTitle companyName')
+        .exec();
 
       for (const app of stale) {
         const job = app.jobListingId as any;
-        const jobLabel = job?.roleTitle ? `${job.roleTitle} at ${job.companyName}` : String(app.jobListingId);
+        const jobLabel = job?.roleTitle
+          ? `${job.roleTitle} at ${job.companyName}`
+          : String(app.jobListingId);
         app.stage = 'ghosted';
         app.lastActivityAt = new Date();
         app.activityLog.push({
@@ -564,7 +723,9 @@ export class DiscoverCrawlService {
       }
 
       if (stale.length > 0) {
-        this.logger.log(`Auto-ghosting: moved ${stale.length} applications to ghosted`);
+        this.logger.log(
+          `Auto-ghosting: moved ${stale.length} applications to ghosted`,
+        );
       }
     } catch (err) {
       this.logger.error('Auto-ghosting check failed:', err);
@@ -572,10 +733,12 @@ export class DiscoverCrawlService {
   }
 
   private async sendDigests(): Promise<void> {
-    const prefs = await this.prefsModel.find({ emailAlertsEnabled: true }).exec();
+    const prefs = await this.prefsModel
+      .find({ emailAlertsEnabled: true })
+      .exec();
     for (const pref of prefs) {
       try {
-        await this.sendDigest((pref.userId as Types.ObjectId).toString());
+        await this.sendDigest(pref.userId.toString());
       } catch (err) {
         this.logger.error(`Digest failed for user ${pref.userId}:`, err);
       }
@@ -583,34 +746,50 @@ export class DiscoverCrawlService {
   }
 
   async sendDigest(userId: string): Promise<void> {
-    const prefs = await this.prefsModel.findOne({ userId: new Types.ObjectId(userId) }).exec();
+    const prefs = await this.prefsModel
+      .findOne({ userId: new Types.ObjectId(userId) })
+      .exec();
     if (!prefs || !prefs.emailAlertsEnabled) return;
 
     const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
 
-    const newJobs = await this.jobListingModel.find({
-      postedAt: { $gte: twentyFourHoursAgo },
-      isExpired: { $ne: true },
-    }).sort({ postedAt: -1 }).limit(5).lean().exec();
+    const newJobs = await this.jobListingModel
+      .find({
+        postedAt: { $gte: twentyFourHoursAgo },
+        isExpired: { $ne: true },
+      })
+      .sort({ postedAt: -1 })
+      .limit(5)
+      .lean()
+      .exec();
 
     if (newJobs.length === 0) return;
 
     const jobIds = newJobs.map((j) => j._id);
-    const matches = await this.jobMatchModel.find({
-      userId: new Types.ObjectId(userId),
-      jobListingId: { $in: jobIds },
-    }).lean().exec();
+    const matches = await this.jobMatchModel
+      .find({
+        userId: new Types.ObjectId(userId),
+        jobListingId: { $in: jobIds },
+      })
+      .lean()
+      .exec();
 
-    const aboveThreshold = matches.filter((m) => m.atsScore >= (prefs.minimumMatchScore || 60));
+    const aboveThreshold = matches.filter(
+      (m) => m.atsScore >= (prefs.minimumMatchScore || 60),
+    );
     if (aboveThreshold.length === 0) return;
 
-    const avgScore = Math.round(matches.reduce((sum, m) => sum + m.atsScore, 0) / matches.length);
+    const avgScore = Math.round(
+      matches.reduce((sum, m) => sum + m.atsScore, 0) / matches.length,
+    );
 
     const subject = `${aboveThreshold.length} new role${aboveThreshold.length > 1 ? 's' : ''} match your resume this morning`;
     let body = `<p>Good morning! Here are the latest roles that match your resume:</p>`;
     body += `<table cellpadding="0" cellspacing="0" style="width:100%;max-width:480px">`;
     for (const match of aboveThreshold) {
-      const job = newJobs.find((j) => j._id.toString() === match.jobListingId.toString());
+      const job = newJobs.find(
+        (j) => j._id.toString() === match.jobListingId.toString(),
+      );
       if (!job) continue;
       body += `<tr><td style="padding:12px 0;border-bottom:1px solid #eee;">`;
       body += `<p style="margin:0 0 2px;font-size:13px;color:#333;"><strong>${job.roleTitle}</strong> at ${job.companyName}</p>`;
@@ -624,11 +803,26 @@ export class DiscoverCrawlService {
 
     this.logger.log(`[Email Digest] To user ${userId}: ${subject}`);
     this.logger.log(`[Email Digest] Body: ${body}`);
-    this.logger.log(`[Email Digest] Email would be sent to user ${userId}. Configure SMTP/Resend/SendGrid for production delivery.`);
+    this.logger.log(
+      `[Email Digest] Email would be sent to user ${userId}. Configure SMTP/Resend/SendGrid for production delivery.`,
+    );
   }
 
   private formatDate(date: Date): string {
-    const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    const months = [
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec',
+    ];
     return `${months[date.getMonth()]} ${date.getDate()}`;
   }
 }

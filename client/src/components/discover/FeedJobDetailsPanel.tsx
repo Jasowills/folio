@@ -5,12 +5,11 @@ import { IconExternalLink, IconMapPin, IconCalendar, IconBriefcase, IconBookmark
 
 interface FeedJobDetailsPanelProps {
   job: any | null
-  onClose?: () => void
   onApprove?: (jobId: string) => void
   approvePending?: boolean
 }
 
-export default function FeedJobDetailsPanel({ job, onClose, onApprove, approvePending }: FeedJobDetailsPanelProps) {
+export default function FeedJobDetailsPanel({ job, onApprove, approvePending }: FeedJobDetailsPanelProps) {
   const trackJob = useTrackJob()
   const untrackJob = useDeleteTrackerJob()
   const { data: odds } = useApplyOdds(job?._id)

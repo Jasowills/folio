@@ -1,9 +1,5 @@
 import { AllExceptionsFilter } from './all-exceptions.filter';
-import {
-  HttpException,
-  HttpStatus,
-  BadRequestException,
-} from '@nestjs/common';
+import { HttpException, HttpStatus, BadRequestException } from '@nestjs/common';
 import { Error as MongooseError } from 'mongoose';
 
 describe('AllExceptionsFilter', () => {

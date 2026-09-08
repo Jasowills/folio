@@ -1,13 +1,13 @@
 import { useState, useRef, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { useNavigate, useSearchParams } from 'react-router-dom'
+import { useSearchParams } from 'react-router-dom'
 import { useResumes, useStartResearch, useResearchStatus, useResearchHistory } from '../lib/queries'
 import { Button } from '../components/ui/button'
 import { Select } from '../components/ui/select'
 import ResearchBrief from './ResearchBrief'
 import { cn } from '../lib/utils'
 import {
-  IconBrandPagekit, IconAlertTriangle,
+  IconBrandPagekit, IconAlertTriangle, IconCircleCheck,
   IconChevronDown, IconChevronRight, IconHistory, IconWorld, IconCompass,
 } from '@tabler/icons-react'
 
@@ -23,7 +23,6 @@ function formatRelativeTime(dateStr: string): string {
 }
 
 export default function Research() {
-  const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const { data: resumes } = useResumes()
   const startResearch = useStartResearch()
@@ -560,7 +559,7 @@ export default function Research() {
               className="h-full"
             >
               <ResearchBrief
-                job={job}
+                job={{ ...job, brief: job.brief! }}
                 onReset={handleNewResearch}
                 onUpgrade={handleUpgrade}
                 upgradePending={startResearch.isPending}

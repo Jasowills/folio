@@ -13,9 +13,9 @@ export default function FinalCtaSection() {
   const isInView = useInView(ref, { once: true, amount: 0.3 })
 
   return (
-    <section className="w-full bg-[#1A1A1A] relative">
+    <section className="w-full bg-[#0F172A] relative">
       <Drift duration={5.6} delay={0.4} className="top-[10%] left-[6%]">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#0F6E56" strokeWidth="1.5" opacity="0.12">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#4F46E5" strokeWidth="1.5" opacity="0.12">
           <path d="M12 2l2.5 6.5L21 9l-5 4.5 1.5 7L12 16.5 6.5 20.5 8 13.5 3 9l6.5-.5z" />
         </svg>
       </Drift>
@@ -34,7 +34,7 @@ export default function FinalCtaSection() {
             Upload your resume. The rest takes seconds.
           </h2>
 
-          <p className="font-body text-[17px] text-[#B4B2A9] leading-[1.7] mb-8 max-w-[540px] mx-auto">
+          <p className="font-body text-[17px] text-[#94A3B8] leading-[1.7] mb-8 max-w-[540px] mx-auto">
             Upload your resume once. Scoring, rewriting, job matching, and interview prep are one click away.
           </p>
 
@@ -50,7 +50,7 @@ export default function FinalCtaSection() {
 
           <div className="mt-8 flex flex-wrap items-center justify-center gap-x-4 gap-y-1">
             {features.map((f) => (
-              <span key={f} className="font-body text-[12px] text-[#555]">
+              <span key={f} className="font-body text-[12px] text-[#64748B]">
                 {f}
               </span>
             ))}

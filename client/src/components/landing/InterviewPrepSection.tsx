@@ -15,11 +15,11 @@ function InterviewMockup() {
       className="w-full max-w-[600px] mx-auto rounded-xl overflow-hidden border border-[#2C2C2A]"
     >
       {/* Interview UI mockup */}
-      <div className="bg-[#1A1A1A] p-4 sm:p-6">
+      <div className="bg-[#0F172A] p-4 sm:p-6">
         {/* Top bar */}
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2">
-            <div className="w-2 h-2 rounded-full bg-[#2D6A2D]" />
+            <div className="w-2 h-2 rounded-full bg-[#16A34A]" />
             <span className="font-body text-[11px] text-[#B4B2A9]">Live session</span>
           </div>
           <span className="font-body text-[10px] text-[#555]">00:12:34</span>
@@ -69,9 +69,9 @@ const stats = [
 
 export default function InterviewPrepSection() {
   return (
-    <section className="w-full bg-[#1A1A1A] relative">
+    <section className="w-full bg-[#0F172A] relative">
       <Drift duration={5} delay={0.6} className="top-[15%] right-[4%]">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#0F6E56" strokeWidth="1.5" opacity="0.15">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#4F46E5" strokeWidth="1.5" opacity="0.15">
           <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
           <line x1="9" y1="10" x2="15" y2="10" />
         </svg>

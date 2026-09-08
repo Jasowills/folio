@@ -31,7 +31,8 @@ export class ResearchController {
   async analyze(
     @Body('companyName') companyName: string,
     @Body('companyUrl') companyUrl: string | undefined,
-    @Body('roleContext') roleContext: { roleTitle: string; resumeId?: string } | undefined,
+    @Body('roleContext')
+    roleContext: { roleTitle: string; resumeId?: string } | undefined,
     @CurrentUser() user: UserDocument,
   ) {
     if (!companyName) throw new BadRequestException('Company name is required');
@@ -46,10 +47,7 @@ export class ResearchController {
 
   @Get('status/:id')
   @ApiOperation({ summary: 'Poll research status' })
-  async status(
-    @Param('id') id: string,
-    @CurrentUser() user: UserDocument,
-  ) {
+  async status(@Param('id') id: string, @CurrentUser() user: UserDocument) {
     const job = await this.researchService.getJob(id);
     if (!job || job.userId.toString() !== user._id.toString()) {
       throw new NotFoundException('Research not found');
@@ -72,11 +70,11 @@ export class ResearchController {
   @Delete(':id')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Delete a research job' })
-  async remove(
-    @Param('id') id: string,
-    @CurrentUser() user: UserDocument,
-  ) {
-    const deleted = await this.researchService.deleteJob(id, user._id.toString());
+  async remove(@Param('id') id: string, @CurrentUser() user: UserDocument) {
+    const deleted = await this.researchService.deleteJob(
+      id,
+      user._id.toString(),
+    );
     if (!deleted) throw new NotFoundException('Research not found');
     return { message: 'Research deleted' };
   }

@@ -72,20 +72,14 @@ export class CoverLettersController {
 
   @Get(':id')
   @ApiOperation({ summary: 'Get cover letter by id' })
-  async get(
-    @Param('id') id: string,
-    @CurrentUser() user: UserDocument,
-  ) {
+  async get(@Param('id') id: string, @CurrentUser() user: UserDocument) {
     return this.coverLettersService.findById(id, user._id.toString());
   }
 
   @Delete(':id')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Delete a cover letter' })
-  async remove(
-    @Param('id') id: string,
-    @CurrentUser() user: UserDocument,
-  ) {
+  async remove(@Param('id') id: string, @CurrentUser() user: UserDocument) {
     await this.coverLettersService.delete(id, user._id.toString());
     return { message: 'Cover letter deleted' };
   }

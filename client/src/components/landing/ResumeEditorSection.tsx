@@ -97,7 +97,7 @@ export default function ResumeEditorSection() {
     <SectionWrapper className="bg-surface">
       <div className="relative">
       <Drift duration={4.8} delay={1} className="top-[15%] left-[4%]">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#1A1A1A" strokeWidth="1.5" opacity="0.08">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#0F172A" strokeWidth="1.5" opacity="0.08">
           <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" />
         </svg>
       </Drift>

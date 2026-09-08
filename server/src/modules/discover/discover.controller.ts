@@ -1,15 +1,30 @@
 import {
-  Controller, Get, Post, Patch, Delete, Body, Param, Query,
-  UseGuards, Req,
+  Controller,
+  Get,
+  Post,
+  Patch,
+  Delete,
+  Body,
+  Param,
+  Query,
+  UseGuards,
+  Req,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { DiscoverService } from './discover.service';
 import { DiscoverCrawlService } from './discover-crawl.service';
 import {
-  UpsertPreferencesDto, TrackJobDto, UpdateTrackerJobDto, FeedQueryDto, DismissJobDto,
+  UpsertPreferencesDto,
+  TrackJobDto,
+  UpdateTrackerJobDto,
+  FeedQueryDto,
+  DismissJobDto,
 } from './dto';
-import type { ActivityLogEntry, ChecklistState } from './schemas/job-application.schema';
+import type {
+  ActivityLogEntry,
+  ChecklistState,
+} from './schemas/job-application.schema';
 
 @ApiTags('Discover')
 @ApiBearerAuth()
@@ -40,7 +55,11 @@ export class DiscoverController {
   }
 
   @Post('dismiss/:jobId')
-  async dismissJob(@Req() req: any, @Param('jobId') jobId: string, @Body() dto: DismissJobDto) {
+  async dismissJob(
+    @Req() req: any,
+    @Param('jobId') jobId: string,
+    @Body() dto: DismissJobDto,
+  ) {
     await this.discoverService.dismissJob(req.user._id, jobId, dto);
     return { success: true };
   }

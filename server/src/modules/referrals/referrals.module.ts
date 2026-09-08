@@ -1,12 +1,18 @@
-import { Module } from '@nestjs/common'
-import { MongooseModule } from '@nestjs/mongoose'
-import { MulterModule } from '@nestjs/platform-express'
-import { AiModule } from '../ai/ai.module'
-import { ReferralsController } from './referrals.controller'
-import { ReferralsService } from './referrals.service'
-import { Connection, ConnectionSchema } from './schemas/connection.schema'
-import { ReferralRequest, ReferralRequestSchema } from './schemas/referral-request.schema'
-import { JobListing, JobListingSchema } from '../discover/schemas/job-listing.schema'
+import { Module } from '@nestjs/common';
+import { MongooseModule } from '@nestjs/mongoose';
+import { MulterModule } from '@nestjs/platform-express';
+import { AiModule } from '../ai/ai.module';
+import { ReferralsController } from './referrals.controller';
+import { ReferralsService } from './referrals.service';
+import { Connection, ConnectionSchema } from './schemas/connection.schema';
+import {
+  ReferralRequest,
+  ReferralRequestSchema,
+} from './schemas/referral-request.schema';
+import {
+  JobListing,
+  JobListingSchema,
+} from '../discover/schemas/job-listing.schema';
 
 @Module({
   imports: [

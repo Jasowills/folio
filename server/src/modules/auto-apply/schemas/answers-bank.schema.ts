@@ -17,9 +17,17 @@ export class AnswersBankEntry {
   @Prop({ required: true })
   answer!: string;
 
-  @Prop({ required: true, enum: [
-    'visa', 'salary', 'notice_period', 'location', 'sponsorship', 'generic',
-  ]})
+  @Prop({
+    required: true,
+    enum: [
+      'visa',
+      'salary',
+      'notice_period',
+      'location',
+      'sponsorship',
+      'generic',
+    ],
+  })
   category!: string;
 
   @Prop({ default: 1 })

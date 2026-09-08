@@ -176,7 +176,7 @@ function AnswersBankSection() {
     setEditCategory(entry.category)
   }
 
-  const handleSaveEdit = (id: string) => {
+  const handleSaveEdit = (_id: string) => {
     storeAnswer.mutate(
       { question: editQuestion, answer: editAnswer, category: editCategory },
       { onSuccess: () => setEditingId(null) },

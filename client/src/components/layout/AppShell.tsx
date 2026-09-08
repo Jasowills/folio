@@ -76,7 +76,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   const newJobCount = feedStats?.newSinceVisit ?? 0
 
   return (
-    <div className="flex min-h-screen bg-paper w-full overflow-x-hidden">
+    <div className="flex min-h-screen bg-paper-light w-full overflow-x-hidden">
       {/* Mobile menu overlay */}
       {mobileNavOpen && (
         <div

@@ -27,7 +27,7 @@ function ResumeIllustration() {
               className="h-1.5 rounded"
               style={{
                 width: `${w}%`,
-                background: i === 2 ? '#BA7517' : i === 4 ? '#C84242' : '#0F6E56',
+                background: i === 2 ? '#D97706' : i === 4 ? '#DC2626' : '#4F46E5',
                 opacity: i === 2 ? 0.4 : i === 4 ? 0.3 : 0.2,
               }}
             />

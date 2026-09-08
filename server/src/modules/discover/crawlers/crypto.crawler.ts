@@ -37,21 +37,45 @@ export class CryptoJobsListCrawler extends BaseCrawler {
     return jobs;
   }
 
-  private parseRSS(xml: string): Array<{ title?: string; link?: string; description?: string; pubDate?: string }> {
-    const items: Array<{ title?: string; link?: string; description?: string; pubDate?: string }> = [];
+  private parseRSS(xml: string): Array<{
+    title?: string;
+    link?: string;
+    description?: string;
+    pubDate?: string;
+  }> {
+    const items: Array<{
+      title?: string;
+      link?: string;
+      description?: string;
+      pubDate?: string;
+    }> = [];
     const itemRegex = /<item>([\s\S]*?)<\/item>/gi;
     let match: RegExpExecArray | null;
     while ((match = itemRegex.exec(xml)) !== null) {
       const block = match[1];
-      const gt = (tag: string) => { const m = new RegExp(`<${tag}[^>]*>([\\s\\S]*?)<\\/${tag}>`, 'i').exec(block); return m ? m[1].trim() : undefined; };
-      items.push({ title: gt('title'), link: gt('link'), description: gt('description'), pubDate: gt('pubDate') });
+      const gt = (tag: string) => {
+        const m = new RegExp(`<${tag}[^>]*>([\\s\\S]*?)<\\/${tag}>`, 'i').exec(
+          block,
+        );
+        return m ? m[1].trim() : undefined;
+      };
+      items.push({
+        title: gt('title'),
+        link: gt('link'),
+        description: gt('description'),
+        pubDate: gt('pubDate'),
+      });
     }
     return items;
   }
 
-  private parseTitle(title: string): { roleTitle?: string; companyName?: string } {
+  private parseTitle(title: string): {
+    roleTitle?: string;
+    companyName?: string;
+  } {
     const match = title.match(/^(.+?)\s+(?:at|@|—|-)\s+(.+)$/);
-    if (match) return { roleTitle: match[1].trim(), companyName: match[2].trim() };
+    if (match)
+      return { roleTitle: match[1].trim(), companyName: match[2].trim() };
     const m2 = title.match(/^([^:]+):\s*(.+)$/);
     if (m2) return { companyName: m2[1].trim(), roleTitle: m2[2].trim() };
     return {};
@@ -94,21 +118,45 @@ export class BitcoinerJobsCrawler extends BaseCrawler {
     return jobs;
   }
 
-  private parseRSS(xml: string): Array<{ title?: string; link?: string; description?: string; pubDate?: string }> {
-    const items: Array<{ title?: string; link?: string; description?: string; pubDate?: string }> = [];
+  private parseRSS(xml: string): Array<{
+    title?: string;
+    link?: string;
+    description?: string;
+    pubDate?: string;
+  }> {
+    const items: Array<{
+      title?: string;
+      link?: string;
+      description?: string;
+      pubDate?: string;
+    }> = [];
     const itemRegex = /<item>([\s\S]*?)<\/item>/gi;
     let match: RegExpExecArray | null;
     while ((match = itemRegex.exec(xml)) !== null) {
       const block = match[1];
-      const gt = (tag: string) => { const m = new RegExp(`<${tag}[^>]*>([\\s\\S]*?)<\\/${tag}>`, 'i').exec(block); return m ? m[1].trim() : undefined; };
-      items.push({ title: gt('title'), link: gt('link'), description: gt('description'), pubDate: gt('pubDate') });
+      const gt = (tag: string) => {
+        const m = new RegExp(`<${tag}[^>]*>([\\s\\S]*?)<\\/${tag}>`, 'i').exec(
+          block,
+        );
+        return m ? m[1].trim() : undefined;
+      };
+      items.push({
+        title: gt('title'),
+        link: gt('link'),
+        description: gt('description'),
+        pubDate: gt('pubDate'),
+      });
     }
     return items;
   }
 
-  private parseTitle(title: string): { roleTitle?: string; companyName?: string } {
+  private parseTitle(title: string): {
+    roleTitle?: string;
+    companyName?: string;
+  } {
     const match = title.match(/^(.+?)\s+(?:at|@|—|-)\s+(.+)$/);
-    if (match) return { roleTitle: match[1].trim(), companyName: match[2].trim() };
+    if (match)
+      return { roleTitle: match[1].trim(), companyName: match[2].trim() };
     const m2 = title.match(/^([^:]+):\s*(.+)$/);
     if (m2) return { companyName: m2[1].trim(), roleTitle: m2[2].trim() };
     const m3 = title.match(/^(.+?)\s+is\s+hiring\s+(.+)$/i);

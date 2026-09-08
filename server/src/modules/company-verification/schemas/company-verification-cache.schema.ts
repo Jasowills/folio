@@ -1,7 +1,8 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { HydratedDocument } from 'mongoose';
 
-export type CompanyVerificationCacheDocument = HydratedDocument<CompanyVerificationCache>;
+export type CompanyVerificationCacheDocument =
+  HydratedDocument<CompanyVerificationCache>;
 
 @Schema()
 export class CompanyVerificationCache {
@@ -26,5 +27,7 @@ export class CompanyVerificationCache {
   ttlMs: number;
 }
 
-export const CompanyVerificationCacheSchema = SchemaFactory.createForClass(CompanyVerificationCache);
+export const CompanyVerificationCacheSchema = SchemaFactory.createForClass(
+  CompanyVerificationCache,
+);
 CompanyVerificationCacheSchema.index({ companyName: 1, createdAt: -1 });

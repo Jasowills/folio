@@ -608,7 +608,7 @@ export default function InterviewLive() {
                         animate={{ opacity: 1, y: 0 }}
                         exit={{ opacity: 0, y: -4 }}
                         transition={{ duration: 0.3 }}
-                        className="text-center text-[#E8E4DC] text-base leading-relaxed max-w-xl px-8 overflow-y-auto max-h-32"
+                        className="text-center text-[#E2E8F0] text-base leading-relaxed max-w-xl px-8 overflow-y-auto max-h-32"
                         style={{ fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif" }}
                       >
                         {captionParagraphs.map((p, i) => (
@@ -808,7 +808,7 @@ export default function InterviewLive() {
                     exit={{ y: 20, opacity: 0 }}
                     className="absolute bottom-2 left-1/2 -translate-x-1/2 z-10"
                   >
-                    <div className="text-[#E8E4DC] text-sm leading-relaxed text-center max-w-lg px-4 py-2 rounded-lg bg-black/40 backdrop-blur-sm overflow-y-auto max-h-32"
+                    <div className="text-[#E2E8F0] text-sm leading-relaxed text-center max-w-lg px-4 py-2 rounded-lg bg-black/40 backdrop-blur-sm overflow-y-auto max-h-32"
                           style={{ fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif" }}
                     >
                       {captionParagraphs.map((p, i) => (
@@ -904,7 +904,7 @@ export default function InterviewLive() {
             transition={{ duration: 0.2, ease: 'easeOut' }}
             className={`px-4 py-1.5 rounded-full text-xs font-medium flex items-center gap-2 ${
               turnState === 'candidate'
-                ? 'bg-[#E8E4DC] text-[#1A1A1A]'
+                ? 'bg-[#E2E8F0] text-[#0F172A]'
                 : turnState === 'processing'
                 ? 'bg-white/5 text-white/50'
                 : 'bg-white/5 text-white/50'

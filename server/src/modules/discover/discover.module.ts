@@ -5,8 +5,14 @@ import { DiscoverService } from './discover.service';
 import { DiscoverCrawlService } from './discover-crawl.service';
 import { JobListing, JobListingSchema } from './schemas/job-listing.schema';
 import { JobMatch, JobMatchSchema } from './schemas/job-match.schema';
-import { JobApplication, JobApplicationSchema } from './schemas/job-application.schema';
-import { DiscoverPreferences, DiscoverPreferencesSchema } from './schemas/discover-preferences.schema';
+import {
+  JobApplication,
+  JobApplicationSchema,
+} from './schemas/job-application.schema';
+import {
+  DiscoverPreferences,
+  DiscoverPreferencesSchema,
+} from './schemas/discover-preferences.schema';
 import { CrawlMeta, CrawlMetaSchema } from './schemas/crawl-meta.schema';
 import { UserSignal, UserSignalSchema } from './schemas/user-signal.schema';
 import { RemoteOkCrawler } from './crawlers/remoteok.crawler';
@@ -19,7 +25,10 @@ import { HNCrawler } from './crawlers/hn.crawler';
 import { YCombinatorCrawler } from './crawlers/ycombinator.crawler';
 import { TwitterCrawler } from './crawlers/twitter.crawler';
 import { LinkedInCrawler } from './crawlers/linkedin.crawler';
-import { CryptoJobsListCrawler, BitcoinerJobsCrawler } from './crawlers/crypto.crawler';
+import {
+  CryptoJobsListCrawler,
+  BitcoinerJobsCrawler,
+} from './crawlers/crypto.crawler';
 import { RemotiveCrawler } from './crawlers/remotive.crawler';
 import { ArcCrawler } from './crawlers/arc.crawler';
 import { WellfoundCrawler } from './crawlers/wellfound.crawler';

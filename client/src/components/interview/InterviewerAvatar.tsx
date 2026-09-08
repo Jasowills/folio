@@ -66,7 +66,7 @@ function BlobShape({ state, size }: { state: InterviewerAvatarProps['state']; si
       <motion.div
         className="w-full h-full relative z-10"
         style={{
-          background: 'radial-gradient(circle at 40% 35%, #5DCAA5, #0F6E56 70%)',
+          background: 'radial-gradient(circle at 40% 35%, #5DCAA5, #4F46E5 70%)',
           borderRadius: isSmall ? '50%' : undefined,
         }}
         animate={{

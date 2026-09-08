@@ -1,12 +1,10 @@
-import type { ResumeContentDiff } from '../../lib/queries'
+import type { ResumeContentDiff } from '../../../lib/queries'
 
 interface Props {
   diff: ResumeContentDiff
-  before?: Record<string, unknown>
-  after?: Record<string, unknown>
 }
 
-export default function VariantDiffViewer({ diff, before, after }: Props) {
+export default function VariantDiffViewer({ diff }: Props) {
   if (!diff) return null
 
   return (
@@ -71,7 +69,7 @@ export default function VariantDiffViewer({ diff, before, after }: Props) {
         <section>
           <h4 className="text-xs font-semibold text-ink mb-1.5">Added Sections</h4>
           <div className="flex flex-wrap gap-1.5">
-            {diff.addedSections.map((s) => (
+            {diff.addedSections.map((s: string) => (
               <span key={s} className="text-[11px] bg-success-light text-success px-2 py-0.5 rounded-full">
                 +{s}
               </span>
@@ -83,7 +81,7 @@ export default function VariantDiffViewer({ diff, before, after }: Props) {
         <section>
           <h4 className="text-xs font-semibold text-ink mb-1.5">Removed Sections</h4>
           <div className="flex flex-wrap gap-1.5">
-            {diff.removedSections.map((s) => (
+            {diff.removedSections.map((s: string) => (
               <span key={s} className="text-[11px] bg-danger-light text-danger px-2 py-0.5 rounded-full">
                 -{s}
               </span>

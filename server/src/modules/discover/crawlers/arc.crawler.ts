@@ -9,17 +9,20 @@ export class ArcCrawler extends BaseCrawler {
   async crawl(): Promise<RawJob[]> {
     const jobs: RawJob[] = [];
     try {
-      const response = await fetch('https://arc.dev/api/v1/jobs/search?q=&page=1', {
-        headers: {
-          'User-Agent': 'Folio/1.0',
-          'Accept': 'application/json',
+      const response = await fetch(
+        'https://arc.dev/api/v1/jobs/search?q=&page=1',
+        {
+          headers: {
+            'User-Agent': 'Folio/1.0',
+            Accept: 'application/json',
+          },
         },
-      });
+      );
       if (!response.ok) {
         this.logger.warn(`Arc API returned ${response.status}`);
         return jobs;
       }
-      const data = await response.json() as any;
+      const data = await response.json();
       const list = data.jobs || data.results || data.data || [];
       if (!Array.isArray(list)) {
         this.logger.warn('Arc API returned unexpected format');
@@ -29,7 +32,10 @@ export class ArcCrawler extends BaseCrawler {
       for (const item of list) {
         const id = item.id || item.slug || item.url;
         if (!id || !item.title) continue;
-        const date = item.published_at || item.publication_date ? new Date(item.published_at || item.publication_date) : null;
+        const date =
+          item.published_at || item.publication_date
+            ? new Date(item.published_at || item.publication_date)
+            : null;
         jobs.push({
           source: 'arc',
           sourceId: `arc-${id}`,

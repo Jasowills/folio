@@ -1,42 +1,47 @@
-import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose'
-import { Document, Types, Schema as MongooseSchema } from 'mongoose'
+import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
+import { Document, Types, Schema as MongooseSchema } from 'mongoose';
 
-export type InterviewResultDocument = InterviewResult & Document
+export type InterviewResultDocument = InterviewResult & Document;
 
 export interface DimensionScore {
-  name: string
-  score: number
+  name: string;
+  score: number;
 }
 
 export interface PerQuestionScore {
-  questionPlanRef: number
-  score: number
-  feedback: string
-  modelAnswer: string
+  questionPlanRef: number;
+  score: number;
+  feedback: string;
+  modelAnswer: string;
 }
 
 @Schema({ timestamps: true })
 export class InterviewResult {
-  @Prop({ required: true, type: MongooseSchema.Types.ObjectId, ref: 'InterviewSession' })
-  sessionId!: Types.ObjectId
+  @Prop({
+    required: true,
+    type: MongooseSchema.Types.ObjectId,
+    ref: 'InterviewSession',
+  })
+  sessionId!: Types.ObjectId;
 
   @Prop({ required: true })
-  overallScore!: number
+  overallScore!: number;
 
   @Prop()
-  headline?: string
+  headline?: string;
 
   @Prop({ type: [{ type: Object }] })
-  dimensionScores?: DimensionScore[]
+  dimensionScores?: DimensionScore[];
 
   @Prop()
-  confidenceLevel?: string
+  confidenceLevel?: string;
 
   @Prop({ type: [{ type: Object }] })
-  perQuestionScores?: PerQuestionScore[]
+  perQuestionScores?: PerQuestionScore[];
 
   @Prop({ type: [String] })
-  nextSteps?: string[]
+  nextSteps?: string[];
 }
 
-export const InterviewResultSchema = SchemaFactory.createForClass(InterviewResult)
+export const InterviewResultSchema =
+  SchemaFactory.createForClass(InterviewResult);

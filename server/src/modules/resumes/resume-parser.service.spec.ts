@@ -24,13 +24,19 @@ describe('ResumeParserService', () => {
     });
 
     it('deducts for moderate non-ASCII ratio', () => {
-      const text = '①②③④⑤⑥⑦⑧⑨⑩⑪' + 'a'.repeat(100) + '\n'.repeat(10) + 'john@example.com 2023';
+      const text =
+        '①②③④⑤⑥⑦⑧⑨⑩⑪' +
+        'a'.repeat(100) +
+        '\n'.repeat(10) +
+        'john@example.com 2023';
       const result = service.assessQuality(text, 1);
       expect(result.issues).toContain('moderate-non-ascii');
     });
 
     it('deducts for repetition artifacts', () => {
-      const text = 'aaaaaaa bbbbbbb ccccccc ddddddd eeeeeee fffffff\n'.repeat(5) + 'john@example.com 2023';
+      const text =
+        'aaaaaaa bbbbbbb ccccccc ddddddd eeeeeee fffffff\n'.repeat(5) +
+        'john@example.com 2023';
       const result = service.assessQuality(text, 1);
       expect(result.issues).toContain('repetition-artifacts');
     });
@@ -50,7 +56,8 @@ describe('ResumeParserService', () => {
 
   describe('detectSections', () => {
     it('detects standard resume sections', () => {
-      const text = 'John Doe\njohn@example.com\n\nExperience\nEngineer at Acme\n2020-2023\n\nEducation\nMIT\nBSc 2016-2020\n\nSkills\nJavaScript, React';
+      const text =
+        'John Doe\njohn@example.com\n\nExperience\nEngineer at Acme\n2020-2023\n\nEducation\nMIT\nBSc 2016-2020\n\nSkills\nJavaScript, React';
       const result = service.detectSections(text);
       expect(result.sections.has('experience')).toBe(true);
       expect(result.sections.has('education')).toBe(true);
@@ -78,7 +85,8 @@ describe('ResumeParserService', () => {
     });
 
     it('calculates confidence based on found sections', () => {
-      const text = 'Name\n\nExperience\nJob\n\nEducation\nSchool\n\nSkills\nJava\n\nSummary\nAbout me';
+      const text =
+        'Name\n\nExperience\nJob\n\nEducation\nSchool\n\nSkills\nJava\n\nSummary\nAbout me';
       const result = service.detectSections(text);
       expect(result.confidence).toBeGreaterThan(0.8);
     });
@@ -92,7 +100,9 @@ describe('ResumeParserService', () => {
 
   describe('parseContact', () => {
     it('extracts name from first line', () => {
-      const result = service.parseContact('John Doe\njohn@example.com\n555-123-4567');
+      const result = service.parseContact(
+        'John Doe\njohn@example.com\n555-123-4567',
+      );
       expect(result.name).toBe('John Doe');
     });
 
@@ -102,7 +112,9 @@ describe('ResumeParserService', () => {
     });
 
     it('extracts phone', () => {
-      const result = service.parseContact('John Doe\njohn@example.com\n(555) 123-4567');
+      const result = service.parseContact(
+        'John Doe\njohn@example.com\n(555) 123-4567',
+      );
       expect(result.phone).toContain('555');
     });
 
@@ -132,7 +144,9 @@ describe('ResumeParserService', () => {
     });
 
     it('extracts location (City, ST)', () => {
-      const result = service.parseContact('John Doe\nSan Francisco, CA\njohn@example.com');
+      const result = service.parseContact(
+        'John Doe\nSan Francisco, CA\njohn@example.com',
+      );
       expect(result.location).toBe('San Francisco, CA');
     });
 
@@ -147,7 +161,9 @@ describe('ResumeParserService', () => {
     });
 
     it('excludes linkedin from website results', () => {
-      const result = service.parseContact('John Doe\nhttps://linkedin.com/in/johndoe\nhttps://portfolio.dev');
+      const result = service.parseContact(
+        'John Doe\nhttps://linkedin.com/in/johndoe\nhttps://portfolio.dev',
+      );
       expect(result.website).toBe('https://portfolio.dev');
     });
   });
@@ -164,7 +180,8 @@ describe('ResumeParserService', () => {
     });
 
     it('extracts and cleans summary content', () => {
-      const summaryText = 'Professional Summary\nA highly skilled engineer with 10 years of experience in backend development.';
+      const summaryText =
+        'Professional Summary\nA highly skilled engineer with 10 years of experience in backend development.';
       const sections = new Map<string, string>([['summary', summaryText]]);
       const result = service['parseSummary'](sections);
       expect(result).toContain('highly skilled engineer');
@@ -180,7 +197,8 @@ describe('ResumeParserService', () => {
     }
 
     it('parses a simple job entry', () => {
-      const text = 'Software Engineer at Acme Corp | 2020-2023\n- Built features\n- Fixed bugs';
+      const text =
+        'Software Engineer at Acme Corp | 2020-2023\n- Built features\n- Fixed bugs';
       const result = service['parseExperience'](makeSections(text));
       expect(result.length).toBe(1);
       expect(result[0].title).toContain('Software Engineer');
@@ -188,19 +206,22 @@ describe('ResumeParserService', () => {
     });
 
     it('parses multiple job entries', () => {
-      const text = 'Senior Engineer at Company A | 2022-2023\n- Did X\n\nJunior Engineer at Company B | 2020-2022\n- Did Y';
+      const text =
+        'Senior Engineer at Company A | 2022-2023\n- Did X\n\nJunior Engineer at Company B | 2020-2022\n- Did Y';
       const result = service['parseExperience'](makeSections(text));
       expect(result.length).toBe(2);
     });
 
     it('collects bullet points', () => {
-      const text = 'Engineer at Co | 2020-2023\n- Built a thing\n- Fixed another thing\n- Led a team';
+      const text =
+        'Engineer at Co | 2020-2023\n- Built a thing\n- Fixed another thing\n- Led a team';
       const result = service['parseExperience'](makeSections(text));
       expect(result[0].bullets.length).toBeGreaterThanOrEqual(2);
     });
 
     it('handles title-only lines followed by date line', () => {
-      const text = 'Software Engineer\n2020-2023\n- Did work\n\nData Scientist\n2018-2020\n- Analyzed data';
+      const text =
+        'Software Engineer\n2020-2023\n- Did work\n\nData Scientist\n2018-2020\n- Analyzed data';
       const result = service['parseExperience'](makeSections(text));
       expect(result.length).toBeGreaterThanOrEqual(2);
     });
@@ -233,15 +254,19 @@ describe('ResumeParserService', () => {
     }
 
     it('parses institution and degree', () => {
-      const text = 'Massachusetts Institute of Technology\nBachelor of Science in Computer Science, 2016-2020';
+      const text =
+        'Massachusetts Institute of Technology\nBachelor of Science in Computer Science, 2016-2020';
       const result = service['parseEducation'](makeSections(text));
       expect(result.length).toBe(1);
-      expect(result[0].institution).toContain('Massachusetts Institute of Technology');
+      expect(result[0].institution).toContain(
+        'Massachusetts Institute of Technology',
+      );
       expect(result[0].degree).toBeTruthy();
     });
 
     it('parses degree on separate line', () => {
-      const text = 'Stanford University\nBSc Computer Science\n2018-2022\nGPA 3.8';
+      const text =
+        'Stanford University\nBSc Computer Science\n2018-2022\nGPA 3.8';
       const result = service['parseEducation'](makeSections(text));
       expect(result.length).toBe(1);
       expect(result[0].institution).toContain('Stanford');
@@ -294,7 +319,9 @@ describe('ResumeParserService', () => {
     it('deduplicates skills', () => {
       const text = 'JavaScript, javascript, JS';
       const result = service['parseSkills'](makeSections(text));
-      const jsCount = result.filter(s => s.toLowerCase() === 'javascript').length;
+      const jsCount = result.filter(
+        (s) => s.toLowerCase() === 'javascript',
+      ).length;
       expect(jsCount).toBeLessThanOrEqual(1);
     });
 
@@ -348,8 +375,12 @@ describe('ResumeParserService', () => {
     it('parses language with proficiency', () => {
       const text = 'English (Native), Spanish (Fluent)';
       const result = service['parseLanguages'](makeSections(text));
-      expect(result.some(l => l.language.toLowerCase() === 'english')).toBe(true);
-      expect(result.some(l => l.language.toLowerCase() === 'spanish')).toBe(true);
+      expect(result.some((l) => l.language.toLowerCase() === 'english')).toBe(
+        true,
+      );
+      expect(result.some((l) => l.language.toLowerCase() === 'spanish')).toBe(
+        true,
+      );
     });
 
     it('assigns proficiency level', () => {
@@ -361,7 +392,9 @@ describe('ResumeParserService', () => {
     it('deduplicates languages', () => {
       const text = 'English, English';
       const result = service['parseLanguages'](makeSections(text));
-      const enCount = result.filter(l => l.language.toLowerCase() === 'english').length;
+      const enCount = result.filter(
+        (l) => l.language.toLowerCase() === 'english',
+      ).length;
       expect(enCount).toBe(1);
     });
 
@@ -448,11 +481,15 @@ describe('ResumeParserService', () => {
     });
 
     it('recognizes Bachelor of Science', () => {
-      expect(service['matchDegree']('Bachelor of Science in Engineering')).toBe('BSc');
+      expect(service['matchDegree']('Bachelor of Science in Engineering')).toBe(
+        'BSc',
+      );
     });
 
     it('recognizes MBA', () => {
-      expect(service['matchDegree']('Master of Business Administration')).toBe('MBA');
+      expect(service['matchDegree']('Master of Business Administration')).toBe(
+        'MBA',
+      );
     });
 
     it('recognizes PhD', () => {
@@ -466,13 +503,17 @@ describe('ResumeParserService', () => {
 
   describe('matchInstitution', () => {
     it('matches university in text', () => {
-      const result = service['matchInstitution']('Massachusetts Institute of Technology');
+      const result = service['matchInstitution'](
+        'Massachusetts Institute of Technology',
+      );
       expect(result).toContain('Massachusetts Institute of Technology');
     });
 
     it('matches standalone abbreviation', () => {
       expect(service['matchInstitution']('MIT')).toBe('MIT');
-      expect(service['matchInstitution']('Stanford University')).toContain('Stanford');
+      expect(service['matchInstitution']('Stanford University')).toContain(
+        'Stanford',
+      );
     });
 
     it('returns null for irrelevant text', () => {
@@ -494,8 +535,12 @@ describe('ResumeParserService', () => {
 
   describe('looksLikeJobEntry', () => {
     it('identifies job entry lines', () => {
-      expect(service['looksLikeJobEntry']('Software Engineer at Acme 2020')).toBe(true);
-      expect(service['looksLikeJobEntry']('Senior Manager | 2022-2023')).toBe(true);
+      expect(
+        service['looksLikeJobEntry']('Software Engineer at Acme 2020'),
+      ).toBe(true);
+      expect(service['looksLikeJobEntry']('Senior Manager | 2022-2023')).toBe(
+        true,
+      );
     });
 
     it('rejects bullet points', () => {

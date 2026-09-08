@@ -702,4 +702,3 @@ Core rules:
 6. Evidence must be concrete — Every claim needs source. Never make up URLs. Only cite URLs that were provided in the search results.
 7. If the provided content has no usable information about the company (no search results, no crawled pages), return riskLevel "unknown" with a single flag explaining the agent couldn't find sufficient data. Never guess.
 8. recommendation — A short actionable sentence for the user. Never definitive ("this is a scam"), always framed as "Check if..." or "Consider whether..."`;
-

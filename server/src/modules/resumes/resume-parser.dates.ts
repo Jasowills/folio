@@ -1,23 +1,58 @@
 const MONTH_NAMES_FULL = [
-  'january', 'february', 'march', 'april', 'may', 'june',
-  'july', 'august', 'september', 'october', 'november', 'december',
+  'january',
+  'february',
+  'march',
+  'april',
+  'may',
+  'june',
+  'july',
+  'august',
+  'september',
+  'october',
+  'november',
+  'december',
 ];
 
 const MONTH_NAMES_SHORT = [
-  'jan', 'feb', 'mar', 'apr', 'may', 'jun',
-  'jul', 'aug', 'sep', 'oct', 'nov', 'dec',
+  'jan',
+  'feb',
+  'mar',
+  'apr',
+  'may',
+  'jun',
+  'jul',
+  'aug',
+  'sep',
+  'oct',
+  'nov',
+  'dec',
 ];
 
 const MONTH_ABBREV: Record<string, string> = {
-  jan: 'Jan', feb: 'Feb', mar: 'Mar', apr: 'Apr', may: 'May', jun: 'Jun',
-  jul: 'Jul', aug: 'Aug', sep: 'Sep', oct: 'Oct', nov: 'Nov', dec: 'Dec',
+  jan: 'Jan',
+  feb: 'Feb',
+  mar: 'Mar',
+  apr: 'Apr',
+  may: 'May',
+  jun: 'Jun',
+  jul: 'Jul',
+  aug: 'Aug',
+  sep: 'Sep',
+  oct: 'Oct',
+  nov: 'Nov',
+  dec: 'Dec',
 };
 
 const SEASON_MONTHS: Record<string, number> = {
-  spring: 3, summer: 6, autumn: 9, fall: 9, winter: 12,
+  spring: 3,
+  summer: 6,
+  autumn: 9,
+  fall: 9,
+  winter: 12,
 };
 
-const CURRENT_INDICATORS = /^(present|current|now|ongoing|today|to date|till date|till now|continuing|—|-)$/i;
+const CURRENT_INDICATORS =
+  /^(present|current|now|ongoing|today|to date|till date|till now|continuing|—|-)$/i;
 
 function normalizeMonth(input: string): string | null {
   const lower = input.toLowerCase().replace(/\.$/, '');
@@ -46,18 +81,25 @@ export interface DateRange {
   current: boolean;
 }
 
-const MONTH_RE = '(?:Jan(?:uary)?\\.?|Feb(?:ruary)?\\.?|Mar(?:ch)?\\.?|Apr(?:il)?\\.?|May\\.?|Jun(?:e)?\\.?|Jul(?:y)?\\.?|Aug(?:ust)?\\.?|Sep(?:tember)?\\.?|Oct(?:ober)?\\.?|Nov(?:ember)?\\.?|Dec(?:ember)?\\.?)';
+const MONTH_RE =
+  '(?:Jan(?:uary)?\\.?|Feb(?:ruary)?\\.?|Mar(?:ch)?\\.?|Apr(?:il)?\\.?|May\\.?|Jun(?:e)?\\.?|Jul(?:y)?\\.?|Aug(?:ust)?\\.?|Sep(?:tember)?\\.?|Oct(?:ober)?\\.?|Nov(?:ember)?\\.?|Dec(?:ember)?\\.?)';
 
 const SEASON_RE = '(?:Spring|Summer|Autumn|Fall|Winter)';
 
 const YEAR_RE = '(?:19|20)\\d{2}';
 
-const FULL_DATE_RE = new RegExp(`(${MONTH_RE})\\s*['°]?(\\d{2})?\\s*(${YEAR_RE})`, 'gi');
+const FULL_DATE_RE = new RegExp(
+  `(${MONTH_RE})\\s*['°]?(\\d{2})?\\s*(${YEAR_RE})`,
+  'gi',
+);
 const SEASON_YEAR_RE = new RegExp(`(${SEASON_RE})\\s+(${YEAR_RE})`, 'gi');
 const NUMERIC_DATE_RE = /(0[1-9]|1[0-2])[./](\d{4})\b/g;
 const YEAR_ONLY_RE = /\b(19|20)\d{2}\b/g;
 
-function extractSingleDate(text: string): { month: string | null; year: string | null } {
+function extractSingleDate(text: string): {
+  month: string | null;
+  year: string | null;
+} {
   const fullMatch = FULL_DATE_RE.exec(text);
   if (fullMatch) {
     FULL_DATE_RE.lastIndex = 0;
@@ -73,7 +115,22 @@ function extractSingleDate(text: string): { month: string | null; year: string |
     const season = seasonMatch[1].toLowerCase();
     const year = seasonMatch[2];
     const monthNum = SEASON_MONTHS[season];
-    const month = monthNum ? ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][monthNum - 1] : null;
+    const month = monthNum
+      ? [
+          'Jan',
+          'Feb',
+          'Mar',
+          'Apr',
+          'May',
+          'Jun',
+          'Jul',
+          'Aug',
+          'Sep',
+          'Oct',
+          'Nov',
+          'Dec',
+        ][monthNum - 1]
+      : null;
     return { month, year };
   }
   SEASON_YEAR_RE.lastIndex = 0;
@@ -82,7 +139,21 @@ function extractSingleDate(text: string): { month: string | null; year: string |
   if (numericMatch) {
     NUMERIC_DATE_RE.lastIndex = 0;
     const monthNum = parseInt(numericMatch[1], 10);
-    const month = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][monthNum - 1] || null;
+    const month =
+      [
+        'Jan',
+        'Feb',
+        'Mar',
+        'Apr',
+        'May',
+        'Jun',
+        'Jul',
+        'Aug',
+        'Sep',
+        'Oct',
+        'Nov',
+        'Dec',
+      ][monthNum - 1] || null;
     return { month, year: numericMatch[2] };
   }
   NUMERIC_DATE_RE.lastIndex = 0;
@@ -97,8 +168,12 @@ function extractSingleDate(text: string): { month: string | null; year: string |
   return { month: null, year: null };
 }
 
-export function normalizeToISO(month: string | null, year: string, isEnd: boolean): string {
-  const m = month ? monthToNumber(month) + 1 : (isEnd ? 12 : 1);
+export function normalizeToISO(
+  month: string | null,
+  year: string,
+  isEnd: boolean,
+): string {
+  const m = month ? monthToNumber(month) + 1 : isEnd ? 12 : 1;
   return `${year}-${String(m).padStart(2, '0')}`;
 }
 
@@ -115,11 +190,18 @@ export function parseDateRange(text: string): DateRange {
 
     const startResult = extractSingleDate(startText);
     const endIsCurrent = CURRENT_INDICATORS.test(endText);
-    const endResult = endIsCurrent ? { month: null, year: null } : extractSingleDate(endText);
+    const endResult = endIsCurrent
+      ? { month: null, year: null }
+      : extractSingleDate(endText);
 
     return {
-      startDate: startResult.year ? normalizeToISO(startResult.month, startResult.year, false) : null,
-      endDate: (endIsCurrent || !endResult.year) ? null : normalizeToISO(endResult.month, endResult.year, true),
+      startDate: startResult.year
+        ? normalizeToISO(startResult.month, startResult.year, false)
+        : null,
+      endDate:
+        endIsCurrent || !endResult.year
+          ? null
+          : normalizeToISO(endResult.month, endResult.year, true),
       current: isCurrent || endIsCurrent,
     };
   }
@@ -154,7 +236,20 @@ export function extractDatesFromText(text: string): string[] {
     const numericMatches = [...text.matchAll(NUMERIC_DATE_RE)];
     for (const m of numericMatches) {
       const monthNum = parseInt(m[1], 10);
-      const month = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][monthNum - 1];
+      const month = [
+        'Jan',
+        'Feb',
+        'Mar',
+        'Apr',
+        'May',
+        'Jun',
+        'Jul',
+        'Aug',
+        'Sep',
+        'Oct',
+        'Nov',
+        'Dec',
+      ][monthNum - 1];
       results.push(normalizeToISO(month, m[2], false));
     }
   }

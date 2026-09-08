@@ -1,10 +1,17 @@
 import { Injectable, NotFoundException, Logger } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
-import { ResumeVariant, ResumeVariantDocument, ResumeContentDiff } from './resume-variant.schema';
+import {
+  ResumeVariant,
+  ResumeVariantDocument,
+  ResumeContentDiff,
+} from './resume-variant.schema';
 import { Resume, ResumeDocument } from '../schemas/resume.schema';
 import { ResumeDiffService } from './resume-diff.service';
-import { JobApplication, JobApplicationDocument } from '../../discover/schemas/job-application.schema';
+import {
+  JobApplication,
+  JobApplicationDocument,
+} from '../../discover/schemas/job-application.schema';
 
 @Injectable()
 export class ResumeVariantService {
@@ -27,17 +34,26 @@ export class ResumeVariantService {
     templateId: string,
     options?: { tailoredForJobId?: string; label?: string },
   ): Promise<ResumeVariantDocument> {
-    const base = await this.resumeModel.findOne({
-      _id: new Types.ObjectId(baseResumeId),
-      userId: new Types.ObjectId(userId),
-    }).lean().exec();
+    const base = await this.resumeModel
+      .findOne({
+        _id: new Types.ObjectId(baseResumeId),
+        userId: new Types.ObjectId(userId),
+      })
+      .lean()
+      .exec();
 
     if (!base) throw new NotFoundException('Base resume not found');
 
-    const frozenSnapshot = JSON.parse(JSON.stringify(base)) as Record<string, unknown>;
+    const frozenSnapshot = JSON.parse(JSON.stringify(base)) as Record<
+      string,
+      unknown
+    >;
     delete frozenSnapshot.versions;
 
-    const contentDiff = this.diffService.generateDiff(frozenSnapshot, tailoredData);
+    const contentDiff = this.diffService.generateDiff(
+      frozenSnapshot,
+      tailoredData,
+    );
 
     return this.variantModel.create({
       userId: new Types.ObjectId(userId),
@@ -52,30 +68,47 @@ export class ResumeVariantService {
     });
   }
 
-  async findByBaseResume(userId: string, baseResumeId: string): Promise<ResumeVariantDocument[]> {
-    return this.variantModel.find({
-      userId: new Types.ObjectId(userId),
-      baseResumeId: new Types.ObjectId(baseResumeId),
-    }).sort({ createdAt: -1 }).exec();
+  async findByBaseResume(
+    userId: string,
+    baseResumeId: string,
+  ): Promise<ResumeVariantDocument[]> {
+    return this.variantModel
+      .find({
+        userId: new Types.ObjectId(userId),
+        baseResumeId: new Types.ObjectId(baseResumeId),
+      })
+      .sort({ createdAt: -1 })
+      .exec();
   }
 
-  async findById(userId: string, variantId: string): Promise<ResumeVariantDocument> {
-    const variant = await this.variantModel.findOne({
-      _id: new Types.ObjectId(variantId),
-      userId: new Types.ObjectId(userId),
-    }).exec();
+  async findById(
+    userId: string,
+    variantId: string,
+  ): Promise<ResumeVariantDocument> {
+    const variant = await this.variantModel
+      .findOne({
+        _id: new Types.ObjectId(variantId),
+        userId: new Types.ObjectId(userId),
+      })
+      .exec();
     if (!variant) throw new NotFoundException('Variant not found');
     return variant;
   }
 
-  async render(userId: string, variantId: string): Promise<Record<string, unknown>> {
+  async render(
+    userId: string,
+    variantId: string,
+  ): Promise<Record<string, unknown>> {
     const variant = await this.findById(userId, variantId);
 
     let baseData: Record<string, unknown>;
     if (variant.frozenSnapshot) {
-      baseData = variant.frozenSnapshot as Record<string, unknown>;
+      baseData = variant.frozenSnapshot;
     } else {
-      const base = await this.resumeModel.findById(variant.baseResumeId).lean().exec();
+      const base = await this.resumeModel
+        .findById(variant.baseResumeId)
+        .lean()
+        .exec();
       if (!base) throw new NotFoundException('Base resume not found');
       baseData = base as unknown as Record<string, unknown>;
     }
@@ -87,20 +120,33 @@ export class ResumeVariantService {
     userId: string,
     variantId: string,
     compareToId: string,
-  ): Promise<ResumeContentDiff | { before: Record<string, unknown>; after: Record<string, unknown>; diff: ResumeContentDiff }> {
+  ): Promise<
+    | ResumeContentDiff
+    | {
+        before: Record<string, unknown>;
+        after: Record<string, unknown>;
+        diff: ResumeContentDiff;
+      }
+  > {
     const variant = await this.findById(userId, variantId);
 
     if (compareToId === 'base') {
       let baseData: Record<string, unknown>;
       if (variant.frozenSnapshot) {
-        baseData = variant.frozenSnapshot as Record<string, unknown>;
+        baseData = variant.frozenSnapshot;
       } else {
-        const base = await this.resumeModel.findById(variant.baseResumeId).lean().exec();
+        const base = await this.resumeModel
+          .findById(variant.baseResumeId)
+          .lean()
+          .exec();
         if (!base) throw new NotFoundException('Base resume not found');
         baseData = base as unknown as Record<string, unknown>;
       }
 
-      const resolved = this.diffService.resolveDiff(baseData, variant.contentDiff);
+      const resolved = this.diffService.resolveDiff(
+        baseData,
+        variant.contentDiff,
+      );
       return { before: baseData, after: resolved, diff: variant.contentDiff };
     }
 
@@ -113,15 +159,21 @@ export class ResumeVariantService {
   }
 
   async getPerformance(userId: string): Promise<any[]> {
-    const variants = await this.variantModel.find({
-      userId: new Types.ObjectId(userId),
-    }).lean().exec();
+    const variants = await this.variantModel
+      .find({
+        userId: new Types.ObjectId(userId),
+      })
+      .lean()
+      .exec();
 
     const variantIds = variants.map((v) => v._id.toString());
-    const apps = await this.jobAppModel.find({
-      userId: new Types.ObjectId(userId),
-      resumeVariantId: { $in: variantIds },
-    }).lean().exec();
+    const apps = await this.jobAppModel
+      .find({
+        userId: new Types.ObjectId(userId),
+        resumeVariantId: { $in: variantIds },
+      })
+      .lean()
+      .exec();
 
     const appMap = new Map<string, any[]>();
     for (const app of apps) {
@@ -135,11 +187,17 @@ export class ResumeVariantService {
     return variants.map((v) => {
       const variantApps = appMap.get(v._id.toString()) || [];
       const totalSent = variantApps.length;
-      const responded = variantApps.filter((a) =>
-        !['saved', 'tailoring', 'applied', 'pending'].includes(a.stage),
+      const responded = variantApps.filter(
+        (a) => !['saved', 'tailoring', 'applied', 'pending'].includes(a.stage),
       );
       const interviews = variantApps.filter((a) =>
-        ['phone_screen', 'technical', 'final_round', 'offer', 'accepted'].includes(a.stage),
+        [
+          'phone_screen',
+          'technical',
+          'final_round',
+          'offer',
+          'accepted',
+        ].includes(a.stage),
       );
 
       return {
@@ -149,7 +207,8 @@ export class ResumeVariantService {
         totalSent,
         responseCount: responded.length,
         interviewCount: interviews.length,
-        responseRate: totalSent > 0 ? Math.round((responded.length / totalSent) * 100) : 0,
+        responseRate:
+          totalSent > 0 ? Math.round((responded.length / totalSent) * 100) : 0,
         sampleSizeWarning: totalSent < 5,
       };
     });

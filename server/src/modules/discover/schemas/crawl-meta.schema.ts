@@ -12,13 +12,16 @@ export class CrawlMeta {
   lastCrawledAt?: Date;
 
   @Prop({ type: Object, default: {} })
-  sourceStatus?: Record<string, {
-    lastCrawledAt?: Date;
-    jobsFound?: number;
-    jobsNew?: number;
-    status?: 'ok' | 'error';
-    error?: string;
-  }>;
+  sourceStatus?: Record<
+    string,
+    {
+      lastCrawledAt?: Date;
+      jobsFound?: number;
+      jobsNew?: number;
+      status?: 'ok' | 'error';
+      error?: string;
+    }
+  >;
 }
 
 export const CrawlMetaSchema = SchemaFactory.createForClass(CrawlMeta);

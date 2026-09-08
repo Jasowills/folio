@@ -32,7 +32,9 @@ export class StorageService {
       resourceType?: 'image' | 'raw';
     },
   ): Promise<UploadResult> {
-    this.logger.log(`upload: starting upload — size=${buffer.length} bytes, folder="${options.folder}", publicId="${options.publicId}", resourceType="${options.resourceType || 'raw'}"`);
+    this.logger.log(
+      `upload: starting upload — size=${buffer.length} bytes, folder="${options.folder}", publicId="${options.publicId}", resourceType="${options.resourceType || 'raw'}"`,
+    );
     const start = Date.now();
     const base64 = buffer.toString('base64');
     const result = await this.cloudinary.uploader.upload(
@@ -45,7 +47,9 @@ export class StorageService {
       },
     );
     const duration = Date.now() - start;
-    this.logger.log(`upload: done — publicId="${result.public_id}", url="${result.secure_url}", duration=${duration}ms`);
+    this.logger.log(
+      `upload: done — publicId="${result.public_id}", url="${result.secure_url}", duration=${duration}ms`,
+    );
     return { publicId: result.public_id, url: result.secure_url };
   }
 
@@ -53,7 +57,9 @@ export class StorageService {
     publicId: string,
     resourceType: 'image' | 'raw' = 'raw',
   ): Promise<Buffer> {
-    this.logger.log(`downloadBuffer: fetching — publicId="${publicId}", resourceType="${resourceType}"`);
+    this.logger.log(
+      `downloadBuffer: fetching — publicId="${publicId}", resourceType="${resourceType}"`,
+    );
     const start = Date.now();
 
     const url = this.cloudinary.utils.private_download_url(publicId, 'pdf', {
@@ -61,17 +67,36 @@ export class StorageService {
       type: 'upload',
       attachment: false,
     });
-    this.logger.log(`downloadBuffer: private_download_url generated in ${Date.now() - start}ms — ${url.slice(0, 100)}...`);
+    this.logger.log(
+      `downloadBuffer: private_download_url generated in ${Date.now() - start}ms — ${url.slice(0, 100)}...`,
+    );
 
-    const res = await fetch(url);
+    // ADV-0007: bounded timeout for Cloudinary fetch
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 15_000);
+    let res: Response;
+    try {
+      res = await fetch(url, { signal: controller.signal });
+    } catch (err) {
+      clearTimeout(timeout);
+      if ((err as Error).name === 'AbortError') {
+        throw new Error('Cloudinary download timed out after 15s');
+      }
+      throw err;
+    }
+    clearTimeout(timeout);
     if (!res.ok) {
       const text = await res.text().catch(() => '');
-      this.logger.error(`downloadBuffer: fetch returned ${res.status} — ${text.slice(0, 300)}`);
+      this.logger.error(
+        `downloadBuffer: fetch returned ${res.status} — ${text.slice(0, 300)}`,
+      );
       throw new Error(`Cloudinary download failed: ${res.status}`);
     }
 
     const buffer = Buffer.from(await res.arrayBuffer());
-    this.logger.log(`downloadBuffer: done — ${buffer.length} bytes from ${resourceType} resource, total=${Date.now() - start}ms`);
+    this.logger.log(
+      `downloadBuffer: done — ${buffer.length} bytes from ${resourceType} resource, total=${Date.now() - start}ms`,
+    );
     return buffer;
   }
 

@@ -1,4 +1,9 @@
-import { Injectable, Logger, NotFoundException, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  NotFoundException,
+  BadRequestException,
+} from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { Resume, ResumeDocument } from '../resumes/schemas/resume.schema';
@@ -46,7 +51,11 @@ interface BuilderStepData {
     certifications?: Array<{ name: string; issuer?: string; date?: string }>;
     languages?: string[];
     projects?: Array<{ name: string; description: string; url?: string }>;
-    volunteer?: Array<{ organization: string; role: string; description?: string }>;
+    volunteer?: Array<{
+      organization: string;
+      role: string;
+      description?: string;
+    }>;
     awards?: Array<{ title: string; issuer?: string; date?: string }>;
   };
 }
@@ -70,13 +79,23 @@ export class BuilderService {
         stepData: {},
         isComplete: false,
       },
-      sectionOrder: ['summary', 'experience', 'education', 'skills', 'certifications', 'languages', 'links'],
+      sectionOrder: [
+        'summary',
+        'experience',
+        'education',
+        'skills',
+        'certifications',
+        'languages',
+        'links',
+      ],
     });
     return resume;
   }
 
   async getState(resumeId: string, userId: string): Promise<ResumeDocument> {
-    const resume = await this.resumeModel.findOne({ _id: resumeId, userId }).exec();
+    const resume = await this.resumeModel
+      .findOne({ _id: resumeId, userId })
+      .exec();
     if (!resume) throw new NotFoundException('Resume not found');
     return resume;
   }
@@ -202,9 +221,13 @@ ${jdContext}`;
     const raw = await this.ai.chatForBuilder(systemPrompt, userPrompt);
     try {
       const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed)) return parsed.filter((s): s is string => typeof s === 'string');
+      if (Array.isArray(parsed))
+        return parsed.filter((s): s is string => typeof s === 'string');
     } catch {
-      return raw.split('\n').map(s => s.trim().replace(/^[-•*"]+|["",]+$/g, '')).filter(Boolean);
+      return raw
+        .split('\n')
+        .map((s) => s.trim().replace(/^[-•*"]+|["",]+$/g, ''))
+        .filter(Boolean);
     }
     return [];
   }
@@ -222,13 +245,19 @@ ${jdContext}`;
     },
     onToken: (token: string) => void,
   ): Promise<void> {
-    this.logger.log(`[chat] userId=${userId} resumeId=${resumeId} message="${body.message?.slice(0, 100)}"`);
-    const stepData = (body.resumeSnapshot || {}) as Record<string, unknown>;
+    this.logger.log(
+      `[chat] userId=${userId} resumeId=${resumeId} message="${body.message?.slice(0, 100)}"`,
+    );
+    const stepData = body.resumeSnapshot || {};
     const snapshot = JSON.stringify(stepData, null, 2);
 
     const basics = stepData.basics as Record<string, unknown> | undefined;
-    const targetRole = stepData.targetRole as Record<string, unknown> | undefined;
-    const experience = stepData.experience as Array<Record<string, unknown>> | undefined;
+    const targetRole = stepData.targetRole as
+      | Record<string, unknown>
+      | undefined;
+    const experience = stepData.experience as
+      | Array<Record<string, unknown>>
+      | undefined;
     const skills = stepData.skills as string[] | undefined;
 
     const stateSummary = body.resumeSnapshot
@@ -238,7 +267,7 @@ Experience: ${(experience || []).length} entries
 Skills: ${(skills || []).join(', ') || 'None'}
 Current template: ${body.currentTemplate || 'minimal'}
 Current color: ${body.currentColor || '#1a1a2e'}
-Current font: ${body.currentFont || 'Inter'}` 
+Current font: ${body.currentFont || 'Inter'}`
       : '';
 
     const systemPrompt = `You are an AI resume builder. The user will give you instructions to build or modify their resume. You must output action tags to make changes.
@@ -278,17 +307,14 @@ Output one or more of these tags (each on its own line, no markdown, no backtick
 5. Be conversational. Confirm what you changed.`;
 
     const historyText = (body.history || [])
-      .map(m => `${m.role === 'user' ? 'User' : 'Assistant'}: ${m.content}`)
+      .map((m) => `${m.role === 'user' ? 'User' : 'Assistant'}: ${m.content}`)
       .join('\n\n');
 
     const userMessage = historyText
       ? `Previous conversation:\n${historyText}\n\nUser message: ${body.message}`
       : body.message;
 
-    const stream = await this.ai.stream(
-      systemPrompt,
-      userMessage,
-    );
+    const stream = await this.ai.stream(systemPrompt, userMessage);
     const reader = stream.getReader();
     const decoder = new TextDecoder();
     const fullResponse: string[] = [];
@@ -298,7 +324,7 @@ Output one or more of these tags (each on its own line, no markdown, no backtick
         const { done, value } = await reader.read();
         if (done) break;
         const chunk = decoder.decode(value, { stream: true });
-        const lines = chunk.split('\n').filter(l => l.startsWith('data: '));
+        const lines = chunk.split('\n').filter((l) => l.startsWith('data: '));
         for (const line of lines) {
           const json = line.slice(6).trim();
           if (json === '[DONE]') break;
@@ -309,7 +335,9 @@ Output one or more of these tags (each on its own line, no markdown, no backtick
               fullResponse.push(token);
               onToken(token);
             }
-          } catch { /* skip partial */ }
+          } catch {
+            /* skip partial */
+          }
         }
       }
     } catch (err) {
@@ -319,9 +347,15 @@ Output one or more of these tags (each on its own line, no markdown, no backtick
     // Always generate fallback actions from the user message in case AI
     // produced malformed or missing action tags (common with small local models)
     const completeResponse = fullResponse.join('');
-    const fallbackTags = this.generateFallbackActions(completeResponse, stepData, body.message);
+    const fallbackTags = this.generateFallbackActions(
+      completeResponse,
+      stepData,
+      body.message,
+    );
     if (fallbackTags.length > 0) {
-      this.logger.log(`[chat] Generated ${fallbackTags.length} fallback action tags: ${fallbackTags.join(', ').slice(0, 200)}`);
+      this.logger.log(
+        `[chat] Generated ${fallbackTags.length} fallback action tags: ${fallbackTags.join(', ').slice(0, 200)}`,
+      );
       for (const tag of fallbackTags) {
         onToken(tag);
       }
@@ -329,7 +363,9 @@ Output one or more of these tags (each on its own line, no markdown, no backtick
       // action processing fails (e.g. malformed AI tags causing errors)
       await this.applyFallbackToDb(resumeId, userId, fallbackTags, stepData);
     } else {
-      this.logger.warn(`[chat] No fallback tags generated. response="${completeResponse.slice(0, 100)}" stepData keys=${Object.keys(stepData).join(',')} msg="${(body.message || '').slice(0, 80)}"`);
+      this.logger.warn(
+        `[chat] No fallback tags generated. response="${completeResponse.slice(0, 100)}" stepData keys=${Object.keys(stepData).join(',')} msg="${(body.message || '').slice(0, 80)}"`,
+      );
     }
   }
 
@@ -339,7 +375,7 @@ Output one or more of these tags (each on its own line, no markdown, no backtick
     tags: string[],
     currentStepData: Record<string, unknown>,
   ): Promise<void> {
-    const stepData = structuredClone(currentStepData) as Record<string, unknown>;
+    const stepData = structuredClone(currentStepData);
 
     for (const tag of tags) {
       const match = tag.match(/\[ACTION\](.*?)\[\/ACTION\]/);
@@ -348,32 +384,75 @@ Output one or more of these tags (each on its own line, no markdown, no backtick
         const action = JSON.parse(match[1]);
         switch (action.fn) {
           case 'set_basics': {
-            const { name, headline, email, phone, location, linkedin, github, website } = action;
-            stepData.basics = { ...((stepData.basics as Record<string, unknown>) || {}), name, headline, email, phone, location, linkedin, github, website };
+            const {
+              name,
+              headline,
+              email,
+              phone,
+              location,
+              linkedin,
+              github,
+              website,
+            } = action;
+            stepData.basics = {
+              ...(stepData.basics || {}),
+              name,
+              headline,
+              email,
+              phone,
+              location,
+              linkedin,
+              github,
+              website,
+            };
             break;
           }
           case 'set_target_role':
-            stepData.targetRole = { role: action.role, level: action.level, industry: action.industry, company: action.company, companyUrl: action.companyUrl, jobDescription: action.jobDescription };
+            stepData.targetRole = {
+              role: action.role,
+              level: action.level,
+              industry: action.industry,
+              company: action.company,
+              companyUrl: action.companyUrl,
+              jobDescription: action.jobDescription,
+            };
             break;
           case 'set_summary':
             stepData.summary = { text: action.text, accepted: true };
             break;
           case 'add_experience': {
-            const exp = (stepData.experience as Array<Record<string, unknown>>) || [];
-            stepData.experience = [...exp, { company: action.company, title: action.title, startDate: action.startDate, endDate: action.endDate, current: action.current || false, bullets: action.bullets || [], rawNotes: action.rawNotes || '' }];
+            const exp =
+              (stepData.experience as Array<Record<string, unknown>>) || [];
+            stepData.experience = [
+              ...exp,
+              {
+                company: action.company,
+                title: action.title,
+                startDate: action.startDate,
+                endDate: action.endDate,
+                current: action.current || false,
+                bullets: action.bullets || [],
+                rawNotes: action.rawNotes || '',
+              },
+            ];
             break;
           }
           case 'remove_experience': {
-            const exp = (stepData.experience as Array<Record<string, unknown>>) || [];
+            const exp =
+              (stepData.experience as Array<Record<string, unknown>>) || [];
             if (typeof action.index === 'number') {
               stepData.experience = exp.filter((_, i) => i !== action.index);
             }
             break;
           }
           case 'update_experience_bullets': {
-            const exp = (stepData.experience as Array<Record<string, unknown>>) || [];
+            const exp =
+              (stepData.experience as Array<Record<string, unknown>>) || [];
             if (typeof action.index === 'number' && exp[action.index]) {
-              exp[action.index] = { ...exp[action.index], bullets: action.bullets || [] };
+              exp[action.index] = {
+                ...exp[action.index],
+                bullets: action.bullets || [],
+              };
               stepData.experience = exp;
             }
             break;
@@ -390,41 +469,77 @@ Output one or more of these tags (each on its own line, no markdown, no backtick
           }
           case 'remove_skill': {
             const existing = (stepData.skills as string[]) || [];
-            stepData.skills = existing.filter((s: string) => s !== action.skill);
+            stepData.skills = existing.filter(
+              (s: string) => s !== action.skill,
+            );
             break;
           }
           case 'add_education': {
-            const edu = (stepData.education as Array<Record<string, unknown>>) || [];
-            stepData.education = [...edu, { degree: action.degree, field: action.field, institution: action.institution, startYear: action.startYear, endYear: action.endYear, inProgress: action.inProgress || false, gpa: action.gpa || '' }];
+            const edu =
+              (stepData.education as Array<Record<string, unknown>>) || [];
+            stepData.education = [
+              ...edu,
+              {
+                degree: action.degree,
+                field: action.field,
+                institution: action.institution,
+                startYear: action.startYear,
+                endYear: action.endYear,
+                inProgress: action.inProgress || false,
+                gpa: action.gpa || '',
+              },
+            ];
             break;
           }
           case 'remove_education': {
-            const edu = (stepData.education as Array<Record<string, unknown>>) || [];
+            const edu =
+              (stepData.education as Array<Record<string, unknown>>) || [];
             if (typeof action.index === 'number') {
               stepData.education = edu.filter((_, i) => i !== action.index);
             }
             break;
           }
           case 'set_optional':
-            stepData.optional = { certifications: action.certifications || false, certificationsData: action.certificationsData || [], languages: action.languages || false, languagesData: action.languagesData || [], projects: action.projects || false, projectsData: action.projectsData || [], volunteer: action.volunteer || false, volunteerData: action.volunteerData || [], awards: action.awards || false, awardsData: action.awardsData || [] };
+            stepData.optional = {
+              certifications: action.certifications || false,
+              certificationsData: action.certificationsData || [],
+              languages: action.languages || false,
+              languagesData: action.languagesData || [],
+              projects: action.projects || false,
+              projectsData: action.projectsData || [],
+              volunteer: action.volunteer || false,
+              volunteerData: action.volunteerData || [],
+              awards: action.awards || false,
+              awardsData: action.awardsData || [],
+            };
             break;
           case 'set_template':
             break;
           case 'set_design':
-            stepData.design = { ...((stepData.design as Record<string, unknown>) || {}), ...action };
+            stepData.design = {
+              ...(stepData.design || {}),
+              ...action,
+            };
             break;
         }
       } catch {}
     }
 
     const updateFields: Record<string, unknown> = {};
-    if (stepData.basics) updateFields['wizardState.stepData.basics'] = stepData.basics;
-    if (stepData.targetRole) updateFields['wizardState.stepData.targetRole'] = stepData.targetRole;
-    if (stepData.summary) updateFields['wizardState.stepData.summary'] = stepData.summary;
-    if (stepData.experience) updateFields['wizardState.stepData.experience'] = stepData.experience;
-    if (stepData.education) updateFields['wizardState.stepData.education'] = stepData.education;
-    if (stepData.skills) updateFields['wizardState.stepData.skills'] = stepData.skills;
-    if (stepData.optional) updateFields['wizardState.stepData.optional'] = stepData.optional;
+    if (stepData.basics)
+      updateFields['wizardState.stepData.basics'] = stepData.basics;
+    if (stepData.targetRole)
+      updateFields['wizardState.stepData.targetRole'] = stepData.targetRole;
+    if (stepData.summary)
+      updateFields['wizardState.stepData.summary'] = stepData.summary;
+    if (stepData.experience)
+      updateFields['wizardState.stepData.experience'] = stepData.experience;
+    if (stepData.education)
+      updateFields['wizardState.stepData.education'] = stepData.education;
+    if (stepData.skills)
+      updateFields['wizardState.stepData.skills'] = stepData.skills;
+    if (stepData.optional)
+      updateFields['wizardState.stepData.optional'] = stepData.optional;
     if (stepData.design) updateFields['wizardState.design'] = stepData.design;
 
     if (Object.keys(updateFields).length > 0) {
@@ -433,9 +548,13 @@ Output one or more of these tags (each on its own line, no markdown, no backtick
           { _id: resumeId, userId },
           { $set: updateFields },
         );
-        this.logger.log(`[chat] Fallback data persisted to DB for resume ${resumeId} (${Object.keys(updateFields).length} fields)`);
+        this.logger.log(
+          `[chat] Fallback data persisted to DB for resume ${resumeId} (${Object.keys(updateFields).length} fields)`,
+        );
       } catch (err) {
-        this.logger.error(`[chat] Failed to persist fallback: ${(err as Error).message}`);
+        this.logger.error(
+          `[chat] Failed to persist fallback: ${(err as Error).message}`,
+        );
       }
     }
   }
@@ -467,63 +586,112 @@ Output one or more of these tags (each on its own line, no markdown, no backtick
     }
 
     // Try to build a full basics object from all sources
-    const basics: Record<string, string> = { ...(current.basics as any || {}) };
+    const basics: Record<string, string> = {
+      ...((current.basics as any) || {}),
+    };
     let basicsChanged = false;
 
-    let nameVal = extractFromSources(/(?:name is|name to|called)\s+([A-Za-z\s\-']+?)(?:\.|,|and|with|$)/);
+    let nameVal = extractFromSources(
+      /(?:name is|name to|called)\s+([A-Za-z\s\-']+?)(?:\.|,|and|with|$)/,
+    );
     if (nameVal) {
       nameVal = nameVal.replace(/^(now|please|set|also|the)\s+/i, '').trim();
     }
-    if (nameVal && !basics.name) { basics.name = nameVal; basicsChanged = true; }
+    if (nameVal && !basics.name) {
+      basics.name = nameVal;
+      basicsChanged = true;
+    }
 
-    const emailVal = extractFromSources(/email(?:\s+is|\s+to|\s*:|)\s+([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/);
-    if (emailVal && !basics.email) { basics.email = emailVal; basicsChanged = true; }
+    const emailVal = extractFromSources(
+      /email(?:\s+is|\s+to|\s*:|)\s+([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/,
+    );
+    if (emailVal && !basics.email) {
+      basics.email = emailVal;
+      basicsChanged = true;
+    }
 
-    const phoneVal = extractFromSources(/phone(?:\s+is|\s+to|\s*:|)\s+([\d\s\-\+\(\)]+?)(?:\.|,|and|$)/);
-    if (phoneVal && !basics.phone) { basics.phone = phoneVal; basicsChanged = true; }
+    const phoneVal = extractFromSources(
+      /phone(?:\s+is|\s+to|\s*:|)\s+([\d\s\-\+\(\)]+?)(?:\.|,|and|$)/,
+    );
+    if (phoneVal && !basics.phone) {
+      basics.phone = phoneVal;
+      basicsChanged = true;
+    }
 
-    const locVal = extractFromSources(/(?:location|based)(?:\s+is|\s+in|\s+to|\s*:|)\s+([A-Za-z\s,]+?)(?:\.|,|and|$)/);
-    if (locVal && !basics.location) { basics.location = locVal; basicsChanged = true; }
+    const locVal = extractFromSources(
+      /(?:location|based)(?:\s+is|\s+in|\s+to|\s*:|)\s+([A-Za-z\s,]+?)(?:\.|,|and|$)/,
+    );
+    if (locVal && !basics.location) {
+      basics.location = locVal;
+      basicsChanged = true;
+    }
 
-    const titleVal = extractFromSources(/(?:title|headline|role)(?:\s+is|\s+to|\s*:|)\s+([A-Za-z\s\-]+?)(?:\.|,|and|with|at|$)/);
-    if (titleVal && !basics.headline) { basics.headline = titleVal; basicsChanged = true; }
+    const titleVal = extractFromSources(
+      /(?:title|headline|role)(?:\s+is|\s+to|\s*:|)\s+([A-Za-z\s\-]+?)(?:\.|,|and|with|at|$)/,
+    );
+    if (titleVal && !basics.headline) {
+      basics.headline = titleVal;
+      basicsChanged = true;
+    }
 
     if (basicsChanged) {
-      tags.push(`[ACTION]${JSON.stringify({ fn: 'set_basics', ...basics })}[/ACTION]`);
+      tags.push(
+        `[ACTION]${JSON.stringify({ fn: 'set_basics', ...basics })}[/ACTION]`,
+      );
     }
 
     // Check for summary text
-    const summaryText = extractFromSources(/summary(?:\s*:|is)\s*(.+?)(?:experience|education|skills|\.\s*$)/s);
+    const summaryText = extractFromSources(
+      /summary(?:\s*:|is)\s*(.+?)(?:experience|education|skills|\.\s*$)/s,
+    );
     if (summaryText && summaryText.length > 10) {
-      tags.push(`[ACTION]${JSON.stringify({ fn: 'set_summary', text: summaryText })}[/ACTION]`);
+      tags.push(
+        `[ACTION]${JSON.stringify({ fn: 'set_summary', text: summaryText })}[/ACTION]`,
+      );
     }
 
     // Check for skills from both sources
     // Patterns: "Add React, TypeScript to skills", "skills: React", "skills include React"
     for (const src of sources) {
       // Try "Add X, Y to skills" first
-      const addSkillsMatch = src.match(/(?:add|added|adding)\s+(.+?)(?:\s+to\s+(?:my\s+)?skills?)/i);
+      const addSkillsMatch = src.match(
+        /(?:add|added|adding)\s+(.+?)(?:\s+to\s+(?:my\s+)?skills?)/i,
+      );
       if (addSkillsMatch) {
-        const extracted = addSkillsMatch[1].split(/,|;| and | & /).map(s => s.trim()).filter(s => s.length > 1);
+        const extracted = addSkillsMatch[1]
+          .split(/,|;| and | & /)
+          .map((s) => s.trim())
+          .filter((s) => s.length > 1);
         if (extracted.length > 0) {
           const existing = (current.skills as string[]) || [];
           const all = [...new Set([...existing, ...extracted])];
-          tags.push(`[ACTION]${JSON.stringify({ fn: 'set_skills', skills: all })}[/ACTION]`);
+          tags.push(
+            `[ACTION]${JSON.stringify({ fn: 'set_skills', skills: all })}[/ACTION]`,
+          );
           break;
         }
       }
       // Try "skills: React, TypeScript" pattern
-      const skillsMatch = src.match(/(?:skills|technologies)(?:\s*:|(?: i added| i'?ve added| include| are)\s+)(.+?)(?:\.|experience|education|summary|$)/);
+      const skillsMatch = src.match(
+        /(?:skills|technologies)(?:\s*:|(?: i added| i'?ve added| include| are)\s+)(.+?)(?:\.|experience|education|summary|$)/,
+      );
       if (skillsMatch) {
         const skillsText = skillsMatch[1];
-        const extractedSkills = skillsText.split(/,|;| and | & /).map(s => s.trim().replace(/^my /, '')).filter(s => s.length > 1);
+        const extractedSkills = skillsText
+          .split(/,|;| and | & /)
+          .map((s) => s.trim().replace(/^my /, ''))
+          .filter((s) => s.length > 1);
         if (extractedSkills.length > 0) {
           const known = ['to', 'the', 'your', 'with', 'for', 'you', 'a'];
-          const filtered = extractedSkills.filter(s => !known.includes(s.toLowerCase()) && s.length > 1);
+          const filtered = extractedSkills.filter(
+            (s) => !known.includes(s.toLowerCase()) && s.length > 1,
+          );
           if (filtered.length > 0) {
             const existing = (current.skills as string[]) || [];
             const all = [...new Set([...existing, ...filtered])];
-            tags.push(`[ACTION]${JSON.stringify({ fn: 'set_skills', skills: all })}[/ACTION]`);
+            tags.push(
+              `[ACTION]${JSON.stringify({ fn: 'set_skills', skills: all })}[/ACTION]`,
+            );
             break;
           }
         }
@@ -531,13 +699,33 @@ Output one or more of these tags (each on its own line, no markdown, no backtick
     }
 
     // Check for template changes
-    const validTemplates = ['minimal', 'modern', 'executive', 'compact', 'classic', 'sidebar', 'bold', 'creative', 'tech', 'academic', 'charter', 'prestige', 'engineer', 'contemporary', 'folio'];
+    const validTemplates = [
+      'minimal',
+      'modern',
+      'executive',
+      'compact',
+      'classic',
+      'sidebar',
+      'bold',
+      'creative',
+      'tech',
+      'academic',
+      'charter',
+      'prestige',
+      'engineer',
+      'contemporary',
+      'folio',
+    ];
     for (const src of sources) {
-      const templateMatch = src.match(/(?:use|change|switch|apply|set)\s+(?:the\s+)?(?:to\s+)?(.+?)\s+template/i);
+      const templateMatch = src.match(
+        /(?:use|change|switch|apply|set)\s+(?:the\s+)?(?:to\s+)?(.+?)\s+template/i,
+      );
       if (templateMatch) {
         const templateId = templateMatch[1]?.trim().toLowerCase();
         if (templateId && validTemplates.includes(templateId)) {
-          tags.push(`[ACTION]${JSON.stringify({ fn: 'set_template', templateId })}[/ACTION]`);
+          tags.push(
+            `[ACTION]${JSON.stringify({ fn: 'set_template', templateId })}[/ACTION]`,
+          );
           break;
         }
       }
@@ -546,32 +734,48 @@ Output one or more of these tags (each on its own line, no markdown, no backtick
     return tags;
   }
 
-  async finish(
-    resumeId: string,
-    userId: string,
-  ): Promise<ResumeDocument> {
-    const resume = await this.resumeModel.findOne({ _id: resumeId, userId }).exec();
+  async finish(resumeId: string, userId: string): Promise<ResumeDocument> {
+    const resume = await this.resumeModel
+      .findOne({ _id: resumeId, userId })
+      .exec();
     if (!resume) throw new NotFoundException('Resume not found');
 
     const ws = resume.wizardState;
     if (!ws) throw new BadRequestException('No wizard state to finalize');
-    if (ws.isComplete) throw new BadRequestException('Wizard already finalized');
+    if (ws.isComplete)
+      throw new BadRequestException('Wizard already finalized');
 
-    const stepData = ws.stepData as Record<string, unknown>;
+    const stepData = ws.stepData;
     const basics = stepData['basics'] as Record<string, unknown> | undefined;
-    const targetRole = stepData['targetRole'] as Record<string, unknown> | undefined;
+    const targetRole = stepData['targetRole'] as
+      | Record<string, unknown>
+      | undefined;
     const summary = stepData['summary'] as Record<string, unknown> | undefined;
-    const experience = (stepData['experience'] || []) as Array<Record<string, unknown>>;
-    const education = (stepData['education'] || []) as Array<Record<string, unknown>>;
+    const experience = (stepData['experience'] || []) as Array<
+      Record<string, unknown>
+    >;
+    const education = (stepData['education'] || []) as Array<
+      Record<string, unknown>
+    >;
     const skills = (stepData['skills'] || []) as string[];
-    const optional = stepData['optional'] as Record<string, unknown> | undefined;
+    const optional = stepData['optional'] as
+      | Record<string, unknown>
+      | undefined;
 
     const optionalData = optional || {};
-    const certs = (optionalData['certificationsData'] || []) as Array<Record<string, unknown>>;
+    const certs = (optionalData['certificationsData'] || []) as Array<
+      Record<string, unknown>
+    >;
     const langs = (optionalData['languagesData'] || []) as string[];
-    const projects = (optionalData['projectsData'] || []) as Array<Record<string, unknown>>;
-    const volunteer = (optionalData['volunteerData'] || []) as Array<Record<string, unknown>>;
-    const awards = (optionalData['awardsData'] || []) as Array<Record<string, unknown>>;
+    const projects = (optionalData['projectsData'] || []) as Array<
+      Record<string, unknown>
+    >;
+    const volunteer = (optionalData['volunteerData'] || []) as Array<
+      Record<string, unknown>
+    >;
+    const awards = (optionalData['awardsData'] || []) as Array<
+      Record<string, unknown>
+    >;
 
     // Build section order
     const sectionOrder: string[] = [];
@@ -579,13 +783,23 @@ Output one or more of these tags (each on its own line, no markdown, no backtick
     if (experience.length > 0) sectionOrder.push('experience');
     if (education.length > 0) sectionOrder.push('education');
     if (skills.length > 0) sectionOrder.push('skills');
-    if (optionalData['certifications'] && certs.length > 0) sectionOrder.push('certifications');
-    if (optionalData['languages'] && langs.length > 0) sectionOrder.push('languages');
+    if (optionalData['certifications'] && certs.length > 0)
+      sectionOrder.push('certifications');
+    if (optionalData['languages'] && langs.length > 0)
+      sectionOrder.push('languages');
     if (projects.length > 0) sectionOrder.push('projects');
     if (volunteer.length > 0) sectionOrder.push('volunteer');
     if (awards.length > 0) sectionOrder.push('awards');
 
-    const defaultOrder = ['summary', 'experience', 'education', 'skills', 'certifications', 'languages', 'links'];
+    const defaultOrder = [
+      'summary',
+      'experience',
+      'education',
+      'skills',
+      'certifications',
+      'languages',
+      'links',
+    ];
 
     const updated = await this.resumeModel
       .findOneAndUpdate(
@@ -603,7 +817,7 @@ Output one or more of these tags (each on its own line, no markdown, no backtick
               github: basics?.github || undefined,
             },
             summary: (summary?.text as string) || '',
-            experience: experience.map(e => ({
+            experience: experience.map((e) => ({
               company: e.company,
               title: e.title,
               startDate: e.startDate,
@@ -611,7 +825,7 @@ Output one or more of these tags (each on its own line, no markdown, no backtick
               current: e.current || false,
               bullets: (e.bullets as string[]) || [],
             })),
-            education: education.map(e => ({
+            education: education.map((e) => ({
               institution: e.institution,
               degree: e.degree,
               field: e.field || '',
@@ -620,7 +834,7 @@ Output one or more of these tags (each on its own line, no markdown, no backtick
               gpa: e.gpa || undefined,
             })),
             skills,
-            certifications: certs.map(c => ({
+            certifications: certs.map((c) => ({
               name: c.name,
               issuer: c.issuer || '',
               date: c.date || undefined,
@@ -669,7 +883,7 @@ Output one or more of these tags (each on its own line, no markdown, no backtick
           break;
         }
         const chunk = decoder.decode(value, { stream: true });
-        const lines = chunk.split('\n').filter(l => l.startsWith('data: '));
+        const lines = chunk.split('\n').filter((l) => l.startsWith('data: '));
         for (const line of lines) {
           const json = line.slice(6).trim();
           if (json === '[DONE]') {

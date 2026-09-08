@@ -34,26 +34,37 @@ export class AiController implements OnModuleInit {
     const hasOllama = !!process.env.OLLAMA_BASE_URL;
     const hasGroq = !!process.env.GROQ_API_KEY;
     const hasOpenRouter = !!process.env.OPENROUTER_API_KEY;
-    this.logger.log(`[init] providers: ollama=${hasOllama} groq=${hasGroq} openrouter=${hasOpenRouter}`);
+    this.logger.log(
+      `[init] providers: ollama=${hasOllama} groq=${hasGroq} openrouter=${hasOpenRouter} opencode=${this.ai.opencodeStatus}`,
+    );
   }
 
   @Post('chat')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Chat with AI to edit resume (returns action tags)' })
+  @ApiOperation({
+    summary: 'Chat with AI to edit resume (returns action tags)',
+  })
   async chat(
     @Body() body: { messages: ChatMessage[] },
     @CurrentUser() user: UserDocument,
   ) {
-    this.logger.log(`[chat] userId=${user._id.toString()} messages=${body.messages?.length}`);
+    this.logger.log(
+      `[chat] userId=${user._id.toString()} messages=${body.messages?.length}`,
+    );
     const lastMsg = body.messages?.at(-1);
     if (!lastMsg) return { message: { content: 'No message provided.' } };
 
-    const systemMsgs = body.messages.filter(m => m.role === 'system');
-    const userMsgs = body.messages.filter(m => m.role !== 'system');
-    const systemPrompt = systemMsgs.map(m => m.content).join('\n\n');
-    const userPrompt = userMsgs.map(m => m.content).join('\n\n');
+    const systemMsgs = body.messages.filter((m) => m.role === 'system');
+    const userMsgs = body.messages.filter((m) => m.role !== 'system');
+    const systemPrompt = systemMsgs.map((m) => m.content).join('\n\n');
+    const userPrompt = userMsgs.map((m) => m.content).join('\n\n');
 
-    const content = await this.ai.chat(systemPrompt, userPrompt, undefined, 'text');
+    const content = await this.ai.chat(
+      systemPrompt,
+      userPrompt,
+      undefined,
+      'text',
+    );
     return { message: { content } };
   }
 
@@ -65,11 +76,13 @@ export class AiController implements OnModuleInit {
     @CurrentUser() user: UserDocument,
     @Res() res: Response,
   ) {
-    this.logger.log(`[chat/stream] userId=${user._id.toString()} messages=${body.messages?.length}`);
-    const systemMsgs = body.messages.filter(m => m.role === 'system');
-    const userMsgs = body.messages.filter(m => m.role !== 'system');
-    const systemPrompt = systemMsgs.map(m => m.content).join('\n\n');
-    const userPrompt = userMsgs.map(m => m.content).join('\n\n');
+    this.logger.log(
+      `[chat/stream] userId=${user._id.toString()} messages=${body.messages?.length}`,
+    );
+    const systemMsgs = body.messages.filter((m) => m.role === 'system');
+    const userMsgs = body.messages.filter((m) => m.role !== 'system');
+    const systemPrompt = systemMsgs.map((m) => m.content).join('\n\n');
+    const userPrompt = userMsgs.map((m) => m.content).join('\n\n');
 
     res.setHeader('Content-Type', 'text/event-stream');
     res.setHeader('Cache-Control', 'no-cache');
@@ -94,7 +107,9 @@ export class AiController implements OnModuleInit {
         const raw = decoder.decode(value, { stream: true });
         buffer += raw;
         if (chunkCount <= 3) {
-          this.logger.log(`[chat/stream] chunk ${chunkCount}: ${raw.slice(0, 200)}`);
+          this.logger.log(
+            `[chat/stream] chunk ${chunkCount}: ${raw.slice(0, 200)}`,
+          );
         }
 
         const lines = buffer.split('\n');
@@ -134,7 +149,9 @@ export class AiController implements OnModuleInit {
         } catch {}
       }
 
-      this.logger.log(`[chat/stream] done: ${chunkCount} chunks, ${tokenCount} tokens`);
+      this.logger.log(
+        `[chat/stream] done: ${chunkCount} chunks, ${tokenCount} tokens`,
+      );
       res.write('data: [DONE]\n\n');
       res.end();
     } catch (e) {

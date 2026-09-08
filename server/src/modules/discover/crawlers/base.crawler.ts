@@ -22,7 +22,9 @@ export abstract class BaseCrawler {
     const now = Date.now();
     const elapsed = now - this.lastRequestTime;
     if (elapsed < this.rateLimitMs) {
-      await new Promise((resolve) => setTimeout(resolve, this.rateLimitMs - elapsed));
+      await new Promise((resolve) =>
+        setTimeout(resolve, this.rateLimitMs - elapsed),
+      );
     }
     this.lastRequestTime = Date.now();
   }

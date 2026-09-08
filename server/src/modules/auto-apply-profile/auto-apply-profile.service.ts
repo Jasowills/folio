@@ -1,10 +1,26 @@
-import { Injectable, Logger, NotFoundException, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  NotFoundException,
+  BadRequestException,
+} from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
-import { AutoApplyProfile, AutoApplyProfileDocument } from './auto-apply-profile.schema';
-import { UpdateLogisticsDto, CreateCustomQaDto, UpdateCustomQaDto, UpdateStyleDto } from './auto-apply-profile.dto';
+import {
+  AutoApplyProfile,
+  AutoApplyProfileDocument,
+} from './auto-apply-profile.schema';
+import {
+  UpdateLogisticsDto,
+  CreateCustomQaDto,
+  UpdateCustomQaDto,
+  UpdateStyleDto,
+} from './auto-apply-profile.dto';
 
-const REQUIRED_FIELDS: (keyof AutoApplyProfile)[] = ['logisticsAnswers', 'applicationStyle'];
+const REQUIRED_FIELDS: (keyof AutoApplyProfile)[] = [
+  'logisticsAnswers',
+  'applicationStyle',
+];
 
 const REQUIRED_LOGISTICS_FIELDS = [
   'availabilityToStart',
@@ -20,13 +36,16 @@ export class AutoApplyProfileService {
   private readonly logger = new Logger(AutoApplyProfileService.name);
 
   constructor(
-    @InjectModel(AutoApplyProfile.name) private profileModel: Model<AutoApplyProfileDocument>,
+    @InjectModel(AutoApplyProfile.name)
+    private profileModel: Model<AutoApplyProfileDocument>,
   ) {}
 
   async getProfile(userId: string): Promise<AutoApplyProfileDocument> {
-    const profile = await this.profileModel.findOne({
-      userId: new Types.ObjectId(userId),
-    }).exec();
+    const profile = await this.profileModel
+      .findOne({
+        userId: new Types.ObjectId(userId),
+      })
+      .exec();
     if (!profile) {
       return this.createDefault(userId);
     }
@@ -34,14 +53,21 @@ export class AutoApplyProfileService {
   }
 
   async getProfileOrThrow(userId: string): Promise<AutoApplyProfileDocument> {
-    const profile = await this.profileModel.findOne({
-      userId: new Types.ObjectId(userId),
-    }).exec();
-    if (!profile) throw new NotFoundException('Auto-apply profile not found. Complete the setup wizard first.');
+    const profile = await this.profileModel
+      .findOne({
+        userId: new Types.ObjectId(userId),
+      })
+      .exec();
+    if (!profile)
+      throw new NotFoundException(
+        'Auto-apply profile not found. Complete the setup wizard first.',
+      );
     return profile;
   }
 
-  private async createDefault(userId: string): Promise<AutoApplyProfileDocument> {
+  private async createDefault(
+    userId: string,
+  ): Promise<AutoApplyProfileDocument> {
     return this.profileModel.create({
       userId: new Types.ObjectId(userId),
       logisticsAnswers: {
@@ -65,7 +91,10 @@ export class AutoApplyProfileService {
     });
   }
 
-  async updateLogistics(userId: string, dto: UpdateLogisticsDto): Promise<AutoApplyProfileDocument> {
+  async updateLogistics(
+    userId: string,
+    dto: UpdateLogisticsDto,
+  ): Promise<AutoApplyProfileDocument> {
     const profile = await this.getProfile(userId);
     profile.logisticsAnswers = { ...dto } as any;
     profile.lastUpdatedAt = new Date();
@@ -73,7 +102,10 @@ export class AutoApplyProfileService {
     return profile.save();
   }
 
-  async addCustomQa(userId: string, dto: CreateCustomQaDto): Promise<AutoApplyProfileDocument> {
+  async addCustomQa(
+    userId: string,
+    dto: CreateCustomQaDto,
+  ): Promise<AutoApplyProfileDocument> {
     const profile = await this.getProfile(userId);
     profile.customQA.push({
       questionPattern: dto.questionPattern,
@@ -85,27 +117,44 @@ export class AutoApplyProfileService {
     return profile.save();
   }
 
-  async updateCustomQa(userId: string, qaId: string, dto: UpdateCustomQaDto): Promise<AutoApplyProfileDocument> {
+  async updateCustomQa(
+    userId: string,
+    qaId: string,
+    dto: UpdateCustomQaDto,
+  ): Promise<AutoApplyProfileDocument> {
     const profile = await this.getProfile(userId);
-    const entry = (profile.customQA as any[]).find((e: any) => e._id.toString() === qaId);
+    const entry = (profile.customQA as any[]).find(
+      (e: any) => e._id.toString() === qaId,
+    );
     if (!entry) throw new NotFoundException('Custom QA entry not found');
-    if (dto.questionPattern !== undefined) entry.questionPattern = dto.questionPattern;
-    if (dto.answerTemplate !== undefined) entry.answerTemplate = dto.answerTemplate;
+    if (dto.questionPattern !== undefined)
+      entry.questionPattern = dto.questionPattern;
+    if (dto.answerTemplate !== undefined)
+      entry.answerTemplate = dto.answerTemplate;
     if (dto.isSensitive !== undefined) entry.isSensitive = dto.isSensitive;
     profile.lastUpdatedAt = new Date();
     return profile.save();
   }
 
-  async deleteCustomQa(userId: string, qaId: string): Promise<AutoApplyProfileDocument> {
+  async deleteCustomQa(
+    userId: string,
+    qaId: string,
+  ): Promise<AutoApplyProfileDocument> {
     const profile = await this.getProfile(userId);
     const before = profile.customQA.length;
-    profile.customQA = profile.customQA.filter((e: any) => e._id.toString() !== qaId) as any;
-    if (profile.customQA.length === before) throw new NotFoundException('Custom QA entry not found');
+    profile.customQA = profile.customQA.filter(
+      (e: any) => e._id.toString() !== qaId,
+    );
+    if (profile.customQA.length === before)
+      throw new NotFoundException('Custom QA entry not found');
     profile.lastUpdatedAt = new Date();
     return profile.save();
   }
 
-  async updateStyle(userId: string, dto: UpdateStyleDto): Promise<AutoApplyProfileDocument> {
+  async updateStyle(
+    userId: string,
+    dto: UpdateStyleDto,
+  ): Promise<AutoApplyProfileDocument> {
     const profile = await this.getProfile(userId);
     profile.applicationStyle = { ...dto } as any;
     profile.lastUpdatedAt = new Date();
@@ -113,13 +162,18 @@ export class AutoApplyProfileService {
     return profile.save();
   }
 
-  async getCompletionStatus(userId: string): Promise<{ complete: boolean; missingFields: string[] }> {
+  async getCompletionStatus(
+    userId: string,
+  ): Promise<{ complete: boolean; missingFields: string[] }> {
     const profile = await this.getProfile(userId);
     const missingFields = this.getMissingFields(profile);
     return { complete: missingFields.length === 0, missingFields };
   }
 
-  async updateWizardStep(userId: string, step: number): Promise<AutoApplyProfileDocument> {
+  async updateWizardStep(
+    userId: string,
+    step: number,
+  ): Promise<AutoApplyProfileDocument> {
     const profile = await this.getProfile(userId);
     profile.wizardStep = step;
     profile.lastUpdatedAt = new Date();
@@ -140,8 +194,14 @@ export class AutoApplyProfileService {
     const l = profile.logisticsAnswers as any;
     for (const field of REQUIRED_LOGISTICS_FIELDS) {
       const val = l[field];
-      if (val === undefined || val === null || val === '' || (typeof val === 'boolean' && field === 'workAuthorizationStatus')) {
-        if (field === 'workAuthorizationStatus' && !val) missing.push(`logisticsAnswers.${field}`);
+      if (
+        val === undefined ||
+        val === null ||
+        val === '' ||
+        (typeof val === 'boolean' && field === 'workAuthorizationStatus')
+      ) {
+        if (field === 'workAuthorizationStatus' && !val)
+          missing.push(`logisticsAnswers.${field}`);
       } else if (val === undefined || val === null || val === '') {
         missing.push(`logisticsAnswers.${field}`);
       }

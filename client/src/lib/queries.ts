@@ -1180,6 +1180,8 @@ export function useDiscoverFeed(filters: FeedFilters, cursor?: string) {
       const { data } = await api.get(`/discover/feed?${params}`)
       return (data.data || data) as DiscoverFeedResponse
     },
+    staleTime: 30_000,
+    refetchOnWindowFocus: false,
   })
 }
 
@@ -1479,6 +1481,9 @@ export function useApproveJobs() {
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['auto-apply-submissions'] })
+    },
+    onError: (err) => {
+      console.error('[useApproveJobs]', err)
     },
   })
 }

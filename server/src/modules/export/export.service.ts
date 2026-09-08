@@ -1,4 +1,9 @@
-import { Injectable, Logger, NotFoundException, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  NotFoundException,
+  BadRequestException,
+} from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { Resume, ResumeDocument } from '../resumes/schemas/resume.schema';
@@ -17,10 +22,14 @@ export class ExportService {
     template?: string,
     primaryColor?: string,
   ): Promise<string> {
-    const resume = await this.resumeModel.findOne({ _id: resumeId, userId }).exec();
+    const resume = await this.resumeModel
+      .findOne({ _id: resumeId, userId })
+      .exec();
     if (!resume) throw new NotFoundException('Resume not found');
 
-    this.logger.log(`exportHtml: generating HTML for resume ${resumeId}, template=${template || 'default'}, color=${primaryColor || 'default'}`);
+    this.logger.log(
+      `exportHtml: generating HTML for resume ${resumeId}, template=${template || 'default'}, color=${primaryColor || 'default'}`,
+    );
 
     if (resume.layoutDocument) {
       return this.buildLayoutHtml(resume.layoutDocument as Record<string, any>);
@@ -34,17 +43,19 @@ export class ExportService {
     const pageHeight = doc.pages?.[0]?.height || 842;
     const unit = 'pt';
 
-    const pagesHtml = (doc.pages || []).map((page: any) => {
-      const blocksHtml = (page.blocks || [])
-        .filter((b: any) => b.text.trim())
-        .map((b: any) => {
-          const fontFamily = b.fontFamily === 'serif'
-            ? '"DM Serif Display", Georgia, serif'
-            : b.fontFamily === 'monospace'
-              ? '"Roboto Mono", "Courier New", monospace'
-              : '"Plus Jakarta Sans", "Helvetica Neue", Arial, sans-serif';
+    const pagesHtml = (doc.pages || [])
+      .map((page: any) => {
+        const blocksHtml = (page.blocks || [])
+          .filter((b: any) => b.text.trim())
+          .map((b: any) => {
+            const fontFamily =
+              b.fontFamily === 'serif'
+                ? '"DM Serif Display", Georgia, serif'
+                : b.fontFamily === 'monospace'
+                  ? '"Roboto Mono", "Courier New", monospace'
+                  : '"Plus Jakarta Sans", "Helvetica Neue", Arial, sans-serif';
 
-          return `<div style="
+            return `<div style="
             position:absolute;
             left:${b.x}${unit};
             top:${b.y}${unit};
@@ -61,9 +72,10 @@ export class ExportService {
             padding:0;
             margin:0;
           ">${this.esc(b.text)}</div>`;
-        }).join('\n');
+          })
+          .join('\n');
 
-      return `<div style="
+        return `<div style="
         position:relative;
         width:${page.width}${unit};
         height:${page.height}${unit};
@@ -71,7 +83,8 @@ export class ExportService {
         overflow:hidden;
         margin:0;
       ">${blocksHtml}</div>`;
-    }).join('\n');
+      })
+      .join('\n');
 
     const widthIn = (pageWidth / 72).toFixed(2);
     const heightIn = (pageHeight / 72).toFixed(2);
@@ -95,12 +108,21 @@ export class ExportService {
 
   private buildHtml(resume: ResumeDocument, color: string): string {
     const name = resume.name || 'Untitled Resume';
-    const contact = (resume.contact || {}) as Record<string, string | null | undefined>;
-    const experience = ((resume.experience || []) as unknown) as Array<Record<string, unknown>>;
-    const education = ((resume.education || []) as unknown) as Array<Record<string, unknown>>;
-    const skills = (resume.skills || []) as string[];
-    const certifications = ((resume.certifications || []) as unknown) as Array<Record<string, unknown>>;
-    const languages = (resume.languages || []) as string[];
+    const contact = (resume.contact || {}) as Record<
+      string,
+      string | null | undefined
+    >;
+    const experience = (resume.experience || []) as unknown as Array<
+      Record<string, unknown>
+    >;
+    const education = (resume.education || []) as unknown as Array<
+      Record<string, unknown>
+    >;
+    const skills = resume.skills || [];
+    const certifications = (resume.certifications || []) as unknown as Array<
+      Record<string, unknown>
+    >;
+    const languages = resume.languages || [];
     const summary = resume.summary || '';
 
     const contactParts = [
@@ -119,7 +141,8 @@ export class ExportService {
       .join('');
 
     const experienceHtml = experience
-      .map((exp) => `
+      .map(
+        (exp) => `
         <div class="entry">
           <div class="entry-header">
             <strong>${exp.title || ''}</strong>
@@ -128,10 +151,13 @@ export class ExportService {
           <p class="entry-sub">${exp.company || ''}</p>
           <ul>${(exp.bullets as string[])?.map((b: string) => `<li>${b}</li>`).join('') || ''}</ul>
         </div>
-      `).join('');
+      `,
+      )
+      .join('');
 
     const educationHtml = education
-      .map((edu) => `
+      .map(
+        (edu) => `
         <div class="entry">
           <div class="entry-header">
             <strong>${edu.institution || ''}</strong>
@@ -139,18 +165,24 @@ export class ExportService {
           </div>
           <p class="entry-sub">${edu.degree || ''}${edu.field ? ' in ' + edu.field : ''}${edu.gpa ? ' &middot; GPA: ' + edu.gpa : ''}</p>
         </div>
-      `).join('');
+      `,
+      )
+      .join('');
 
     const skillsHtml = skills.length
       ? `<div class="section"><h2>Skills</h2><p class="skills">${skills.join(' &middot; ')}</p></div>`
       : '';
 
     const certHtml = certifications.length
-      ? `<div class="section"><h2>Certifications</h2>${certifications.map((c) => `
+      ? `<div class="section"><h2>Certifications</h2>${certifications
+          .map(
+            (c) => `
         <div class="entry">
           <p><strong>${c.name || ''}</strong>${c.issuer ? ' - ' + c.issuer : ''}</p>
         </div>
-      `).join('')}</div>`
+      `,
+          )
+          .join('')}</div>`
       : '';
 
     const langHtml = languages.length
@@ -217,7 +249,11 @@ export class ExportService {
   }
 
   private esc(s: string): string {
-    return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    return s
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
   }
 
   async guestReportHtml(data: {
@@ -226,15 +262,47 @@ export class ExportService {
     issues: string[];
     redFlags?: Array<{ message: string; severity: string; section: string }>;
     sectionScores?: Record<string, number>;
-    detectedRole?: { role: string; seniority: string; industries: string[]; confidence: number };
-    quality?: { overallQuality: number; layoutScore: number; linksScore: number; professionalismScore: number; readabilityScore: number; strengths: string[]; issues: string[]; suggestions: string[] };
+    detectedRole?: {
+      role: string;
+      seniority: string;
+      industries: string[];
+      confidence: number;
+    };
+    quality?: {
+      overallQuality: number;
+      layoutScore: number;
+      linksScore: number;
+      professionalismScore: number;
+      readabilityScore: number;
+      strengths: string[];
+      issues: string[];
+      suggestions: string[];
+    };
     name?: string | null;
     contact?: Record<string, string | null | undefined>;
     summary?: string | null;
-    experience?: Array<{ company: string; title: string; startDate?: string | null; endDate?: string | null; current?: boolean; bullets: string[] }>;
-    education?: Array<{ institution: string; degree: string; field?: string | null; startDate?: string | null; endDate?: string | null; gpa?: string | null }>;
+    experience?: Array<{
+      company: string;
+      title: string;
+      startDate?: string | null;
+      endDate?: string | null;
+      current?: boolean;
+      bullets: string[];
+    }>;
+    education?: Array<{
+      institution: string;
+      degree: string;
+      field?: string | null;
+      startDate?: string | null;
+      endDate?: string | null;
+      gpa?: string | null;
+    }>;
     skills?: string[];
-    certifications?: Array<{ name: string; issuer?: string | null; date?: string | null }>;
+    certifications?: Array<{
+      name: string;
+      issuer?: string | null;
+      date?: string | null;
+    }>;
     languages?: string[];
   }): Promise<string> {
     if (!data || typeof data.score !== 'number') {
@@ -242,7 +310,11 @@ export class ExportService {
     }
 
     const getSeverityColor = (severity: string) =>
-      severity === 'high' ? '#C84242' : severity === 'medium' ? '#BA7517' : '#0F6E56';
+      severity === 'high'
+        ? '#C84242'
+        : severity === 'medium'
+          ? '#BA7517'
+          : '#0F6E56';
 
     const score = Math.round(data.score);
     const getInterpretation = (s: number) => {
@@ -253,27 +325,37 @@ export class ExportService {
     };
 
     const redFlagsHtml = (data.redFlags || [])
-      .map((f) => `
+      .map(
+        (f) => `
         <div class="flag">
           <span class="flag-badge" style="background:${getSeverityColor(f.severity)}">${this.esc(f.severity.toUpperCase())}</span>
           <span class="flag-section">${this.esc(f.section)}</span>
           <span class="flag-message">${this.esc(f.message)}</span>
         </div>
-      `).join('');
+      `,
+      )
+      .join('');
 
     const qualityMetrics = data.quality
       ? [
           { label: 'Overall', value: data.quality.overallQuality },
           { label: 'Layout', value: data.quality.layoutScore },
           { label: 'Links', value: data.quality.linksScore },
-          { label: 'Professionalism', value: data.quality.professionalismScore },
+          {
+            label: 'Professionalism',
+            value: data.quality.professionalismScore,
+          },
           { label: 'Readability', value: data.quality.readabilityScore },
-        ].map((m) => `
+        ]
+          .map(
+            (m) => `
           <div class="metric">
             <span class="metric-value" style="color:${m.value >= 70 ? '#0F6E56' : m.value >= 45 ? '#BA7517' : '#C84242'}">${Math.round(m.value)}</span>
             <span class="metric-label">${m.label}</span>
           </div>
-        `).join('')
+        `,
+          )
+          .join('')
       : '';
 
     const strengthsHtml = data.quality?.strengths?.length
@@ -281,14 +363,21 @@ export class ExportService {
       : '';
 
     const suggestionsHtml = data.quality?.suggestions?.length
-      ? `<div class="section"><h2>Suggestions</h2><ul>${data.quality.suggestions.slice(0, 5).map((s) => `<li>+ ${this.esc(s)}</li>`).join('')}</ul></div>`
+      ? `<div class="section"><h2>Suggestions</h2><ul>${data.quality.suggestions
+          .slice(0, 5)
+          .map((s) => `<li>+ ${this.esc(s)}</li>`)
+          .join('')}</ul></div>`
       : '';
 
     const issuesHtml = data.issues.length
-      ? `<div class="section"><h2>${data.issues.length} Issue${data.issues.length !== 1 ? 's' : ''} Found</h2><ul>${data.issues.map((issue) => {
-          const isSerious = issue.toLowerCase().includes('missing') || issue.toLowerCase().includes('no');
-          return `<li class="issue ${isSerious ? 'serious' : ''}">${this.esc(issue.split('—')[0]?.trim() || issue)}${issue.includes('—') ? '<br><span class="issue-detail">' + this.esc(issue.split('—')[1]?.trim() || '') + '</span>' : ''}</li>`;
-        }).join('')}</ul></div>`
+      ? `<div class="section"><h2>${data.issues.length} Issue${data.issues.length !== 1 ? 's' : ''} Found</h2><ul>${data.issues
+          .map((issue) => {
+            const isSerious =
+              issue.toLowerCase().includes('missing') ||
+              issue.toLowerCase().includes('no');
+            return `<li class="issue ${isSerious ? 'serious' : ''}">${this.esc(issue.split('—')[0]?.trim() || issue)}${issue.includes('—') ? '<br><span class="issue-detail">' + this.esc(issue.split('—')[1]?.trim() || '') + '</span>' : ''}</li>`;
+          })
+          .join('')}</ul></div>`
       : '';
 
     const roleHtml = data.detectedRole

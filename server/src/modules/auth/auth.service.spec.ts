@@ -115,9 +115,9 @@ describe('AuthService', () => {
         throw new Error('invalid token');
       });
 
-      await expect(
-        service.refreshTokens('bad-token'),
-      ).rejects.toThrow(UnauthorizedException);
+      await expect(service.refreshTokens('bad-token')).rejects.toThrow(
+        UnauthorizedException,
+      );
     });
 
     it('throws if user is not found', async () => {

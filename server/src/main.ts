@@ -18,14 +18,21 @@ validateEnv();
 dns.setServers(['8.8.8.8', '1.1.1.1', '208.67.222.222']);
 const origLookup = dns.lookup;
 dns.lookup = ((hostname: string, options: any, callback?: any) => {
-  if (typeof options === 'function') { callback = options; options = 0; }
+  if (typeof options === 'function') {
+    callback = options;
+    options = 0;
+  }
   if (typeof callback !== 'function') {
     return origLookup(hostname, options, callback);
   }
   dns.resolve4(hostname, (err: any, addresses?: string[]) => {
-    if (err || !addresses?.length) return origLookup(hostname, options, callback);
-    if (options && (options as any).all) {
-      callback(null, addresses.map((a) => ({ address: a, family: 4 })));
+    if (err || !addresses?.length)
+      return origLookup(hostname, options, callback);
+    if (options && options.all) {
+      callback(
+        null,
+        addresses.map((a) => ({ address: a, family: 4 })),
+      );
     } else {
       callback(null, addresses[0], 4);
     }
@@ -41,27 +48,39 @@ async function bootstrap() {
     enabled: !!process.env.SENTRY_DSN,
   });
 
-  app.use(helmet({
-    crossOriginOpenerPolicy: false,
-    contentSecurityPolicy: {
-      directives: {
-        defaultSrc: ["'self'"],
-        scriptSrc: ["'self'", "'unsafe-inline'", 'https://accounts.google.com'],
-        styleSrc: ["'self'", "'unsafe-inline'"],
-        imgSrc: ["'self'", 'data:', 'https://res.cloudinary.com'],
-        connectSrc: ["'self'", 'https://openrouter.ai', 'https://res.cloudinary.com'],
-        fontSrc: ["'self'", 'data:'],
-        frameSrc: ["'self'", 'https://accounts.google.com'],
-        objectSrc: ["'none'"],
+  app.use(
+    helmet({
+      crossOriginOpenerPolicy: false,
+      contentSecurityPolicy: {
+        directives: {
+          defaultSrc: ["'self'"],
+          scriptSrc: [
+            "'self'",
+            "'unsafe-inline'",
+            'https://accounts.google.com',
+          ],
+          styleSrc: ["'self'", "'unsafe-inline'"],
+          imgSrc: ["'self'", 'data:', 'https://res.cloudinary.com'],
+          connectSrc: [
+            "'self'",
+            'https://openrouter.ai',
+            'https://res.cloudinary.com',
+          ],
+          fontSrc: ["'self'", 'data:'],
+          frameSrc: ["'self'", 'https://accounts.google.com'],
+          objectSrc: ["'none'"],
+        },
       },
-    },
-  }));
-  app.use(compression({
-    filter: (req, res) => {
-      if (req.headers.accept === 'text/event-stream') return false;
-      return compression.filter(req, res);
-    },
-  }));
+    }),
+  );
+  app.use(
+    compression({
+      filter: (req, res) => {
+        if (req.headers.accept === 'text/event-stream') return false;
+        return compression.filter(req, res);
+      },
+    }),
+  );
   app.use(cookieParser());
   app.enableCors({ origin: process.env.CLIENT_URL, credentials: true });
   app.setGlobalPrefix('api');

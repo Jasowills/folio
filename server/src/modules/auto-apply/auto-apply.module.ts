@@ -11,11 +11,26 @@ import { WorkdayAdapter } from './ats-adapters/workday.adapter';
 import { ICIMSAdapter } from './ats-adapters/icims.adapter';
 import { AshbyAdapter } from './ats-adapters/ashby.adapter';
 import { SmartRecruitersAdapter } from './ats-adapters/smartrecruiters.adapter';
-import { ApplySubmission, ApplySubmissionSchema } from './schemas/apply-submission.schema';
-import { AnswersBankEntry, AnswersBankSchema } from './schemas/answers-bank.schema';
-import { AutoApplyConfig, AutoApplyConfigSchema } from './schemas/auto-apply-config.schema';
-import { JobListing, JobListingSchema } from '../discover/schemas/job-listing.schema';
-import { JobApplication, JobApplicationSchema } from '../discover/schemas/job-application.schema';
+import {
+  ApplySubmission,
+  ApplySubmissionSchema,
+} from './schemas/apply-submission.schema';
+import {
+  AnswersBankEntry,
+  AnswersBankSchema,
+} from './schemas/answers-bank.schema';
+import {
+  AutoApplyConfig,
+  AutoApplyConfigSchema,
+} from './schemas/auto-apply-config.schema';
+import {
+  JobListing,
+  JobListingSchema,
+} from '../discover/schemas/job-listing.schema';
+import {
+  JobApplication,
+  JobApplicationSchema,
+} from '../discover/schemas/job-application.schema';
 import { CoverLettersModule } from '../cover-letters/cover-letters.module';
 import { ResumesModule } from '../resumes/resumes.module';
 import { AiModule } from '../ai/ai.module';

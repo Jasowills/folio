@@ -120,7 +120,14 @@ export class AuthController {
   @ApiOperation({ summary: 'Get current user profile' })
   @Get('me')
   getMe(@CurrentUser() user: UserDocument) {
-    return { _id: user._id, email: user.email, name: user.name, picture: user.avatar, googleId: user.googleId || null, hasPassword: !!user.password };
+    return {
+      _id: user._id,
+      email: user.email,
+      name: user.name,
+      picture: user.avatar,
+      googleId: user.googleId || null,
+      hasPassword: !!user.password,
+    };
   }
 
   @ApiBearerAuth()
@@ -147,7 +154,7 @@ export class AuthController {
     });
   }
 
-  private googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID!);
+  private googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
   private async verifyGoogleToken(credential: string) {
     try {

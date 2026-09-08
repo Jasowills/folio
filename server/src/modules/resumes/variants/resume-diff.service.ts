@@ -1,13 +1,24 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ResumeContentDiff, ModifiedBullet } from './resume-variant.schema';
 
-const SECTION_NAMES = ['summary', 'experience', 'education', 'skills', 'certifications', 'languages', 'links'] as const;
+const SECTION_NAMES = [
+  'summary',
+  'experience',
+  'education',
+  'skills',
+  'certifications',
+  'languages',
+  'links',
+] as const;
 
 @Injectable()
 export class ResumeDiffService {
   private readonly logger = new Logger(ResumeDiffService.name);
 
-  generateDiff(base: Record<string, unknown>, tailored: Record<string, unknown>): ResumeContentDiff {
+  generateDiff(
+    base: Record<string, unknown>,
+    tailored: Record<string, unknown>,
+  ): ResumeContentDiff {
     const diff: ResumeContentDiff = {};
 
     const sections = this.detectSectionChanges(base, tailored);
@@ -28,8 +39,14 @@ export class ResumeDiffService {
     return diff;
   }
 
-  resolveDiff(base: Record<string, unknown>, diff: ResumeContentDiff): Record<string, unknown> {
-    const resolved = JSON.parse(JSON.stringify(base)) as Record<string, unknown>;
+  resolveDiff(
+    base: Record<string, unknown>,
+    diff: ResumeContentDiff,
+  ): Record<string, unknown> {
+    const resolved = JSON.parse(JSON.stringify(base)) as Record<
+      string,
+      unknown
+    >;
 
     if (diff.summaryChange) {
       resolved.summary = diff.summaryChange.after;
@@ -39,7 +56,9 @@ export class ResumeDiffService {
       const baseSkills = (base.skills as string[]) || [];
       const added = diff.skillsChange.added || [];
       const removed = new Set(diff.skillsChange.removed || []);
-      resolved.skills = [...new Set([...baseSkills.filter((s) => !removed.has(s)), ...added])];
+      resolved.skills = [
+        ...new Set([...baseSkills.filter((s) => !removed.has(s)), ...added]),
+      ];
     }
 
     if (diff.modifiedBullets && diff.modifiedBullets.length > 0) {
@@ -71,8 +90,12 @@ export class ResumeDiffService {
     base: Record<string, unknown>,
     tailored: Record<string, unknown>,
   ): { added: string[]; removed: string[] } {
-    const baseKeys = new Set(Object.keys(base).filter((k) => SECTION_NAMES.includes(k as any)));
-    const tailoredKeys = new Set(Object.keys(tailored).filter((k) => SECTION_NAMES.includes(k as any)));
+    const baseKeys = new Set(
+      Object.keys(base).filter((k) => SECTION_NAMES.includes(k as any)),
+    );
+    const tailoredKeys = new Set(
+      Object.keys(tailored).filter((k) => SECTION_NAMES.includes(k as any)),
+    );
 
     const added = [...tailoredKeys].filter((k) => !baseKeys.has(k));
     const removed = [...baseKeys].filter((k) => !tailoredKeys.has(k));
@@ -90,14 +113,23 @@ export class ResumeDiffService {
     const modified: ModifiedBullet[] = [];
 
     for (let i = 0; i < Math.min(baseExp.length, tailoredExp.length); i++) {
-      const baseBullets = (baseExp[i] as any).bullets || [];
-      const tailoredBullets = (tailoredExp[i] as any).bullets || [];
+      const baseBullets = baseExp[i].bullets || [];
+      const tailoredBullets = tailoredExp[i].bullets || [];
 
-      for (let j = 0; j < Math.min(baseBullets.length, tailoredBullets.length); j++) {
+      for (
+        let j = 0;
+        j < Math.min(baseBullets.length, tailoredBullets.length);
+        j++
+      ) {
         const before = String(baseBullets[j] || '');
         const after = String(tailoredBullets[j] || '');
         if (before !== after && before.trim() && after.trim()) {
-          modified.push({ sectionId: String(i), bulletIndex: j, before, after });
+          modified.push({
+            sectionId: String(i),
+            bulletIndex: j,
+            before,
+            after,
+          });
         }
       }
 
@@ -105,7 +137,12 @@ export class ResumeDiffService {
         for (let j = baseBullets.length; j < tailoredBullets.length; j++) {
           const after = String(tailoredBullets[j] || '');
           if (after.trim()) {
-            modified.push({ sectionId: String(i), bulletIndex: j, before: '', after });
+            modified.push({
+              sectionId: String(i),
+              bulletIndex: j,
+              before: '',
+              after,
+            });
           }
         }
       }

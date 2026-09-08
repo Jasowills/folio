@@ -5,20 +5,65 @@ import {
   ApplyOddsAssessment,
   ApplyOddsAssessmentDocument,
 } from './apply-odds.schema';
-import { JobListing, JobListingDocument } from '../discover/schemas/job-listing.schema';
-import { JobMatch, JobMatchDocument } from '../discover/schemas/job-match.schema';
+import {
+  JobListing,
+  JobListingDocument,
+} from '../discover/schemas/job-listing.schema';
+import {
+  JobMatch,
+  JobMatchDocument,
+} from '../discover/schemas/job-match.schema';
 
 const PRESTIGE_COMPANIES = new Set([
-  'google', 'meta', 'amazon', 'apple', 'microsoft', 'netflix',
-  'google inc', 'meta platforms', 'amazon.com', 'amazon web services',
-  'apple inc', 'microsoft corporation', 'netflix inc',
-  'stripe', 'airbnb', 'uber', 'lyft', 'spotify', 'slack',
-  'twitter', 'x corp', 'linkedin', 'salesforce', 'oracle',
-  'nvidia', 'intel', 'ibm', 'cisco', 'adobe', 'vmware',
-  'palantir', 'datadog', 'mongodb', 'cloudflare', 'snowflake',
-  'coinbase', 'robinhood', 'square', 'block', 'shopify',
-  'figma', 'notion', 'vercel', 'databricks', 'scale ai',
-  'openai', 'anthropic', 'deepmind', 'hugging face',
+  'google',
+  'meta',
+  'amazon',
+  'apple',
+  'microsoft',
+  'netflix',
+  'google inc',
+  'meta platforms',
+  'amazon.com',
+  'amazon web services',
+  'apple inc',
+  'microsoft corporation',
+  'netflix inc',
+  'stripe',
+  'airbnb',
+  'uber',
+  'lyft',
+  'spotify',
+  'slack',
+  'twitter',
+  'x corp',
+  'linkedin',
+  'salesforce',
+  'oracle',
+  'nvidia',
+  'intel',
+  'ibm',
+  'cisco',
+  'adobe',
+  'vmware',
+  'palantir',
+  'datadog',
+  'mongodb',
+  'cloudflare',
+  'snowflake',
+  'coinbase',
+  'robinhood',
+  'square',
+  'block',
+  'shopify',
+  'figma',
+  'notion',
+  'vercel',
+  'databricks',
+  'scale ai',
+  'openai',
+  'anthropic',
+  'deepmind',
+  'hugging face',
 ]);
 
 @Injectable()
@@ -34,34 +79,57 @@ export class ApplyOddsService {
     private jobMatchModel: Model<JobMatchDocument>,
   ) {}
 
-  async getOrCreate(userId: string, jobId: string): Promise<ApplyOddsAssessmentDocument> {
-    const existing = await this.oddsModel.findOne({
-      userId: new Types.ObjectId(userId),
-      jobId: new Types.ObjectId(jobId),
-    }).exec();
+  async getOrCreate(
+    userId: string,
+    jobId: string,
+  ): Promise<ApplyOddsAssessmentDocument> {
+    const existing = await this.oddsModel
+      .findOne({
+        userId: new Types.ObjectId(userId),
+        jobId: new Types.ObjectId(jobId),
+      })
+      .exec();
 
     if (existing) return existing;
 
     return this.create(userId, jobId);
   }
 
-  async create(userId: string, jobId: string): Promise<ApplyOddsAssessmentDocument> {
+  async create(
+    userId: string,
+    jobId: string,
+  ): Promise<ApplyOddsAssessmentDocument> {
     const [match, listing] = await Promise.all([
-      this.jobMatchModel.findOne({
-        userId: new Types.ObjectId(userId),
-        jobListingId: new Types.ObjectId(jobId),
-      }).lean().exec(),
+      this.jobMatchModel
+        .findOne({
+          userId: new Types.ObjectId(userId),
+          jobListingId: new Types.ObjectId(jobId),
+        })
+        .lean()
+        .exec(),
       this.jobListingModel.findById(jobId).lean().exec(),
     ]);
 
     const atsScore = match?.atsScore ?? null;
     const listingAgeDays = listing?.postedAt
-      ? Math.floor((Date.now() - new Date(listing.postedAt).getTime()) / 86400000)
+      ? Math.floor(
+          (Date.now() - new Date(listing.postedAt).getTime()) / 86400000,
+        )
       : null;
 
     const competitionLevel = this.estimateCompetition(listing, listingAgeDays);
-    const recommendation = this.getRecommendation(atsScore, listingAgeDays, competitionLevel);
-    const reasoningNotes = this.buildReasoning(atsScore, listingAgeDays, competitionLevel, recommendation, listing);
+    const recommendation = this.getRecommendation(
+      atsScore,
+      listingAgeDays,
+      competitionLevel,
+    );
+    const reasoningNotes = this.buildReasoning(
+      atsScore,
+      listingAgeDays,
+      competitionLevel,
+      recommendation,
+      listing,
+    );
 
     const assessment = await this.oddsModel.create({
       userId: new Types.ObjectId(userId),
@@ -129,40 +197,65 @@ export class ApplyOddsService {
     const notes: string[] = [];
 
     if (atsScore !== null) {
-      notes.push(`ATS match: ${atsScore}%${atsScore >= 80 ? ' (strong)' : atsScore >= 60 ? ' (moderate)' : atsScore >= 40 ? ' (weak)' : ' (poor)'}.`);
+      notes.push(
+        `ATS match: ${atsScore}%${atsScore >= 80 ? ' (strong)' : atsScore >= 60 ? ' (moderate)' : atsScore >= 40 ? ' (weak)' : ' (poor)'}.`,
+      );
     } else {
-      notes.push('ATS score not available — scored based on listing metadata only.');
+      notes.push(
+        'ATS score not available — scored based on listing metadata only.',
+      );
     }
 
     if (ageDays !== null) {
-      const ageLabel = ageDays === 0 ? 'posted today' : ageDays === 1 ? 'posted yesterday' : `listed ${ageDays} days ago`;
-      notes.push(`Listing ${ageLabel}${ageDays > 30 ? ' (may be stale or filled).' : '.'}`);
+      const ageLabel =
+        ageDays === 0
+          ? 'posted today'
+          : ageDays === 1
+            ? 'posted yesterday'
+            : `listed ${ageDays} days ago`;
+      notes.push(
+        `Listing ${ageLabel}${ageDays > 30 ? ' (may be stale or filled).' : '.'}`,
+      );
     } else {
       notes.push('Listing age unknown.');
     }
 
     const companyName = listing?.companyName || 'Unknown';
     if (competition === 'high') {
-      notes.push(`Competition estimate: high — ${companyName} typically receives many applications.`);
+      notes.push(
+        `Competition estimate: high — ${companyName} typically receives many applications.`,
+      );
     } else if (competition === 'medium') {
       notes.push('Competition estimate: moderate.');
     } else if (competition === 'low') {
-      notes.push('Competition estimate: low — older listing with likely fewer active applicants.');
+      notes.push(
+        'Competition estimate: low — older listing with likely fewer active applicants.',
+      );
     } else {
       notes.push('Competition estimate: unknown.');
     }
 
     if (recommendation === 'strong_apply') {
-      notes.push('Recommendation: strong apply. Your profile is a good match for a fresh listing.');
+      notes.push(
+        'Recommendation: strong apply. Your profile is a good match for a fresh listing.',
+      );
     } else if (recommendation === 'apply') {
-      notes.push('Recommendation: apply. Reasonable match with moderate competition.');
+      notes.push(
+        'Recommendation: apply. Reasonable match with moderate competition.',
+      );
     } else if (recommendation === 'long_shot') {
-      notes.push('Recommendation: long shot. Low ATS match — consider tailoring your resume before applying.');
+      notes.push(
+        'Recommendation: long shot. Low ATS match — consider tailoring your resume before applying.',
+      );
     } else if (recommendation === 'skip') {
-      notes.push('Recommendation: skip. Low match and stale listing — focus on better-fitting opportunities.');
+      notes.push(
+        'Recommendation: skip. Low match and stale listing — focus on better-fitting opportunities.',
+      );
     }
 
-    notes.push('Competition level is a heuristic estimate, not precise market data.');
+    notes.push(
+      'Competition level is a heuristic estimate, not precise market data.',
+    );
 
     return notes;
   }

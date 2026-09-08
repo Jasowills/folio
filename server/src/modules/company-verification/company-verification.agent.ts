@@ -2,7 +2,12 @@ import { Injectable, Logger } from '@nestjs/common';
 import { chromium, type Browser, type Page } from 'playwright';
 import { AiService } from '../ai/ai.service';
 import { COMPANY_VERIFICATION_SYSTEM } from '../ai/prompts';
-import type { CompanyVerificationInput, CompanyVerificationResult, FlagType, RiskLevel } from './company-verification.types';
+import type {
+  CompanyVerificationInput,
+  CompanyVerificationResult,
+  FlagType,
+  RiskLevel,
+} from './company-verification.types';
 
 const PAGE_TIMEOUT = 15000;
 const RATE_LIMIT_MS = 2000;
@@ -26,7 +31,9 @@ export class CompanyVerificationAgent {
 
   constructor(private aiService: AiService) {}
 
-  async verify(input: CompanyVerificationInput): Promise<CompanyVerificationResult> {
+  async verify(
+    input: CompanyVerificationInput,
+  ): Promise<CompanyVerificationResult> {
     const pages: CrawledPage[] = [];
     let browser: Browser | null = null;
 
@@ -90,12 +97,16 @@ export class CompanyVerificationAgent {
     if (pages.length === 0) {
       return {
         riskLevel: 'unknown',
-        flags: [{
-          type: 'other',
-          summary: 'Could not find sufficient web data to verify this company.',
-          evidence: [],
-        }],
-        recommendation: 'Proceed with caution — we could not verify the company. Check their website and LinkedIn profile manually.',
+        flags: [
+          {
+            type: 'other',
+            summary:
+              'Could not find sufficient web data to verify this company.',
+            evidence: [],
+          },
+        ],
+        recommendation:
+          'Proceed with caution — we could not verify the company. Check their website and LinkedIn profile manually.',
       };
     }
 
@@ -104,7 +115,9 @@ export class CompanyVerificationAgent {
       .join('\n\n');
 
     if (crawledContent.length > MAX_SYNTHESIS_CHARS) {
-      crawledContent = crawledContent.slice(0, MAX_SYNTHESIS_CHARS) + '\n\n[Content truncated]';
+      crawledContent =
+        crawledContent.slice(0, MAX_SYNTHESIS_CHARS) +
+        '\n\n[Content truncated]';
     }
 
     const emailSection = input.emailBody
@@ -123,31 +136,47 @@ Web search results:
 ${crawledContent}`;
 
     try {
-      const raw = await this.aiService.chat(COMPANY_VERIFICATION_SYSTEM, prompt);
-      return this.parseResult(raw as Record<string, unknown>);
+      const raw = await this.aiService.chat(
+        COMPANY_VERIFICATION_SYSTEM,
+        prompt,
+      );
+      return this.parseResult(raw);
     } catch (err) {
       this.logger.error(`LLM analysis failed for ${input.companyName}:`, err);
       return {
         riskLevel: 'unknown',
-        flags: [{
-          type: 'other',
-          summary: 'The verification analysis failed due to an internal error.',
-          evidence: [],
-        }],
+        flags: [
+          {
+            type: 'other',
+            summary:
+              'The verification analysis failed due to an internal error.',
+            evidence: [],
+          },
+        ],
         recommendation: 'Try again later.',
       };
     }
   }
 
-  private async search(browser: Browser, query: string, maxResults: number): Promise<SearchResult[]> {
+  private async search(
+    browser: Browser,
+    query: string,
+    maxResults: number,
+  ): Promise<SearchResult[]> {
     const results: SearchResult[] = [];
     let page: Page | null = null;
     try {
       page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
-      await page.route('**/*.{png,jpg,jpeg,gif,svg,ico,woff,woff2,ttf,mp4,mp3,avi,webm,pdf}', (route) => route.abort());
+      await page.route(
+        '**/*.{png,jpg,jpeg,gif,svg,ico,woff,woff2,ttf,mp4,mp3,avi,webm,pdf}',
+        (route) => route.abort(),
+      );
 
       const searchUrl = `https://html.duckduckgo.com/html?q=${encodeURIComponent(query)}`;
-      await page.goto(searchUrl, { waitUntil: 'domcontentloaded', timeout: PAGE_TIMEOUT });
+      await page.goto(searchUrl, {
+        waitUntil: 'domcontentloaded',
+        timeout: PAGE_TIMEOUT,
+      });
       await page.waitForTimeout(1500);
 
       const items = await page.$$eval('.result', (els) =>
@@ -158,25 +187,36 @@ ${crawledContent}`;
             url: link?.href || '',
             snippet: snippet?.textContent?.trim() || '',
           };
-        })
+        }),
       );
 
       results.push(...items.filter((r): r is SearchResult => !!r.url));
     } catch (err) {
-      this.logger.warn(`Search failed for "${query.slice(0, 60)}": ${(err as Error).message}`);
+      this.logger.warn(
+        `Search failed for "${query.slice(0, 60)}": ${(err as Error).message}`,
+      );
     } finally {
       if (page) await page.close().catch(() => {});
     }
     return results;
   }
 
-  private async crawl(browser: Browser, url: string): Promise<CrawledPage | null> {
+  private async crawl(
+    browser: Browser,
+    url: string,
+  ): Promise<CrawledPage | null> {
     let page: Page | null = null;
     try {
       page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
-      await page.route('**/*.{png,jpg,jpeg,gif,svg,ico,woff,woff2,ttf,mp4,mp3,avi,webm,pdf}', (route) => route.abort());
+      await page.route(
+        '**/*.{png,jpg,jpeg,gif,svg,ico,woff,woff2,ttf,mp4,mp3,avi,webm,pdf}',
+        (route) => route.abort(),
+      );
 
-      await page.goto(url, { waitUntil: 'domcontentloaded', timeout: PAGE_TIMEOUT });
+      await page.goto(url, {
+        waitUntil: 'domcontentloaded',
+        timeout: PAGE_TIMEOUT,
+      });
       await page.waitForTimeout(1000);
 
       const title = await page.title();
@@ -223,9 +263,15 @@ ${crawledContent}`;
   }
 
   private extractQuestionPhrases(emailBody: string): string | null {
-    const lines = emailBody.split('\n')
+    const lines = emailBody
+      .split('\n')
       .map((l) => l.trim())
-      .filter((l) => l.length > 20 && l.length < 200 && (l.endsWith('?') || /^\d+[\.\)]\s/.test(l)));
+      .filter(
+        (l) =>
+          l.length > 20 &&
+          l.length < 200 &&
+          (l.endsWith('?') || /^\d+[\.\)]\s/.test(l)),
+      );
 
     if (lines.length === 0) return null;
 
@@ -237,7 +283,13 @@ ${crawledContent}`;
     const safeArr = (v: unknown): any[] => (Array.isArray(v) ? v : []);
 
     const flags = safeArr(raw.flags).map((f: any) => ({
-      type: (['identity_mismatch', 'known_scam_pattern', 'location_mismatch', 'presence_check', 'other'].includes(f?.type)
+      type: ([
+        'identity_mismatch',
+        'known_scam_pattern',
+        'location_mismatch',
+        'presence_check',
+        'other',
+      ].includes(f?.type)
         ? f.type
         : 'other') as FlagType,
       summary: safeStr(f?.summary),
@@ -247,9 +299,11 @@ ${crawledContent}`;
       })),
     }));
 
-    const riskLevel = (['low', 'medium', 'high', 'unknown'].includes(safeStr(raw.riskLevel))
-      ? safeStr(raw.riskLevel)
-      : 'unknown') as RiskLevel;
+    const riskLevel = (
+      ['low', 'medium', 'high', 'unknown'].includes(safeStr(raw.riskLevel))
+        ? safeStr(raw.riskLevel)
+        : 'unknown'
+    ) as RiskLevel;
 
     return {
       riskLevel,

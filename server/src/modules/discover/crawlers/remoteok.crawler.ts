@@ -18,7 +18,8 @@ export class RemoteOkCrawler extends BaseCrawler {
       for (const item of data) {
         if (!item.id || !item.position || !item.company) continue;
         const date = item.date ? new Date(item.date) : null;
-        const salaryText = `${item.salary_min || ''} ${item.salary_max || ''}`.trim();
+        const salaryText =
+          `${item.salary_min || ''} ${item.salary_max || ''}`.trim();
         jobs.push({
           source: 'remoteok',
           sourceId: `remoteok-${item.id}`,
@@ -28,7 +29,8 @@ export class RemoteOkCrawler extends BaseCrawler {
           isRemote: true,
           postedAt: date,
           descriptionRaw: item.description || '',
-          applicationUrl: item.url || `https://remoteok.com/remote-jobs/${item.slug}`,
+          applicationUrl:
+            item.url || `https://remoteok.com/remote-jobs/${item.slug}`,
           isVerified: false,
         });
       }

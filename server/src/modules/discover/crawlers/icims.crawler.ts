@@ -63,7 +63,7 @@ export class ICIMSCrawler extends BaseCrawler {
     const response = await fetch(searchUrl, {
       headers: {
         'User-Agent': 'Folio/1.0',
-        'Accept': 'application/json, text/html',
+        Accept: 'application/json, text/html',
       },
     });
 
@@ -78,7 +78,8 @@ export class ICIMSCrawler extends BaseCrawler {
       return this.parseFromHtml(text, company);
     }
 
-    const results = Array.isArray(jsonData) ? jsonData
+    const results = Array.isArray(jsonData)
+      ? jsonData
       : jsonData?.results || jsonData?.jobs || jsonData?.data || [];
 
     for (const job of results) {
@@ -91,21 +92,29 @@ export class ICIMSCrawler extends BaseCrawler {
 
   private parseFromHtml(html: string, company: ICIMSCompany): RawJob[] {
     const jobs: RawJob[] = [];
-    const jobRegex = /<div[^>]*class=["'][^"']*(?:job|result)["'][^>]*>([\s\S]*?)<\/div>\s*<\/div>/gi;
+    const jobRegex =
+      /<div[^>]*class=["'][^"']*(?:job|result)["'][^>]*>([\s\S]*?)<\/div>\s*<\/div>/gi;
     let match: RegExpExecArray | null;
 
     while ((match = jobRegex.exec(html)) !== null) {
       const block = match[1];
-      const titleMatch = block.match(/<a[^>]*href=["']([^"']+)["'][^>]*>([\s\S]*?)<\/a>/i);
+      const titleMatch = block.match(
+        /<a[^>]*href=["']([^"']+)["'][^>]*>([\s\S]*?)<\/a>/i,
+      );
       if (!titleMatch) continue;
 
-      const url = titleMatch[1].startsWith('http') ? titleMatch[1] : `${company.boardUrl}${titleMatch[1]}`;
+      const url = titleMatch[1].startsWith('http')
+        ? titleMatch[1]
+        : `${company.boardUrl}${titleMatch[1]}`;
       const title = titleMatch[2].replace(/<[^>]*>/g, '').trim();
       if (!title) continue;
 
-      const locationMatch = block.match(/<span[^>]*class=["'][^"']*(?:location|city|state)["'][^>]*>([^<]+)<\/span>/i);
+      const locationMatch = block.match(
+        /<span[^>]*class=["'][^"']*(?:location|city|state)["'][^>]*>([^<]+)<\/span>/i,
+      );
       const location = locationMatch ? locationMatch[1].trim() : null;
-      const id = url.match(/[?&]jobId[=](\d+)/)?.[1] || url.split('/').pop() || '';
+      const id =
+        url.match(/[?&]jobId[=](\d+)/)?.[1] || url.split('/').pop() || '';
 
       jobs.push({
         source: 'icims',
@@ -129,9 +138,12 @@ export class ICIMSCrawler extends BaseCrawler {
 
     const id = job.id || job.jobId || String(Math.random()).slice(2);
     const location = job.location || job.city || null;
-    const locationStr = typeof location === 'string' ? location : location?.name || null;
+    const locationStr =
+      typeof location === 'string' ? location : location?.name || null;
     const url = job.url || job.applyUrl || `${company.boardUrl}/jobs/${id}/job`;
-    const description = (job.description || job.descriptionPlain || '').replace(/<[^>]*>/g, '').trim();
+    const description = (job.description || job.descriptionPlain || '')
+      .replace(/<[^>]*>/g, '')
+      .trim();
     const postedDate = job.postedDate || job.datePosted || null;
 
     return {
@@ -140,7 +152,9 @@ export class ICIMSCrawler extends BaseCrawler {
       roleTitle: title,
       companyName: company.name,
       location: locationStr,
-      isRemote: locationStr ? locationStr.toLowerCase().includes('remote') : false,
+      isRemote: locationStr
+        ? locationStr.toLowerCase().includes('remote')
+        : false,
       postedAt: postedDate ? new Date(postedDate) : null,
       descriptionRaw: description,
       applicationUrl: url,

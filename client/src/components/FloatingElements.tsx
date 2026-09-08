@@ -16,8 +16,8 @@ function ResumeDoc({ width, height }: { width: number; height: number }) {
   const lines = Math.floor(height / (lineH + 4))
   return (
     <svg width={width} height={height} viewBox={`0 0 ${width} ${height}`}>
-      <rect x="0" y="0" width={width} height={height} rx="3" fill="white" stroke="#E5E0D8" strokeWidth="1" />
-      <rect x={width * 0.15} y="12" width={width * 0.7} height="8" rx="2" fill="#E5E0D8" opacity="0.5" />
+      <rect x="0" y="0" width={width} height={height} rx="3" fill="white" stroke="#E2E8F0" strokeWidth="1" />
+      <rect x={width * 0.15} y="12" width={width * 0.7} height="8" rx="2" fill="#E2E8F0" opacity="0.5" />
       {Array.from({ length: lines }).map((_, i) => (
         <rect
           key={i}
@@ -26,7 +26,7 @@ function ResumeDoc({ width, height }: { width: number; height: number }) {
           width={width * (0.3 + Math.random() * 0.5)}
           height={lineH}
           rx="1.5"
-          fill="#E5E0D8"
+          fill="#E2E8F0"
           opacity="0.35"
         />
       ))}
@@ -42,17 +42,17 @@ function StickyNote({ size }: { size: number }) {
           <polygon points={`0,0 ${size - 8},0 ${size},8 ${size},${size} 0,${size}`} />
         </clipPath>
       </defs>
-      <rect x="0" y="0" width={size} height={size} rx="2" fill="#FDF3E3" stroke="#BA7517" strokeWidth="0.5" opacity="0.4" clipPath={`url(#clip-${size})`} />
-      <line x1={size * 0.2} y1={size * 0.3} x2={size * 0.8} y2={size * 0.3} stroke="#BA7517" strokeWidth="1.5" opacity="0.2" strokeLinecap="round" />
-      <line x1={size * 0.2} y1={size * 0.45} x2={size * 0.7} y2={size * 0.45} stroke="#BA7517" strokeWidth="1.5" opacity="0.2" strokeLinecap="round" />
-      <line x1={size * 0.2} y1={size * 0.6} x2={size * 0.6} y2={size * 0.6} stroke="#BA7517" strokeWidth="1.5" opacity="0.2" strokeLinecap="round" />
+      <rect x="0" y="0" width={size} height={size} rx="2" fill="#FFFBEB" stroke="#D97706" strokeWidth="0.5" opacity="0.4" clipPath={`url(#clip-${size})`} />
+      <line x1={size * 0.2} y1={size * 0.3} x2={size * 0.8} y2={size * 0.3} stroke="#D97706" strokeWidth="1.5" opacity="0.2" strokeLinecap="round" />
+      <line x1={size * 0.2} y1={size * 0.45} x2={size * 0.7} y2={size * 0.45} stroke="#D97706" strokeWidth="1.5" opacity="0.2" strokeLinecap="round" />
+      <line x1={size * 0.2} y1={size * 0.6} x2={size * 0.6} y2={size * 0.6} stroke="#D97706" strokeWidth="1.5" opacity="0.2" strokeLinecap="round" />
     </svg>
   )
 }
 
 function PaperAirplane({ size }: { size: number }) {
   return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="#0F6E56" strokeWidth="1.5" opacity="0.15">
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="#4F46E5" strokeWidth="1.5" opacity="0.15">
       <path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z" strokeLinejoin="round" strokeLinecap="round" />
     </svg>
   )
@@ -60,7 +60,7 @@ function PaperAirplane({ size }: { size: number }) {
 
 function Briefcase({ size }: { size: number }) {
   return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="#1A1A1A" strokeWidth="1.5" opacity="0.08">
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="#0F172A" strokeWidth="1.5" opacity="0.08">
       <rect x="2" y="7" width="20" height="14" rx="2" ry="2" />
       <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16" />
     </svg>
@@ -69,7 +69,7 @@ function Briefcase({ size }: { size: number }) {
 
 function MagnifyingGlass({ size }: { size: number }) {
   return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="#0F6E56" strokeWidth="1.5" opacity="0.12">
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="#4F46E5" strokeWidth="1.5" opacity="0.12">
       <circle cx="11" cy="11" r="8" />
       <path d="m21 21-4.35-4.35" />
     </svg>
@@ -79,16 +79,16 @@ function MagnifyingGlass({ size }: { size: number }) {
 function Stamp({ size }: { size: number }) {
   return (
     <svg width={size} height={size} viewBox="0 0 40 40" fill="none" opacity="0.1">
-      <circle cx="20" cy="20" r="18" stroke="#BA7517" strokeWidth="1.5" />
-      <circle cx="20" cy="20" r="14" stroke="#BA7517" strokeWidth="0.5" />
-      <path d="M14 20l4 4 8-8" stroke="#BA7517" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+      <circle cx="20" cy="20" r="18" stroke="#D97706" strokeWidth="1.5" />
+      <circle cx="20" cy="20" r="14" stroke="#D97706" strokeWidth="0.5" />
+      <path d="M14 20l4 4 8-8" stroke="#D97706" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   )
 }
 
 function Sparkle({ size }: { size: number }) {
   return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="#0F6E56" strokeWidth="1.5" opacity="0.3">
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="#4F46E5" strokeWidth="1.5" opacity="0.3">
       <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
     </svg>
   )
@@ -96,7 +96,7 @@ function Sparkle({ size }: { size: number }) {
 
 function ChatBubble({ size }: { size: number }) {
   return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="#1A1A1A" strokeWidth="1.5" opacity="0.2">
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="#0F172A" strokeWidth="1.5" opacity="0.2">
       <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
     </svg>
   )
@@ -104,7 +104,7 @@ function ChatBubble({ size }: { size: number }) {
 
 function Target({ size }: { size: number }) {
   return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="#0F6E56" strokeWidth="1.5" opacity="0.25">
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="#4F46E5" strokeWidth="1.5" opacity="0.25">
       <circle cx="12" cy="12" r="10" />
       <circle cx="12" cy="12" r="6" />
       <circle cx="12" cy="12" r="2" />
@@ -114,7 +114,7 @@ function Target({ size }: { size: number }) {
 
 function CheckmarkBadge({ size }: { size: number }) {
   return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="#0F6E56" strokeWidth="1.5" opacity="0.2">
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="#4F46E5" strokeWidth="1.5" opacity="0.2">
       <circle cx="12" cy="12" r="10" />
       <path d="M8 12l2.5 2.5 5-5" />
     </svg>
@@ -123,11 +123,11 @@ function CheckmarkBadge({ size }: { size: number }) {
 
 function PercentBadge({ size }: { size: number }) {
   return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="#BA7517" strokeWidth="1.5" opacity="0.2">
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="#D97706" strokeWidth="1.5" opacity="0.2">
       <circle cx="12" cy="12" r="10" />
       <path d="M8 16l8-8" />
-      <circle cx="9" cy="9" r="1" fill="#BA7517" />
-      <circle cx="15" cy="15" r="1" fill="#BA7517" />
+      <circle cx="9" cy="9" r="1" fill="#D97706" />
+      <circle cx="15" cy="15" r="1" fill="#D97706" />
     </svg>
   )
 }

@@ -29,7 +29,7 @@ export default function ThreeBackground() {
     geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3))
 
     const material = new THREE.PointsMaterial({
-      color: 0x0F6E56,
+      color: 0x4F46E5,
       size: 0.008,
       transparent: true,
       opacity: 0.2,

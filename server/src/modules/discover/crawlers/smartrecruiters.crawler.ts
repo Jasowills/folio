@@ -96,13 +96,13 @@ export class SmartRecruitersCrawler extends BaseCrawler {
     const response = await fetch(apiUrl, {
       headers: {
         'User-Agent': 'Folio/1.0',
-        'Accept': 'application/json',
+        Accept: 'application/json',
       },
     });
 
     if (!response.ok) return jobs;
 
-    const data = await response.json() as any;
+    const data = await response.json();
     const results = data?.content || data?.results || data?.data || [];
 
     if (!Array.isArray(results)) return jobs;
@@ -113,14 +113,30 @@ export class SmartRecruitersCrawler extends BaseCrawler {
 
       const id = posting.id || '';
       const location = posting.location || {};
-      const locationStr = typeof location === 'string' ? location : location.city || '';
-      const isRemote = posting.remote || posting.remoteType === 'fully_remote'
-        || (typeof locationStr === 'string' && locationStr.toLowerCase().includes('remote'));
-      const description = (posting.description || posting.descriptionPlain || posting.jobDescription || '')
-        .replace(/<[^>]*>/g, '').trim();
-      const postedDate = posting.postedDate || posting.createdDate || posting.publicationDate || null;
-      const url = posting.applyUrl || posting.applicationUrl
-        || `https://jobs.smartrecruiters.com/${company.companyId}/${id}`;
+      const locationStr =
+        typeof location === 'string' ? location : location.city || '';
+      const isRemote =
+        posting.remote ||
+        posting.remoteType === 'fully_remote' ||
+        (typeof locationStr === 'string' &&
+          locationStr.toLowerCase().includes('remote'));
+      const description = (
+        posting.description ||
+        posting.descriptionPlain ||
+        posting.jobDescription ||
+        ''
+      )
+        .replace(/<[^>]*>/g, '')
+        .trim();
+      const postedDate =
+        posting.postedDate ||
+        posting.createdDate ||
+        posting.publicationDate ||
+        null;
+      const url =
+        posting.applyUrl ||
+        posting.applicationUrl ||
+        `https://jobs.smartrecruiters.com/${company.companyId}/${id}`;
 
       jobs.push({
         source: 'smartrecruiters',

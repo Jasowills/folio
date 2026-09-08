@@ -22,7 +22,7 @@ export function ScoreRing({
   const offset = circumference - (Math.min(Math.max(score, 0), 100) / 100) * circumference
 
   const color =
-    score >= 75 ? '#2D6A2D' : score >= 50 ? '#BA7517' : '#9B2335'
+    score >= 75 ? '#16A34A' : score >= 50 ? '#D97706' : '#DC2626'
 
   return (
     <div className={cn('flex flex-col items-center gap-2', className)}>
@@ -32,7 +32,7 @@ export function ScoreRing({
           cy={size / 2}
           r={radius}
           fill="none"
-          stroke="#E8E4DC"
+          stroke="#E2E8F0"
           strokeWidth={strokeWidth}
         />
         <circle

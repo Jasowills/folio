@@ -10,9 +10,10 @@ import { map } from 'rxjs/operators';
 import { ApiResponseDto } from '../dto/api-response.dto';
 
 @Injectable()
-export class ResponseTransformInterceptor<T>
-  implements NestInterceptor<T, ApiResponseDto<T> | StreamableFile>
-{
+export class ResponseTransformInterceptor<T> implements NestInterceptor<
+  T,
+  ApiResponseDto<T> | StreamableFile
+> {
   intercept(
     context: ExecutionContext,
     next: CallHandler,

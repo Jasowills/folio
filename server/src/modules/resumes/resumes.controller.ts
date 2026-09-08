@@ -76,9 +76,7 @@ export class ResumesController {
   @Header('Content-Type', 'application/pdf')
   @Header('Content-Disposition', 'inline')
   @ApiOperation({ summary: 'Get guest upload PDF file' })
-  async getGuestPdf(
-    @Query('url') url: string,
-  ) {
+  async getGuestPdf(@Query('url') url: string) {
     if (!url) throw new NotFoundException('No url provided');
     this.logger.log(`getGuestPdf: fetching url="${url.slice(0, 100)}..."`);
     try {
@@ -86,11 +84,15 @@ export class ResumesController {
       const res = await fetch(url);
       if (!res.ok) {
         const text = await res.text().catch(() => '');
-        this.logger.error(`getGuestPdf: Cloudinary returned ${res.status} — ${text.slice(0, 200)}`);
+        this.logger.error(
+          `getGuestPdf: Cloudinary returned ${res.status} — ${text.slice(0, 200)}`,
+        );
         throw new Error(`Cloudinary fetch failed: ${res.status}`);
       }
       const buffer = Buffer.from(await res.arrayBuffer());
-      this.logger.log(`getGuestPdf: returning ${buffer.length} bytes in ${Date.now() - start}ms`);
+      this.logger.log(
+        `getGuestPdf: returning ${buffer.length} bytes in ${Date.now() - start}ms`,
+      );
       return new StreamableFile(buffer);
     } catch (err) {
       this.logger.error(`getGuestPdf: failed — ${(err as Error).message}`);
@@ -100,13 +102,15 @@ export class ResumesController {
 
   @Get('guest-result/:token')
   @ApiOperation({ summary: 'Get cached guest analysis result by token' })
-  async getGuestResult(
-    @Param('token') token: string,
-  ) {
-    this.logger.log(`getGuestResult: fetching token="${token.slice(0, 12)}..."`);
+  async getGuestResult(@Param('token') token: string) {
+    this.logger.log(
+      `getGuestResult: fetching token="${token.slice(0, 12)}..."`,
+    );
     const data = await this.resumesService.getGuestResult(token);
     if (!data) throw new NotFoundException('Result not found or expired');
-    this.logger.log(`getGuestResult: keys=${Object.keys(data).join(',')}, fileUrl="${(data as any)?.fileUrl}", rawText length=${(data as any)?.rawText?.length}, redFlags=${(data as any)?.redFlags?.length}, score=${(data as any)?.score}`);
+    this.logger.log(
+      `getGuestResult: keys=${Object.keys(data).join(',')}, fileUrl="${(data as any)?.fileUrl}", rawText length=${(data as any)?.rawText?.length}, redFlags=${(data as any)?.redFlags?.length}, score=${(data as any)?.score}`,
+    );
     return data;
   }
 
@@ -114,10 +118,7 @@ export class ResumesController {
   @ApiBearerAuth()
   @Get(':id')
   @ApiOperation({ summary: 'Get resume by id' })
-  async get(
-    @Param('id') id: string,
-    @CurrentUser() user: UserDocument,
-  ) {
+  async get(@Param('id') id: string, @CurrentUser() user: UserDocument) {
     return this.resumesService.findById(id, user._id.toString());
   }
 
@@ -145,16 +146,24 @@ export class ResumesController {
   ) {
     this.validateFile(file);
     const text = await this.extractText(file);
-    this.logger.log(`uploadFile: extracted ${text.length} chars from ${file.originalname}`);
-    const uploadResult = await this.storage.upload(file.buffer, {
-      folder: 'folio-uploads',
-      publicId: file.originalname.replace(/\.[^/.]+$/, '') + '-' + Date.now(),
-      resourceType: 'raw',
-    }).catch((err) => {
-      this.logger.error(`Cloudinary upload failed for ${file.originalname}: ${err.message}`);
-      return null;
-    });
-    this.logger.log(`uploadFile: Cloudinary result — url=${uploadResult?.url || '(empty)'}, publicId=${uploadResult?.publicId || '(empty)'}`);
+    this.logger.log(
+      `uploadFile: extracted ${text.length} chars from ${file.originalname}`,
+    );
+    const uploadResult = await this.storage
+      .upload(file.buffer, {
+        folder: 'folio-uploads',
+        publicId: file.originalname.replace(/\.[^/.]+$/, '') + '-' + Date.now(),
+        resourceType: 'raw',
+      })
+      .catch((err) => {
+        this.logger.error(
+          `Cloudinary upload failed for ${file.originalname}: ${err.message}`,
+        );
+        return null;
+      });
+    this.logger.log(
+      `uploadFile: Cloudinary result — url=${uploadResult?.url || '(empty)'}, publicId=${uploadResult?.publicId || '(empty)'}`,
+    );
     const saved = await this.resumesService.uploadFile(
       user._id.toString(),
       text,
@@ -162,7 +171,9 @@ export class ResumesController {
       uploadResult?.publicId || '',
       file.originalname,
     );
-    this.logger.log(`uploadFile: saved resume ${saved._id} — fileUrl=${saved.fileUrl || '(empty)'}, cloudinaryPublicId=${saved.cloudinaryPublicId || '(empty)'}`);
+    this.logger.log(
+      `uploadFile: saved resume ${saved._id} — fileUrl=${saved.fileUrl || '(empty)'}, cloudinaryPublicId=${saved.cloudinaryPublicId || '(empty)'}`,
+    );
     return saved;
   }
 
@@ -170,11 +181,10 @@ export class ResumesController {
   @ApiBearerAuth()
   @Post(':id/analyze')
   @Throttle({ default: { limit: 3, ttl: 60000 } })
-  @ApiOperation({ summary: 'Run AI extraction + analysis on an existing resume' })
-  async analyze(
-    @Param('id') id: string,
-    @CurrentUser() user: UserDocument,
-  ) {
+  @ApiOperation({
+    summary: 'Run AI extraction + analysis on an existing resume',
+  })
+  async analyze(@Param('id') id: string, @CurrentUser() user: UserDocument) {
     return this.resumesService.analyzeResume(id, user._id.toString());
   }
 
@@ -182,11 +192,11 @@ export class ResumesController {
   @ApiBearerAuth()
   @Post(':id/re-extract')
   @Throttle({ default: { limit: 10, ttl: 60000 } })
-  @ApiOperation({ summary: 'Re-run extraction on an existing resume (AI-assisted if Ollama available)' })
-  async reExtract(
-    @Param('id') id: string,
-    @CurrentUser() user: UserDocument,
-  ) {
+  @ApiOperation({
+    summary:
+      'Re-run extraction on an existing resume (AI-assisted if Ollama available)',
+  })
+  async reExtract(@Param('id') id: string, @CurrentUser() user: UserDocument) {
     return this.resumesService.reExtract(id, user._id.toString());
   }
 
@@ -237,25 +247,31 @@ export class ResumesController {
   @Throttle({ default: { limit: 3, ttl: 60000 } })
   @ApiOperation({ summary: 'Upload and analyze a resume without signing in' })
   @ApiConsumes('multipart/form-data')
-  async guestExtract(
-    @UploadedFile() file: Express.Multer.File,
-  ) {
+  async guestExtract(@UploadedFile() file: Express.Multer.File) {
     this.validateFile(file);
-    this.logger.log(`guest-extract: received file ${file?.originalname}, type: ${file?.mimetype}, size: ${file?.size}`);
+    this.logger.log(
+      `guest-extract: received file ${file?.originalname}, type: ${file?.mimetype}, size: ${file?.size}`,
+    );
     const text = (await this.extractText(file)) || '';
     this.logger.log(`guest-extract: extracted ${text.length} chars of text`);
     if (!text) {
-      this.logger.error('guest-extract: no text extracted, returning empty result');
+      this.logger.error(
+        'guest-extract: no text extracted, returning empty result',
+      );
       return { score: 0, issues: [], redFlags: [], resumeText: '' };
     }
-    const { url, publicId } = await this.storage.upload(file.buffer, {
-      folder: 'folio-uploads',
-      publicId: file.originalname.replace(/\.[^/.]+$/, '') + '-' + Date.now(),
-      resourceType: 'raw',
-    }).catch((err) => {
-      this.logger.error(`Cloudinary guest-upload failed for ${file.originalname}: ${err.message}`);
-      return { url: '', publicId: '' };
-    });
+    const { url, publicId } = await this.storage
+      .upload(file.buffer, {
+        folder: 'folio-uploads',
+        publicId: file.originalname.replace(/\.[^/.]+$/, '') + '-' + Date.now(),
+        resourceType: 'raw',
+      })
+      .catch((err) => {
+        this.logger.error(
+          `Cloudinary guest-upload failed for ${file.originalname}: ${err.message}`,
+        );
+        return { url: '', publicId: '' };
+      });
     return this.resumesService.guestExtractFromText(text, url, publicId);
   }
 
@@ -264,7 +280,9 @@ export class ResumesController {
   @Post(':id/extract-layout')
   @Throttle({ default: { limit: 5, ttl: 60000 } })
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Extract layout document from PDF using pdfplumber' })
+  @ApiOperation({
+    summary: 'Extract layout document from PDF using pdfplumber',
+  })
   async extractLayout(
     @Param('id') id: string,
     @CurrentUser() user: UserDocument,
@@ -276,7 +294,10 @@ export class ResumesController {
   @ApiBearerAuth()
   @Get(':id/render-html')
   @Header('Content-Type', 'text/html; charset=utf-8')
-  @ApiOperation({ summary: 'Get self-contained HTML render of the layout document for Puppeteer export' })
+  @ApiOperation({
+    summary:
+      'Get self-contained HTML render of the layout document for Puppeteer export',
+  })
   async renderHtml(
     @Param('id') id: string,
     @CurrentUser() user: UserDocument,
@@ -311,10 +332,7 @@ export class ResumesController {
   @Header('Content-Type', 'application/pdf')
   @Header('Content-Disposition', 'inline')
   @ApiOperation({ summary: 'Get resume PDF file for inline display' })
-  async getPdf(
-    @Param('id') id: string,
-    @CurrentUser() user: UserDocument,
-  ) {
+  async getPdf(@Param('id') id: string, @CurrentUser() user: UserDocument) {
     const resume = await this.resumesService.findById(id, user._id.toString());
     const fileUrl = resume.fileUrl;
     if (!fileUrl) throw new NotFoundException('No PDF file for this resume');
@@ -323,18 +341,21 @@ export class ResumesController {
     try {
       const agent = new https.Agent({ maxVersion: 'TLSv1.2', keepAlive: true });
       const buffer = await new Promise<Buffer>((resolve, reject) => {
-        https.get(fileUrl, { agent, timeout: 30000 }, (res) => {
-          if (!res.statusCode || res.statusCode >= 400) {
-            reject(new Error(`Cloudinary returned ${res.statusCode}`));
-            return;
-          }
-          const chunks: Buffer[] = [];
-          res.on('data', (c) => chunks.push(c));
-          res.on('end', () => resolve(Buffer.concat(chunks)));
-        }).on('error', reject).on('timeout', function () {
-          this.destroy();
-          reject(new Error('timeout'));
-        });
+        https
+          .get(fileUrl, { agent, timeout: 30000 }, (res) => {
+            if (!res.statusCode || res.statusCode >= 400) {
+              reject(new Error(`Cloudinary returned ${res.statusCode}`));
+              return;
+            }
+            const chunks: Buffer[] = [];
+            res.on('data', (c) => chunks.push(c));
+            res.on('end', () => resolve(Buffer.concat(chunks)));
+          })
+          .on('error', reject)
+          .on('timeout', function () {
+            this.destroy();
+            reject(new Error('timeout'));
+          });
       });
       this.logger.log(`getPdf: returned ${buffer.length} bytes`);
       return new StreamableFile(buffer);
@@ -349,57 +370,85 @@ export class ResumesController {
   @Delete(':id')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Delete a resume' })
-  async remove(
-    @Param('id') id: string,
-    @CurrentUser() user: UserDocument,
-  ) {
+  async remove(@Param('id') id: string, @CurrentUser() user: UserDocument) {
     await this.resumesService.delete(id, user._id.toString());
     return { message: 'Resume deleted' };
   }
 
-  private async extractText(
-    file: Express.Multer.File,
-  ): Promise<string> {
+  private async extractText(file: Express.Multer.File): Promise<string> {
     if (!file) {
       this.logger.warn('extractText: no file provided');
       return '';
     }
     try {
       if (file.mimetype === 'application/pdf') {
-        this.logger.log(`extractText: parsing PDF with pdf-parse (${file.size} bytes)`);
+        this.logger.log(
+          `extractText: parsing PDF with pdf-parse (${file.size} bytes)`,
+        );
         const data = await pdfParse(file.buffer);
         let text = data.text || '';
         const totalPages = data.numpages || 1;
-        this.logger.log(`extractText: pdf-parse returned ${text.length} chars, ${totalPages} pages`);
+        this.logger.log(
+          `extractText: pdf-parse returned ${text.length} chars, ${totalPages} pages`,
+        );
 
         const quality = this.resumeParser.assessQuality(text, totalPages);
-        this.logger.log(`extractText: quality score = ${quality.score}, issues = ${quality.issues.join(', ')}, requiresFallback = ${quality.requiresFallback}`);
+        this.logger.log(
+          `extractText: quality score = ${quality.score}, issues = ${quality.issues.join(', ')}, requiresFallback = ${quality.requiresFallback}`,
+        );
 
         if (quality.requiresFallback) {
           this.logger.log('extractText: attempting pdfplumber fallback');
-          const pythonScript = path.resolve(__dirname, '..', '..', '..', 'scripts', 'extract_pdf.py');
+          const pythonScript = path.resolve(
+            __dirname,
+            '..',
+            '..',
+            '..',
+            'scripts',
+            'extract_pdf.py',
+          );
           if (fs.existsSync(pythonScript)) {
             try {
-              const tempFile = path.join(process.cwd(), `temp_pdf_${Date.now()}_${Math.random().toString(36).slice(2)}.pdf`);
+              const tempFile = path.join(
+                process.cwd(),
+                `temp_pdf_${Date.now()}_${Math.random().toString(36).slice(2)}.pdf`,
+              );
               fs.writeFileSync(tempFile, file.buffer);
-              const { stdout } = await execFileAsync('python3', [pythonScript, tempFile], { timeout: 30000 });
+              const { stdout } = await execFileAsync(
+                'python3',
+                [pythonScript, tempFile],
+                { timeout: 30000 },
+              );
               fs.unlinkSync(tempFile);
               const fallbackResult = JSON.parse(stdout);
               if (fallbackResult.text && !fallbackResult.error) {
                 text = fallbackResult.text;
-                this.logger.log(`extractText: pdfplumber returned ${text.length} chars, ${fallbackResult.pages} pages`);
-                const fallbackQuality = this.resumeParser.assessQuality(text, fallbackResult.pages || totalPages);
+                this.logger.log(
+                  `extractText: pdfplumber returned ${text.length} chars, ${fallbackResult.pages} pages`,
+                );
+                const fallbackQuality = this.resumeParser.assessQuality(
+                  text,
+                  fallbackResult.pages || totalPages,
+                );
                 if (fallbackQuality.score < 0.4) {
-                  this.logger.error('extractText: quality < 0.4 even after pdfplumber fallback');
+                  this.logger.error(
+                    'extractText: quality < 0.4 even after pdfplumber fallback',
+                  );
                 }
               } else {
-                this.logger.error(`extractText: pdfplumber error — ${fallbackResult.error || 'empty result'}`);
+                this.logger.error(
+                  `extractText: pdfplumber error — ${fallbackResult.error || 'empty result'}`,
+                );
               }
             } catch (fallbackErr) {
-              this.logger.error(`extractText: pdfplumber fallback failed: ${(fallbackErr as Error).message}`);
+              this.logger.error(
+                `extractText: pdfplumber fallback failed: ${(fallbackErr as Error).message}`,
+              );
             }
           } else {
-            this.logger.warn(`extractText: pdfplumber script not found at ${pythonScript}`);
+            this.logger.warn(
+              `extractText: pdfplumber script not found at ${pythonScript}`,
+            );
           }
         }
 
@@ -407,10 +456,14 @@ export class ResumesController {
       }
       this.logger.log(`extractText: parsing DOCX (${file.size} bytes)`);
       const result = await mammoth.extractRawText({ buffer: file.buffer });
-      this.logger.log(`extractText: DOCX parsing returned ${result.value?.length || 0} chars`);
+      this.logger.log(
+        `extractText: DOCX parsing returned ${result.value?.length || 0} chars`,
+      );
       return result.value;
     } catch (err) {
-      this.logger.error(`extractText: failed to parse ${file.mimetype}: ${(err as Error).message}`);
+      this.logger.error(
+        `extractText: failed to parse ${file.mimetype}: ${(err as Error).message}`,
+      );
       return '';
     }
   }
@@ -423,7 +476,10 @@ export class ResumesController {
     if (file.size > MAX_SIZE) {
       throw new PayloadTooLargeException('File size exceeds 15MB limit');
     }
-    const allowedMimes = ['application/pdf', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'];
+    const allowedMimes = [
+      'application/pdf',
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    ];
     if (!allowedMimes.includes(file.mimetype)) {
       throw new BadRequestException('Only PDF and DOCX files are accepted');
     }

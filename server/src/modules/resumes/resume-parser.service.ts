@@ -1,5 +1,11 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { SKILL_DICTIONARY, LANGUAGE_DICTIONARY, PROFICIENCY_MAP, SECTION_PATTERNS, ALL_SECTION_HEADERS } from './resume-parser.constants';
+import {
+  SKILL_DICTIONARY,
+  LANGUAGE_DICTIONARY,
+  PROFICIENCY_MAP,
+  SECTION_PATTERNS,
+  ALL_SECTION_HEADERS,
+} from './resume-parser.constants';
 import { parseDateRange, normalizeToISO } from './resume-parser.dates';
 
 interface ParsedContact {
@@ -79,49 +85,186 @@ const PHONE_RE = /(?:\+?\d{1,3}[-.\s]?)?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}/;
 const URL_RE = /(https?:\/\/[^\s"<>]+)/gi;
 const LINKEDIN_RE = /linkedin\.com\/(?:in|pub|company)\/[a-zA-Z0-9_-]+/i;
 const GITHUB_RE = /github\.com\/[a-zA-Z0-9_-]+/i;
-const BARE_DOMAIN_RE = /(?:^|\s)([a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\.(?:vercel\.app|netlify\.app|github\.io|pages\.dev|herokuapp\.com|onrender\.com|fly\.dev|replit\.app|glitch\.me|railway\.app|cyclic\.app|koyeb\.app|uwu\.ai|render\.com|adaptable\.app|wordpress\.com|blogspot\.com|wixsite\.com|squarespace\.com|web\.app))\b/gi;
+const BARE_DOMAIN_RE =
+  /(?:^|\s)([a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\.(?:vercel\.app|netlify\.app|github\.io|pages\.dev|herokuapp\.com|onrender\.com|fly\.dev|replit\.app|glitch\.me|railway\.app|cyclic\.app|koyeb\.app|uwu\.ai|render\.com|adaptable\.app|wordpress\.com|blogspot\.com|wixsite\.com|squarespace\.com|web\.app))\b/gi;
 const BARE_GITHUB_RE = /(?:^|\s)(github\.com\/[a-zA-Z0-9_-]+)(?:\s|$)/gi;
 
 const TITLE_KEYWORDS = [
-  'engineer', 'manager', 'designer', 'director', 'lead', 'senior',
-  'junior', 'head', 'vp', 'vice president', 'analyst', 'developer',
-  'consultant', 'specialist', 'coordinator', 'executive', 'officer',
-  'associate', 'architect', 'principal', 'product', 'software',
-  'data', 'ux', 'ui', 'marketing', 'sales', 'operations', 'finance',
-  'legal', 'hr', 'research', 'intern', 'founder', 'co-founder',
-  'owner', 'partner', 'freelance', 'contractor', 'ceo', 'cto', 'cfo',
-  'scrum master', 'devops', 'sre', 'solutions', 'technical',
-  'full stack', 'fullstack', 'frontend', 'front-end', 'backend',
-  'back-end', 'qa', 'quality assurance', 'sysadmin', 'administrator',
-  'scientist', 'professor', 'lecturer', 'instructor', 'teacher',
-  'nurse', 'doctor', 'physician', 'attorney', 'lawyer', 'accountant',
-  'auditor', 'broker', 'agent',
+  'engineer',
+  'manager',
+  'designer',
+  'director',
+  'lead',
+  'senior',
+  'junior',
+  'head',
+  'vp',
+  'vice president',
+  'analyst',
+  'developer',
+  'consultant',
+  'specialist',
+  'coordinator',
+  'executive',
+  'officer',
+  'associate',
+  'architect',
+  'principal',
+  'product',
+  'software',
+  'data',
+  'ux',
+  'ui',
+  'marketing',
+  'sales',
+  'operations',
+  'finance',
+  'legal',
+  'hr',
+  'research',
+  'intern',
+  'founder',
+  'co-founder',
+  'owner',
+  'partner',
+  'freelance',
+  'contractor',
+  'ceo',
+  'cto',
+  'cfo',
+  'scrum master',
+  'devops',
+  'sre',
+  'solutions',
+  'technical',
+  'full stack',
+  'fullstack',
+  'frontend',
+  'front-end',
+  'backend',
+  'back-end',
+  'qa',
+  'quality assurance',
+  'sysadmin',
+  'administrator',
+  'scientist',
+  'professor',
+  'lecturer',
+  'instructor',
+  'teacher',
+  'nurse',
+  'doctor',
+  'physician',
+  'attorney',
+  'lawyer',
+  'accountant',
+  'auditor',
+  'broker',
+  'agent',
 ];
 
 const COMPANY_SUFFIXES = [
-  'ltd', 'limited', 'llc', 'inc', 'plc', 'gmbh', 'ag', 'corp',
-  'corporation', 'group', 'technologies', 'tech', 'solutions',
-  'services', 'consulting', 'digital', 'labs', 'studio', 'agency',
-  'partners', 'ventures', 'capital', 'health', 'media', 'systems',
-  'software', 'industries', 'global', 'international', 'holdings',
-  'network', 'associates', 'enterprises', 'llp', 'pvt',
+  'ltd',
+  'limited',
+  'llc',
+  'inc',
+  'plc',
+  'gmbh',
+  'ag',
+  'corp',
+  'corporation',
+  'group',
+  'technologies',
+  'tech',
+  'solutions',
+  'services',
+  'consulting',
+  'digital',
+  'labs',
+  'studio',
+  'agency',
+  'partners',
+  'ventures',
+  'capital',
+  'health',
+  'media',
+  'systems',
+  'software',
+  'industries',
+  'global',
+  'international',
+  'holdings',
+  'network',
+  'associates',
+  'enterprises',
+  'llp',
+  'pvt',
 ];
 
 const LOCATION_BLOCKLIST = new Set([
-  'rust', 'solana', 'solidity', 'node', 'react', 'angular', 'vue',
-  'python', 'java', 'ruby', 'go', 'c++', 'c#', 'typescript',
-  'javascript', 'html', 'css', 'sql', 'docker', 'kubernetes',
-  'aws', 'azure', 'gcp', 'linux', 'git',
+  'rust',
+  'solana',
+  'solidity',
+  'node',
+  'react',
+  'angular',
+  'vue',
+  'python',
+  'java',
+  'ruby',
+  'go',
+  'c++',
+  'c#',
+  'typescript',
+  'javascript',
+  'html',
+  'css',
+  'sql',
+  'docker',
+  'kubernetes',
+  'aws',
+  'azure',
+  'gcp',
+  'linux',
+  'git',
 ]);
 
 const KNOWN_COMPOUND_WORDS = new Set([
-  'javascript', 'typescript', 'webgl', 'webrtc', 'webassembly',
-  'websocket', 'webpack', 'graphql', 'devops', 'devsecops',
-  'github', 'gitlab', 'gitbook', 'gitops', 'macos', 'ios',
-  'openapi', 'openid', 'openssl', 'opencv', 'postgresql', 'mysql',
-  'mongodb', 'sqlite', 'cloudfront', 'cloudwatch', 'cloudformation',
-  'cloudflare', 'codepipeline', 'codebuild', 'codecommit',
-  'nextjs', 'nestjs', 'fastapi', 'springboot',
+  'javascript',
+  'typescript',
+  'webgl',
+  'webrtc',
+  'webassembly',
+  'websocket',
+  'webpack',
+  'graphql',
+  'devops',
+  'devsecops',
+  'github',
+  'gitlab',
+  'gitbook',
+  'gitops',
+  'macos',
+  'ios',
+  'openapi',
+  'openid',
+  'openssl',
+  'opencv',
+  'postgresql',
+  'mysql',
+  'mongodb',
+  'sqlite',
+  'cloudfront',
+  'cloudwatch',
+  'cloudformation',
+  'cloudflare',
+  'codepipeline',
+  'codebuild',
+  'codecommit',
+  'nextjs',
+  'nestjs',
+  'fastapi',
+  'springboot',
 ]);
 
 @Injectable()
@@ -159,14 +302,25 @@ export class ResumeParserService {
 
     const hasEmail = EMAIL_RE.test(text);
     const hasDate = /\b(19|20)\d{2}\b/.test(text);
-    const newlinesPer100 = (text.match(/\n/g) || []).length / Math.max(text.length / 100, 1);
+    const newlinesPer100 =
+      (text.match(/\n/g) || []).length / Math.max(text.length / 100, 1);
     const hasStructure = newlinesPer100 >= 2;
 
-    if (!hasEmail) { score -= 0.1; issues.push('missing-email'); }
-    if (!hasDate) { score -= 0.1; issues.push('missing-date'); }
-    if (!hasStructure) { score -= 0.1; issues.push('no-line-structure'); }
+    if (!hasEmail) {
+      score -= 0.1;
+      issues.push('missing-email');
+    }
+    if (!hasDate) {
+      score -= 0.1;
+      issues.push('missing-date');
+    }
+    if (!hasStructure) {
+      score -= 0.1;
+      issues.push('no-line-structure');
+    }
 
-    const alphaNumRatio = (text.match(/[a-zA-Z0-9]/g) || []).length / Math.max(text.length, 1);
+    const alphaNumRatio =
+      (text.match(/[a-zA-Z0-9]/g) || []).length / Math.max(text.length, 1);
 
     const result = {
       score: Math.max(0, score),
@@ -174,7 +328,9 @@ export class ResumeParserService {
       requiresFallback: score < 0.6,
       isLikelyScanned: score < 0.4 && alphaNumRatio < 0.3,
     };
-    this.logger.log(`assessQuality: score=${result.score}, issues=[${issues.join(', ')}], requiresFallback=${result.requiresFallback}, isLikelyScanned=${result.isLikelyScanned}, charsPerPage=${charsPerPage.toFixed(1)}, nonAsciiPct=${(nonAsciiPct * 100).toFixed(1)}%`);
+    this.logger.log(
+      `assessQuality: score=${result.score}, issues=[${issues.join(', ')}], requiresFallback=${result.requiresFallback}, isLikelyScanned=${result.isLikelyScanned}, charsPerPage=${charsPerPage.toFixed(1)}, nonAsciiPct=${(nonAsciiPct * 100).toFixed(1)}%`,
+    );
     return result;
   }
 
@@ -196,20 +352,22 @@ export class ResumeParserService {
       if (singleLetterTokens < 3) return line;
 
       // Remove single inter-letter spaces, collapse multiple spaces
-      return trimmed
-        .replace(/([A-Z]) (?=[A-Z])/g, '$1')
-        .replace(/\s+/g, ' ');
+      return trimmed.replace(/([A-Z]) (?=[A-Z])/g, '$1').replace(/\s+/g, ' ');
     });
   }
 
   detectSections(text: string): SectionMap {
     const rawLines = text.split('\n');
     const mergedLines = this.mergeWrappedLines(rawLines);
-    let lines = mergedLines.map(l => l.trim());
+    let lines = mergedLines.map((l) => l.trim());
 
     lines = this.normalizeSpacedCaps(lines);
 
-    const headings: Array<{ index: number; line: string; section: string | null }> = [];
+    const headings: Array<{
+      index: number;
+      line: string;
+      section: string | null;
+    }> = [];
 
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i];
@@ -222,9 +380,16 @@ export class ResumeParserService {
       const matched = this.matchSectionHeader(trimmed);
       const matchedExact = this.matchSectionHeader(trimmed, true);
 
-      if (!this.isHeadingCandidate(trimmed, i === 0, prevIsBlank) && !matchedExact) continue;
+      if (
+        !this.isHeadingCandidate(trimmed, i === 0, prevIsBlank) &&
+        !matchedExact
+      )
+        continue;
 
-      const isAllUpper = trimmed.length > 4 && trimmed === trimmed.toUpperCase() && /[A-Z]{3,}/.test(trimmed);
+      const isAllUpper =
+        trimmed.length > 4 &&
+        trimmed === trimmed.toUpperCase() &&
+        /[A-Z]{3,}/.test(trimmed);
       const nextLine = i < lines.length - 1 ? lines[i + 1] : '';
       const nextIsBlank = !nextLine || nextLine.trim().length === 0;
 
@@ -241,7 +406,7 @@ export class ResumeParserService {
     let currentContent: string[] = [];
 
     for (let i = 0; i < lines.length; i++) {
-      const heading = headings.find(h => h.index === i);
+      const heading = headings.find((h) => h.index === i);
 
       if (heading) {
         if (currentContent.length > 0) {
@@ -249,7 +414,9 @@ export class ResumeParserService {
           sections.set(currentSection, existing + currentContent.join('\n'));
         }
 
-        currentSection = heading.section || `unrecognized_${heading.line.toLowerCase().replace(/[^a-z0-9]/g, '_')}`;
+        currentSection =
+          heading.section ||
+          `unrecognized_${heading.line.toLowerCase().replace(/[^a-z0-9]/g, '_')}`;
 
         if (!detectedOrder.includes(currentSection)) {
           detectedOrder.push(currentSection);
@@ -273,13 +440,21 @@ export class ResumeParserService {
     const expectedSections = ['experience', 'education', 'skills', 'summary'];
     let foundCount = 0;
     for (const es of expectedSections) {
-      if (sections.has(es) && (sections.get(es) || '').trim().length > 0) foundCount++;
+      if (sections.has(es) && (sections.get(es) || '').trim().length > 0)
+        foundCount++;
     }
     let confidence = 0.0;
-    if (foundCount >= 2) confidence = 0.8 + Math.min((foundCount - 2) * 0.05, 0.2);
-    if (sections.has('header') && (sections.get('header') || '').trim().length > 3) confidence = Math.max(confidence, 0.3);
+    if (foundCount >= 2)
+      confidence = 0.8 + Math.min((foundCount - 2) * 0.05, 0.2);
+    if (
+      sections.has('header') &&
+      (sections.get('header') || '').trim().length > 3
+    )
+      confidence = Math.max(confidence, 0.3);
 
-    this.logger.log(`detectSections: foundCount=${foundCount}, confidence=${confidence}, sections=${[...sections.keys()].join(', ')}, detectedOrder=[${detectedOrder.join(', ')}], unrecognized=[${unrecognized.join(', ')}]`);
+    this.logger.log(
+      `detectSections: foundCount=${foundCount}, confidence=${confidence}, sections=${[...sections.keys()].join(', ')}, detectedOrder=[${detectedOrder.join(', ')}], unrecognized=[${unrecognized.join(', ')}]`,
+    );
     return { sections, detectedOrder, unrecognized, confidence };
   }
 
@@ -288,7 +463,13 @@ export class ResumeParserService {
     for (let i = 0; i < lines.length; i++) {
       const current = lines[i];
       const next = lines[i + 1];
-      if (next && /^[a-z]/.test(next.trim()) && current.length > 30 && !current.match(/[.!?:]$/) && next.trim().length > 10) {
+      if (
+        next &&
+        /^[a-z]/.test(next.trim()) &&
+        current.length > 30 &&
+        !current.match(/[.!?:]$/) &&
+        next.trim().length > 10
+      ) {
         result.push(current + ' ' + next.trim());
         i++;
       } else {
@@ -298,13 +479,18 @@ export class ResumeParserService {
     return result;
   }
 
-  private isHeadingCandidate(line: string, isFirstLine: boolean, precededByBlank: boolean): boolean {
+  private isHeadingCandidate(
+    line: string,
+    isFirstLine: boolean,
+    precededByBlank: boolean,
+  ): boolean {
     if (!isFirstLine && !precededByBlank) return false;
     const trimmed = line.trim();
     if (trimmed.length < 3 || trimmed.length > 45) return false;
     if (trimmed.includes('@')) return false;
     if (/http|www/i.test(trimmed)) return false;
-    if (/\b\d{4}\b/.test(trimmed) && /present|current|to|–|—|-/i.test(trimmed)) return false;
+    if (/\b\d{4}\b/.test(trimmed) && /present|current|to|–|—|-/i.test(trimmed))
+      return false;
     if (/^[-•*♦‣⁃◦‣\d.)]/.test(trimmed)) return false;
     return true;
   }
@@ -320,7 +506,8 @@ export class ResumeParserService {
       for (const pattern of patterns) {
         if (clean === pattern) return section;
         if (clean === pattern + 's') return section;
-        if (clean.endsWith(':') && clean.slice(0, -1).trim() === pattern) return section;
+        if (clean.endsWith(':') && clean.slice(0, -1).trim() === pattern)
+          return section;
         if (!exactOnly && this.fuzzyMatch(clean, pattern, 2)) return section;
       }
     }
@@ -332,7 +519,8 @@ export class ResumeParserService {
       for (const [section, patterns] of Object.entries(SECTION_PATTERNS)) {
         for (const pattern of patterns) {
           const patternCompact = pattern.replace(/\s+/g, '');
-          if (patternCompact.length >= 4 && compact.includes(patternCompact)) return section;
+          if (patternCompact.length >= 4 && compact.includes(patternCompact))
+            return section;
         }
       }
     }
@@ -340,7 +528,11 @@ export class ResumeParserService {
     return null;
   }
 
-  private fuzzyMatch(text: string, keyword: string, threshold: number): boolean {
+  private fuzzyMatch(
+    text: string,
+    keyword: string,
+    threshold: number,
+  ): boolean {
     const clean = text.toLowerCase().trim();
     const kw = keyword.toLowerCase().trim();
     if (clean === kw) return true;
@@ -360,8 +552,12 @@ export class ResumeParserService {
     if (alen === 0) return blen;
     if (blen === 0) return alen;
     const matrix: number[][] = [];
-    for (let i = 0; i <= alen; i++) { matrix[i] = [i]; }
-    for (let j = 0; j <= blen; j++) { matrix[0][j] = j; }
+    for (let i = 0; i <= alen; i++) {
+      matrix[i] = [i];
+    }
+    for (let j = 0; j <= blen; j++) {
+      matrix[0][j] = j;
+    }
     for (let i = 1; i <= alen; i++) {
       for (let j = 1; j <= blen; j++) {
         const cost = a[i - 1] === b[j - 1] ? 0 : 1;
@@ -376,15 +572,28 @@ export class ResumeParserService {
   }
 
   async parse(rawText: string): Promise<ParsedResume> {
-    this.logger.log(`parse: input length=${rawText.length}, preview="${rawText.slice(0, 120).replace(/\n/g, '\\n')}"`);
+    this.logger.log(
+      `parse: input length=${rawText.length}, preview="${rawText.slice(0, 120).replace(/\n/g, '\\n')}"`,
+    );
 
     const sectionMap = this.detectSections(rawText);
     const { sections } = sectionMap;
-    this.logger.log(`parse: sections detected=${sections.size}, order=[${sectionMap.detectedOrder.join(', ')}], confidence=${sectionMap.confidence}, unrecognized=[${sectionMap.unrecognized.join(', ')}]`);
+    this.logger.log(
+      `parse: sections detected=${sections.size}, order=[${sectionMap.detectedOrder.join(', ')}], confidence=${sectionMap.confidence}, unrecognized=[${sectionMap.unrecognized.join(', ')}]`,
+    );
 
-    const headerSection = sections.get('header') || rawText.split('\n').slice(0, 15).join('\n');
+    const headerSection =
+      sections.get('header') || rawText.split('\n').slice(0, 15).join('\n');
 
-    const [contactResult, summaryResult, experienceResult, educationResult, skillsResult, certsResult, langsResult] = await Promise.all([
+    const [
+      contactResult,
+      summaryResult,
+      experienceResult,
+      educationResult,
+      skillsResult,
+      certsResult,
+      langsResult,
+    ] = await Promise.all([
       Promise.resolve(this.parseContact(headerSection)),
       Promise.resolve(this.parseSummary(sections)),
       Promise.resolve(this.parseExperience(sections)),
@@ -398,7 +607,9 @@ export class ResumeParserService {
       const fullEmailMatch = rawText.match(EMAIL_RE);
       if (fullEmailMatch) {
         contactResult.email = fullEmailMatch[0].toLowerCase();
-        this.logger.log(`parse: email fallback from full text — "${contactResult.email}"`);
+        this.logger.log(
+          `parse: email fallback from full text — "${contactResult.email}"`,
+        );
       }
     }
     // Fallback: if phone not found in header, search full text
@@ -406,24 +617,36 @@ export class ResumeParserService {
       const fullPhoneMatch = rawText.match(PHONE_RE);
       if (fullPhoneMatch) {
         contactResult.phone = fullPhoneMatch[0].trim();
-        this.logger.log(`parse: phone fallback from full text — "${contactResult.phone}"`);
+        this.logger.log(
+          `parse: phone fallback from full text — "${contactResult.phone}"`,
+        );
       }
     }
 
-    this.logger.log(`parse: contact name="${contactResult.name}", email=${contactResult.email}, phone=${contactResult.phone}, linkedin=${contactResult.linkedin}, github=${contactResult.github}, website=${contactResult.website}, location=${contactResult.location}`);
-    this.logger.log(`parse: summary length=${summaryResult?.length || 0}, experience=${experienceResult.length} entries, education=${educationResult.length} entries, skills=${skillsResult.length} raw items, certifications=${certsResult.length}, languages=${langsResult.length}`);
+    this.logger.log(
+      `parse: contact name="${contactResult.name}", email=${contactResult.email}, phone=${contactResult.phone}, linkedin=${contactResult.linkedin}, github=${contactResult.github}, website=${contactResult.website}, location=${contactResult.location}`,
+    );
+    this.logger.log(
+      `parse: summary length=${summaryResult?.length || 0}, experience=${experienceResult.length} entries, education=${educationResult.length} entries, skills=${skillsResult.length} raw items, certifications=${certsResult.length}, languages=${langsResult.length}`,
+    );
 
     const links = this.buildLinks(contactResult, rawText, sections);
     this.logger.log(`parse: links built=${links.length}`);
 
     const warnings: string[] = [];
-    if (sectionMap.confidence < 0.5) warnings.push('low-section-detection-confidence');
-    if (sectionMap.unrecognized.length > 0) warnings.push(`unrecognized-sections: ${sectionMap.unrecognized.join(', ')}`);
+    if (sectionMap.confidence < 0.5)
+      warnings.push('low-section-detection-confidence');
+    if (sectionMap.unrecognized.length > 0)
+      warnings.push(
+        `unrecognized-sections: ${sectionMap.unrecognized.join(', ')}`,
+      );
 
     const experienceClean = this.cleanupExperience(experienceResult);
     const educationClean = this.cleanupEducation(educationResult);
     const skillsClean = this.deduplicateSkills(skillsResult);
-    this.logger.log(`parse: after cleanup — experience=${experienceClean.length}, education=${educationClean.length}, skills=${skillsClean.length}`);
+    this.logger.log(
+      `parse: after cleanup — experience=${experienceClean.length}, education=${educationClean.length}, skills=${skillsClean.length}`,
+    );
 
     const overallConfidence = this.calculateOverallConfidence(
       contactResult.name,
@@ -432,7 +655,9 @@ export class ResumeParserService {
       educationClean,
       skillsClean,
     );
-    this.logger.log(`parse: done — isResume=${sectionMap.confidence >= 0.3 || overallConfidence >= 0.3}, confidence=${overallConfidence}, warnings=[${warnings.join(', ')}]`);
+    this.logger.log(
+      `parse: done — isResume=${sectionMap.confidence >= 0.3 || overallConfidence >= 0.3}, confidence=${overallConfidence}, warnings=[${warnings.join(', ')}]`,
+    );
 
     return {
       isResume: sectionMap.confidence >= 0.3 || overallConfidence >= 0.3,
@@ -466,7 +691,10 @@ export class ResumeParserService {
     website: string | null;
     github: string | null;
   } {
-    const lines = headerText.split('\n').map(l => l.trim()).filter(Boolean);
+    const lines = headerText
+      .split('\n')
+      .map((l) => l.trim())
+      .filter(Boolean);
     const headerJoined = lines.join(' ');
     // Also join without spaces so split email addresses get reconstructed
     const headerJoinedFlat = lines.join('');
@@ -482,7 +710,11 @@ export class ResumeParserService {
     return { name, email, phone, location, linkedin, website, github };
   }
 
-  private parseName(lines: string[], email: string | null, phone: string | null): string | null {
+  private parseName(
+    lines: string[],
+    email: string | null,
+    phone: string | null,
+  ): string | null {
     const firstLine = lines[0];
     if (!firstLine) return null;
 
@@ -494,7 +726,9 @@ export class ResumeParserService {
     // CamelCase/PascalCase recovery: if PDF extraction merged words like "AmadiJason",
     // split on uppercase boundaries and check if that produces a valid name
     if (wordCount === 1) {
-      const split = name.replace(/([a-z])([A-Z])/g, '$1 $2').replace(/([A-Z])([A-Z][a-z])/g, '$1 $2');
+      const split = name
+        .replace(/([a-z])([A-Z])/g, '$1 $2')
+        .replace(/([A-Z])([A-Z][a-z])/g, '$1 $2');
       const splitCount = split.split(/\s+/).length;
       if (splitCount >= 2 && splitCount <= 5) {
         name = split;
@@ -504,13 +738,15 @@ export class ResumeParserService {
 
     if (wordCount < 2 || wordCount > 5) return null;
 
-    if (name.includes('@') || /http/i.test(name) || /\d/.test(name)) return null;
+    if (name.includes('@') || /http/i.test(name) || /\d/.test(name))
+      return null;
     if (phone && PHONE_RE.test(name)) return null;
     if (EMAIL_RE.test(name)) return null;
     if (/\b(19|20)\d{2}\b/.test(name)) return null;
-    if (ALL_SECTION_HEADERS.some(h => name.toLowerCase().includes(h))) return null;
+    if (ALL_SECTION_HEADERS.some((h) => name.toLowerCase().includes(h)))
+      return null;
 
-    const hasTitleCase = name.split(/\s+/).every(w => /^[A-Z]/.test(w));
+    const hasTitleCase = name.split(/\s+/).every((w) => /^[A-Z]/.test(w));
     const isAllUpper = name === name.toUpperCase() && name.length > 3;
     if (!hasTitleCase && !isAllUpper) return null;
 
@@ -518,8 +754,14 @@ export class ResumeParserService {
   }
 
   private parseEmail(joinedText: string, flatText?: string): string | null {
-    const joinedAddrs = [...joinedText.matchAll(EMAIL_RE)].map(m => m[0].toLowerCase()).filter(Boolean);
-    const flatAddrs = flatText ? [...flatText.matchAll(EMAIL_RE)].map(m => m[0].toLowerCase()).filter(Boolean) : [];
+    const joinedAddrs = [...joinedText.matchAll(EMAIL_RE)]
+      .map((m) => m[0].toLowerCase())
+      .filter(Boolean);
+    const flatAddrs = flatText
+      ? [...flatText.matchAll(EMAIL_RE)]
+          .map((m) => m[0].toLowerCase())
+          .filter(Boolean)
+      : [];
 
     // Prefer a letter-starting email from the space-joined text (clean extraction)
     for (const addr of joinedAddrs) {
@@ -547,8 +789,11 @@ export class ResumeParserService {
   private parseLinkedin(text: string): string | null {
     const match = text.match(LINKEDIN_RE);
     if (match) return `https://${match[0].toLowerCase()}`;
-    const usernameMatch = text.match(/\blinkedin\s*[:/]\s*([a-zA-Z0-9_-]{3,50})\b/i);
-    if (usernameMatch) return `https://linkedin.com/in/${usernameMatch[1].toLowerCase()}`;
+    const usernameMatch = text.match(
+      /\blinkedin\s*[:/]\s*([a-zA-Z0-9_-]{3,50})\b/i,
+    );
+    if (usernameMatch)
+      return `https://linkedin.com/in/${usernameMatch[1].toLowerCase()}`;
     return null;
   }
 
@@ -560,7 +805,11 @@ export class ResumeParserService {
     return null;
   }
 
-  private parseWebsite(text: string, linkedin: string | null, github: string | null): string | null {
+  private parseWebsite(
+    text: string,
+    linkedin: string | null,
+    github: string | null,
+  ): string | null {
     const urls = [...text.matchAll(URL_RE)];
     const excluded = new Set<string>();
     if (linkedin) excluded.add(linkedin.toLowerCase());
@@ -568,7 +817,11 @@ export class ResumeParserService {
 
     for (const m of urls) {
       const url = m[0].toLowerCase();
-      if (!excluded.has(url) && !url.includes('linkedin') && !url.includes('github')) {
+      if (
+        !excluded.has(url) &&
+        !url.includes('linkedin') &&
+        !url.includes('github')
+      ) {
         return m[0];
       }
     }
@@ -586,14 +839,18 @@ export class ResumeParserService {
       if (/^remote$/i.test(line.trim())) return 'Remote';
       if (/^hybrid$/i.test(line.trim())) return 'Hybrid';
 
-      const match = line.match(/([A-Z][a-zA-Z'-]+(?:[\s,]+[A-Z][a-zA-Z'-]+)*)\s*,\s*([A-Z]{2})\b/);
+      const match = line.match(
+        /([A-Z][a-zA-Z'-]+(?:[\s,]+[A-Z][a-zA-Z'-]+)*)\s*,\s*([A-Z]{2})\b/,
+      );
       if (match) {
         const firstWord = match[1].split(/[\s,]+/)[0].toLowerCase();
         if (LOCATION_BLOCKLIST.has(firstWord)) continue;
         return match[0].trim();
       }
 
-      const fullMatch = line.match(/([A-Z][a-zA-Z]+(?:[\s,]+[A-Z][a-zA-Z'-]+)*)\s*,\s*([A-Z][a-zA-Z]+(?:\s[A-Z][a-zA-Z]+)*)\b/);
+      const fullMatch = line.match(
+        /([A-Z][a-zA-Z]+(?:[\s,]+[A-Z][a-zA-Z'-]+)*)\s*,\s*([A-Z][a-zA-Z]+(?:\s[A-Z][a-zA-Z]+)*)\b/,
+      );
       if (fullMatch) {
         const firstWord = fullMatch[1].split(/[\s,]+/)[0].toLowerCase();
         if (LOCATION_BLOCKLIST.has(firstWord)) continue;
@@ -618,19 +875,26 @@ export class ResumeParserService {
     if (!content || content.trim().length < 20) return null;
 
     let cleaned = content;
-    const headingMatch = cleaned.match(/^(professional\s+)?(summary|profile|objective|about)/i);
+    const headingMatch = cleaned.match(
+      /^(professional\s+)?(summary|profile|objective|about)/i,
+    );
     if (headingMatch && headingMatch.index === 0) {
       cleaned = cleaned.substring(headingMatch[0].length).trim();
     }
 
     cleaned = cleaned.replace(/\n{3,}/g, '\n\n');
-    cleaned = cleaned.split('\n').filter(l => {
-      const t = l.trim();
-      if (t.length <= 1) return false;
-      if (/^[.\-–—=*_]+$/.test(t)) return false;
-      if (ALL_SECTION_HEADERS.some(h => t.toLowerCase() === h)) return false;
-      return true;
-    }).join('\n').trim();
+    cleaned = cleaned
+      .split('\n')
+      .filter((l) => {
+        const t = l.trim();
+        if (t.length <= 1) return false;
+        if (/^[.\-–—=*_]+$/.test(t)) return false;
+        if (ALL_SECTION_HEADERS.some((h) => t.toLowerCase() === h))
+          return false;
+        return true;
+      })
+      .join('\n')
+      .trim();
 
     if (cleaned.length < 20) return null;
     return cleaned;
@@ -663,7 +927,14 @@ export class ResumeParserService {
     if (projContent) {
       const projects = this.parseExperienceBlocks(projContent);
       for (const p of projects) {
-        if (p.title && !experience.some(e => e.title.toLowerCase() === p.title.toLowerCase() && e.company.toLowerCase() === p.company.toLowerCase())) {
+        if (
+          p.title &&
+          !experience.some(
+            (e) =>
+              e.title.toLowerCase() === p.title.toLowerCase() &&
+              e.company.toLowerCase() === p.company.toLowerCase(),
+          )
+        ) {
           experience.push(p);
         }
       }
@@ -673,7 +944,10 @@ export class ResumeParserService {
   }
 
   private parseExperienceBlocks(text: string): ParsedExperience[] {
-    const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
+    const lines = text
+      .split('\n')
+      .map((l) => l.trim())
+      .filter(Boolean);
     if (lines.length === 0) return [];
 
     const blocks: ParsedExperience[] = [];
@@ -699,7 +973,11 @@ export class ResumeParserService {
         continue;
       }
 
-      const hasTitleOnly = this.matchesTitleKeyword(line) && !/\b(19|20)\d{2}\b/.test(line) && line.length > 3 && line.length < 80;
+      const hasTitleOnly =
+        this.matchesTitleKeyword(line) &&
+        !/\b(19|20)\d{2}\b/.test(line) &&
+        line.length > 3 &&
+        line.length < 80;
       if (hasTitleOnly) {
         const nextLine = lines[i + 1];
         const nextHasDate = nextLine && /\b(19|20)\d{2}\b/.test(nextLine);
@@ -708,7 +986,9 @@ export class ResumeParserService {
 
         if (nextHasDate || nextTwoHasDate) {
           if (current) blocks.push(current);
-          const mergedLine = nextHasDate ? `${line} ${nextLine}` : `${line} ${nextLine} ${nextTwo}`;
+          const mergedLine = nextHasDate
+            ? `${line} ${nextLine}`
+            : `${line} ${nextLine} ${nextTwo}`;
           const dateRange = parseDateRange(mergedLine);
           current = {
             company: '',
@@ -727,10 +1007,12 @@ export class ResumeParserService {
       if (current) {
         const hasDate = /\b(19|20)\d{2}\b/.test(line);
         const isBullet = /^[-•*♦‣⁃◦‣]/.test(line) || /^\d+[.)]/.test(line);
-        const isDateRange = hasDate && /present|current|to|–|—|-|until/i.test(line);
+        const isDateRange =
+          hasDate && /present|current|to|–|—|-|until/i.test(line);
 
         if (isDateRange && !isBullet && line.length < 80) {
-          current.startDate = current.startDate || parseDateRange(line).startDate;
+          current.startDate =
+            current.startDate || parseDateRange(line).startDate;
           current.endDate = current.endDate || parseDateRange(line).endDate;
           current.current = current.current || parseDateRange(line).current;
           continue;
@@ -742,14 +1024,22 @@ export class ResumeParserService {
           const bullet = line.replace(/^[-•*♦‣⁃◦‣\d.)\s]+/, '').trim();
           if (bullet && bullet.length >= 10) current.bullets.push(bullet);
         } else if (line.length > 20 && !/^\d{4}\s/.test(line)) {
-          if (this.matchesTitleKeyword(line) && line.length < 60 && /\b(19|20)\d{2}\b/.test(line)) {
+          if (
+            this.matchesTitleKeyword(line) &&
+            line.length < 60 &&
+            /\b(19|20)\d{2}\b/.test(line)
+          ) {
           } else if (this.looksLikeCompanyLine(line)) {
             if (!current.company) current.company = line;
             else current.bullets.push(line);
           } else {
             current.bullets.push(line);
           }
-        } else if (line.length > 3 && this.matchesTitleKeyword(line) && !hasCurrentIndicators(line)) {
+        } else if (
+          line.length > 3 &&
+          this.matchesTitleKeyword(line) &&
+          !hasCurrentIndicators(line)
+        ) {
           current.bullets.push(line);
         }
       }
@@ -761,9 +1051,17 @@ export class ResumeParserService {
     for (let i = 0; i < blocks.length; i++) {
       const block = blocks[i];
       const next = blocks[i + 1];
-      if (!block.company && next && next.bullets.length === 0 && !next.startDate && !next.endDate) {
+      if (
+        !block.company &&
+        next &&
+        next.bullets.length === 0 &&
+        !next.startDate &&
+        !next.endDate
+      ) {
         const hasTitleKw = this.matchesTitleKeyword(next.title);
-        const hasCompanyKw = next.company ? this.matchesTitleKeyword(next.company) : false;
+        const hasCompanyKw = next.company
+          ? this.matchesTitleKeyword(next.company)
+          : false;
         if (!hasTitleKw || hasCompanyKw) {
           block.company = next.title;
           blocks.splice(i + 1, 1);
@@ -778,7 +1076,8 @@ export class ResumeParserService {
   private matchesTitleKeyword(line: string): boolean {
     const lower = line.toLowerCase();
     for (const kw of TITLE_KEYWORDS) {
-      if (new RegExp(`\\b${kw.replace(/\./g, '\\.')}`, 'i').test(lower)) return true;
+      if (new RegExp(`\\b${kw.replace(/\./g, '\\.')}`, 'i').test(lower))
+        return true;
     }
     const words = lower.split(/\s+/);
     for (const word of words) {
@@ -803,7 +1102,8 @@ export class ResumeParserService {
     if (hasTitle && hasDate) return true;
     if (hasSeparator && hasDate) return true;
     if (hasTitle && hasSeparator) return true;
-    if (hasDate && /^[A-Z]/.test(line) && line.split(/\s+/).length >= 2) return true;
+    if (hasDate && /^[A-Z]/.test(line) && line.split(/\s+/).length >= 2)
+      return true;
 
     return false;
   }
@@ -824,21 +1124,37 @@ export class ResumeParserService {
       { sep: /\s+at\s+/i, before: true, after: true },
       { sep: /\s+@\s+/, before: true, after: true },
       { sep: /\s+[—–]\s+/, before: true, after: true },
-      { sep: /\s+,\s+(?=inc|llc|ltd|corp|co|technologies|tech|solutions|group)/i, before: true, after: false },
+      {
+        sep: /\s+,\s+(?=inc|llc|ltd|corp|co|technologies|tech|solutions|group)/i,
+        before: true,
+        after: false,
+      },
     ];
 
     for (const { sep, before, after } of patterns) {
       const parts = line.split(sep);
       if (parts.length >= 2) {
-        const datesRemoved = parts.map(p => p.replace(/\b(19|20)\d{2}\b(?:\s*[–—]\s*(?:(?:19|20)\d{2}|present|current|now|ongoing))?[^,]*/gi, '').trim());
+        const datesRemoved = parts.map((p) =>
+          p
+            .replace(
+              /\b(19|20)\d{2}\b(?:\s*[–—]\s*(?:(?:19|20)\d{2}|present|current|now|ongoing))?[^,]*/gi,
+              '',
+            )
+            .trim(),
+        );
         const first = datesRemoved[0].replace(/[,;]+$/, '').trim();
-        const second = datesRemoved.slice(1).join(' ').replace(/[,;]+$/, '').trim();
+        const second = datesRemoved
+          .slice(1)
+          .join(' ')
+          .replace(/[,;]+$/, '')
+          .trim();
         if (first && second) {
           const title = before ? first : second;
           const company = before ? second : first;
           const titleScore = countTitleWords(title);
           const companyScore = countTitleWords(company);
-          if (companyScore > titleScore) return { title: company, company: title };
+          if (companyScore > titleScore)
+            return { title: company, company: title };
           return { title, company };
         }
       }
@@ -846,7 +1162,10 @@ export class ResumeParserService {
 
     const dateMatch = line.match(/\b(19|20)\d{2}\b/);
     if (dateMatch) {
-      const beforeDate = line.substring(0, dateMatch.index).trim().replace(/[,;/]+$/, '');
+      const beforeDate = line
+        .substring(0, dateMatch.index)
+        .trim()
+        .replace(/[,;/]+$/, '');
       return { title: beforeDate || line, company: '' };
     }
 
@@ -855,16 +1174,25 @@ export class ResumeParserService {
 
   private looksLikeCompanyLine(line: string): boolean {
     const lower = line.toLowerCase();
-    const hasSuffix = COMPANY_SUFFIXES.some(s => new RegExp(`\\b${s}$`, 'i').test(lower));
+    const hasSuffix = COMPANY_SUFFIXES.some((s) =>
+      new RegExp(`\\b${s}$`, 'i').test(lower),
+    );
     if (hasSuffix) return true;
     // "Company — Location" pattern: if the part before the separator doesn't match title keywords, treat as company
-    const dashMatch = line.match(/^([A-Za-z][A-Za-z'.\s]{1,40})\s*[—–]\s*[A-Z]/);
+    const dashMatch = line.match(
+      /^([A-Za-z][A-Za-z'.\s]{1,40})\s*[—–]\s*[A-Z]/,
+    );
     if (dashMatch) {
       const beforeDash = dashMatch[1].trim();
-      if (!this.matchesTitleKeyword(beforeDash) && beforeDash.length >= 2) return true;
+      if (!this.matchesTitleKeyword(beforeDash) && beforeDash.length >= 2)
+        return true;
       return false;
     }
-    if (/^[A-Z][a-zA-Z'.\s]{2,40}$/.test(line) && !this.matchesTitleKeyword(line)) return true;
+    if (
+      /^[A-Z][a-zA-Z'.\s]{2,40}$/.test(line) &&
+      !this.matchesTitleKeyword(line)
+    )
+      return true;
     return false;
   }
 
@@ -881,7 +1209,10 @@ export class ResumeParserService {
 
     if (!content) return [];
 
-    const lines = content.split('\n').map(l => l.trim()).filter(Boolean);
+    const lines = content
+      .split('\n')
+      .map((l) => l.trim())
+      .filter(Boolean);
     const blocks: ParsedEducation[] = [];
     let current: ParsedEducation | null = null;
 
@@ -908,8 +1239,10 @@ export class ResumeParserService {
 
         const years = line.match(/\b(19|20)\d{2}\b/g);
         if (years) {
-          if (years.length >= 2) { current.startDate = years[0]; current.endDate = years[1]; }
-          else if (!current.startDate) current.startDate = years[0];
+          if (years.length >= 2) {
+            current.startDate = years[0];
+            current.endDate = years[1];
+          } else if (!current.startDate) current.startDate = years[0];
           else current.endDate = years[0];
           continue;
         }
@@ -926,13 +1259,15 @@ export class ResumeParserService {
   private matchInstitution(line: string): string | null {
     if (line.length < 2 || /^[-•*♦\d.)]/.test(line)) return null;
 
-    const standaloneAbbrevs = /\b(MIT|UCL|LSE|KCL|LBS|Imperial|Oxford|Cambridge|Harvard|Stanford|Yale|Columbia|NYU|UCLA|UC Berkeley|UPenn|Cornell|Princeton|Duke)\b/;
+    const standaloneAbbrevs =
+      /\b(MIT|UCL|LSE|KCL|LBS|Imperial|Oxford|Cambridge|Harvard|Stanford|Yale|Columbia|NYU|UCLA|UC Berkeley|UPenn|Cornell|Princeton|Duke)\b/;
     const abMatch = line.match(standaloneAbbrevs);
     if (abMatch && line.length < 50) return line.trim();
 
     if (line.length < 5) return null;
 
-    const indicators = /\b(University|College|Institute|School|Academy|Polytechnic|Conservatory|Faculty|Seminary|Campus)\b/i;
+    const indicators =
+      /\b(University|College|Institute|School|Academy|Polytechnic|Conservatory|Faculty|Seminary|Campus)\b/i;
     const match = line.match(indicators);
     if (match) {
       const idx = match.index!;
@@ -941,10 +1276,18 @@ export class ResumeParserService {
       const start = orEarlier ? orEarlier.index! : idx;
       const end = line.indexOf(',', idx);
       const endIdx = end > 0 && end - idx < 40 ? end : idx + 40;
-      return line.substring(start, endIdx).replace(/[,;–—|].*$/, '').trim();
+      return line
+        .substring(start, endIdx)
+        .replace(/[,;–—|].*$/, '')
+        .trim();
     }
 
-    const commonPrefixes = ['university of', 'university at', 'state university of', 'institute of'];
+    const commonPrefixes = [
+      'university of',
+      'university at',
+      'state university of',
+      'institute of',
+    ];
     const lower = line.toLowerCase();
     for (const prefix of commonPrefixes) {
       if (lower.startsWith(prefix)) {
@@ -958,42 +1301,92 @@ export class ResumeParserService {
 
   private matchDegree(line: string): string | null {
     const patterns: RegExp[] = [
-      /\bbachelor\s+of\s+science\b/i, /\bbachelor\s+of\s+arts\b/i,
-      /\bbachelor\s+of\s+engineering\b/i, /\b(?:bsc|b\.sc\.?)\b/i,
-      /\b(?:ba|b\.a\.?)\b/i, /\b(?:beng|b\.eng\.?)\b/i,
-      /\b(?:bba|b\.b\.a\.?)\b/i, /\bllb\b/i, /\b(?:bfa|b\.f\.a\.?)\b/i,
+      /\bbachelor\s+of\s+science\b/i,
+      /\bbachelor\s+of\s+arts\b/i,
+      /\bbachelor\s+of\s+engineering\b/i,
+      /\b(?:bsc|b\.sc\.?)\b/i,
+      /\b(?:ba|b\.a\.?)\b/i,
+      /\b(?:beng|b\.eng\.?)\b/i,
+      /\b(?:bba|b\.b\.a\.?)\b/i,
+      /\bllb\b/i,
+      /\b(?:bfa|b\.f\.a\.?)\b/i,
       /\bbachelor\b/i,
-      /\bmaster\s+of\s+science\b/i, /\bmaster\s+of\s+arts\b/i,
+      /\bmaster\s+of\s+science\b/i,
+      /\bmaster\s+of\s+arts\b/i,
       /\bmaster\s+of\s+business\s+administration\b/i,
-      /\b(?:msc|m\.sc\.?)\b/i, /\b(?:ma|m\.a\.?)\b/i,
-      /\b(?:meng|m\.eng\.?)\b/i, /\bmba\b/i, /\bllm\b/i,
-      /\b(?:mfa|m\.f\.a\.?)\b/i, /\bmphil\b/i, /\bmph\b/i,
+      /\b(?:msc|m\.sc\.?)\b/i,
+      /\b(?:ma|m\.a\.?)\b/i,
+      /\b(?:meng|m\.eng\.?)\b/i,
+      /\bmba\b/i,
+      /\bllm\b/i,
+      /\b(?:mfa|m\.f\.a\.?)\b/i,
+      /\bmphil\b/i,
+      /\bmph\b/i,
       /\bmaster\b/i,
-      /\bdoctor\s+of\s+philosophy\b/i, /\bphd\b/i, /\bdphil\b/i,
-      /\bmd\b/i, /\bjd\b/i, /\bedd\b/i, /\bdoctor(?:al|ate)?\b/i,
-      /\bhnd\b/i, /\bhnc\b/i, /\bbtec\b/i, /\bnvq\b/i,
-      /\bfoundation\s+degree\b/i, /\bassociate\s+degree\b/i,
-      /\bdiploma\b/i, /\bcertificate\b/i,
+      /\bdoctor\s+of\s+philosophy\b/i,
+      /\bphd\b/i,
+      /\bdphil\b/i,
+      /\bmd\b/i,
+      /\bjd\b/i,
+      /\bedd\b/i,
+      /\bdoctor(?:al|ate)?\b/i,
+      /\bhnd\b/i,
+      /\bhnc\b/i,
+      /\bbtec\b/i,
+      /\bnvq\b/i,
+      /\bfoundation\s+degree\b/i,
+      /\bassociate\s+degree\b/i,
+      /\bdiploma\b/i,
+      /\bcertificate\b/i,
     ];
 
     const canonical: Record<string, string> = {
-      'bachelor of science': 'BSc', 'bachelor of arts': 'BA',
-      'bachelor of engineering': 'BEng', 'bsc': 'BSc', 'b.sc.': 'BSc',
-      'ba': 'BA', 'b.a.': 'BA', 'beng': 'BEng', 'b.eng.': 'BEng',
-      'bba': 'BBA', 'b.b.a.': 'BBA', 'llb': 'LLB', 'bfa': 'BFA',
-      'b.f.a.': 'BFA', 'bachelor': 'Bachelor',
-      'master of science': 'MSc', 'master of arts': 'MA',
+      'bachelor of science': 'BSc',
+      'bachelor of arts': 'BA',
+      'bachelor of engineering': 'BEng',
+      bsc: 'BSc',
+      'b.sc.': 'BSc',
+      ba: 'BA',
+      'b.a.': 'BA',
+      beng: 'BEng',
+      'b.eng.': 'BEng',
+      bba: 'BBA',
+      'b.b.a.': 'BBA',
+      llb: 'LLB',
+      bfa: 'BFA',
+      'b.f.a.': 'BFA',
+      bachelor: 'Bachelor',
+      'master of science': 'MSc',
+      'master of arts': 'MA',
       'master of business administration': 'MBA',
-      'msc': 'MSc', 'm.sc.': 'MSc', 'ma': 'MA', 'm.a.': 'MA',
-      'meng': 'MEng', 'm.eng.': 'MEng', 'mba': 'MBA', 'llm': 'LLM',
-      'mfa': 'MFA', 'm.f.a.': 'MFA', 'mphil': 'MPhil', 'mph': 'MPH',
-      'master': 'Master',
-      'doctor of philosophy': 'PhD', 'phd': 'PhD', 'dphil': 'DPhil',
-      'md': 'MD', 'jd': 'JD', 'edd': 'EdD', 'doctor': 'Doctor',
-      'hnd': 'HND', 'hnc': 'HNC', 'btec': 'BTEC', 'nvq': 'NVQ',
+      msc: 'MSc',
+      'm.sc.': 'MSc',
+      ma: 'MA',
+      'm.a.': 'MA',
+      meng: 'MEng',
+      'm.eng.': 'MEng',
+      mba: 'MBA',
+      llm: 'LLM',
+      mfa: 'MFA',
+      'm.f.a.': 'MFA',
+      mphil: 'MPhil',
+      mph: 'MPH',
+      master: 'Master',
+      'doctor of philosophy': 'PhD',
+      phd: 'PhD',
+      dphil: 'DPhil',
+      md: 'MD',
+      jd: 'JD',
+      edd: 'EdD',
+      doctor: 'Doctor',
+      hnd: 'HND',
+      hnc: 'HNC',
+      btec: 'BTEC',
+      nvq: 'NVQ',
       'foundation degree': 'Foundation Degree',
       'associate degree': 'Associate Degree',
-      'diploma': 'Diploma', 'certificate': 'Certificate',
+      diploma: 'Diploma',
+      certificate: 'Certificate',
     };
 
     for (const regex of patterns) {
@@ -1008,7 +1401,11 @@ export class ResumeParserService {
     return null;
   }
 
-  private extractField(line: string, institution: string, degree: string): string | null {
+  private extractField(
+    line: string,
+    institution: string,
+    degree: string,
+  ): string | null {
     let remainder = line;
     if (institution) remainder = remainder.replace(institution, '');
     const degRegex = new RegExp(degree.replace(/\./g, '\\.'), 'i');
@@ -1020,7 +1417,8 @@ export class ResumeParserService {
       .replace(/^of\s+/i, '')
       .trim();
 
-    if (field && field.length > 1 && field.length < 50 && !/^\d+$/.test(field)) return field;
+    if (field && field.length > 1 && field.length < 50 && !/^\d+$/.test(field))
+      return field;
     return null;
   }
 
@@ -1039,22 +1437,29 @@ export class ResumeParserService {
 
     const allSkills = new Set<string>();
 
-    const lines = content.split('\n').map(l => l.trim()).filter(Boolean);
+    const lines = content
+      .split('\n')
+      .map((l) => l.trim())
+      .filter(Boolean);
 
-    const categoryLabel = /^(languages|frontend|backend|blockchain|cloud|devops|databases|tools|practices|frameworks|libraries|platforms|technologies|stacks?|database|programming|methodologies|testing|design|data|other):\s*/i;
+    const categoryLabel =
+      /^(languages|frontend|backend|blockchain|cloud|devops|databases|tools|practices|frameworks|libraries|platforms|technologies|stacks?|database|programming|methodologies|testing|design|data|other):\s*/i;
 
     for (const line of lines) {
       const cleaned = line.replace(categoryLabel, '').trim();
       if (!cleaned) continue;
 
-      const commaSkills = cleaned.split(/[,•·|;]+/).map(s => s.trim()).filter(Boolean);
+      const commaSkills = cleaned
+        .split(/[,•·|;]+/)
+        .map((s) => s.trim())
+        .filter(Boolean);
       for (const s of commaSkills) {
         const normalized = this.matchSkill(s);
         if (normalized) allSkills.add(normalized);
       }
     }
 
-    const flat = [...allSkills].filter(s => s.length >= 2 && s.length <= 50);
+    const flat = [...allSkills].filter((s) => s.length >= 2 && s.length <= 50);
     return this.deduplicateSkills(flat);
   }
 
@@ -1070,7 +1475,10 @@ export class ResumeParserService {
     // Fuzzy dictionary match — whole-word match with short remaining text guard
     for (const [key, value] of Object.entries(SKILL_DICTIONARY)) {
       if (lower === key) return value;
-      const keyRegex = new RegExp(`\\b${key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i');
+      const keyRegex = new RegExp(
+        `\\b${key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`,
+        'i',
+      );
       if (keyRegex.test(lower)) {
         const remaining = lower.replace(keyRegex, '').trim();
         // Only treat as variant if very little remains (punctuation, whitespace)
@@ -1080,7 +1488,7 @@ export class ResumeParserService {
     }
 
     // Reject known non-skill patterns
-    if (ALL_SECTION_HEADERS.some(h => lower === h)) return null;
+    if (ALL_SECTION_HEADERS.some((h) => lower === h)) return null;
     if (/^\d+$/.test(clean)) return null;
     if (/^[-•*♦‣⁃◦‣\d.)]+$/.test(clean)) return null;
 
@@ -1088,7 +1496,7 @@ export class ResumeParserService {
     // Must start with a letter or digit, contain letters/digits/spaces/slashes/dots/hashes/+/#
     if (/^[a-zA-Z0-9][a-zA-Z0-9\s/+.#&-]{1,58}$/.test(clean)) {
       // Title-case normalize, but preserve all-caps words (e.g. "SEO", "API")
-      return clean.replace(/\b\w+/g, word => {
+      return clean.replace(/\b\w+/g, (word) => {
         if (/^[A-Z]{2,}$/.test(word)) return word;
         return word.charAt(0).toUpperCase() + word.slice(1).toLowerCase();
       });
@@ -1097,7 +1505,9 @@ export class ResumeParserService {
     return null;
   }
 
-  private parseCertifications(sections: Map<string, string>): ParsedCertification[] {
+  private parseCertifications(
+    sections: Map<string, string>,
+  ): ParsedCertification[] {
     const certHeaders = SECTION_PATTERNS.certifications;
     let content = '';
     for (const h of certHeaders) {
@@ -1110,19 +1520,52 @@ export class ResumeParserService {
 
     if (!content) return [];
 
-    const lines = content.split('\n').map(l => l.trim()).filter(Boolean);
+    const lines = content
+      .split('\n')
+      .map((l) => l.trim())
+      .filter(Boolean);
     const certs: ParsedCertification[] = [];
 
     const knownIssuers = [
-      'aws', 'amazon web services', 'google', 'microsoft', 'cisco',
-      'comptia', 'pmi', 'scrum alliance', 'hubspot', 'salesforce',
-      'oracle', 'ibm', 'adobe', 'meta', 'coursera', 'udemy', 'edx',
-      'linkedin learning', 'isaca', 'iapp', 'cfa institute', 'acca',
-      'cima', 'prince2', 'axelos', 'isc2', 'ec-council',
-      'offensive security', 'hashicorp', 'red hat', 'vmware',
-      'databricks', 'snowflake', 'tableau', 'pagerduty',
-      'nielsen norman group', 'ideo',
-      'interaction design foundation', 'freecodecamp',
+      'aws',
+      'amazon web services',
+      'google',
+      'microsoft',
+      'cisco',
+      'comptia',
+      'pmi',
+      'scrum alliance',
+      'hubspot',
+      'salesforce',
+      'oracle',
+      'ibm',
+      'adobe',
+      'meta',
+      'coursera',
+      'udemy',
+      'edx',
+      'linkedin learning',
+      'isaca',
+      'iapp',
+      'cfa institute',
+      'acca',
+      'cima',
+      'prince2',
+      'axelos',
+      'isc2',
+      'ec-council',
+      'offensive security',
+      'hashicorp',
+      'red hat',
+      'vmware',
+      'databricks',
+      'snowflake',
+      'tableau',
+      'pagerduty',
+      'nielsen norman group',
+      'ideo',
+      'interaction design foundation',
+      'freecodecamp',
     ];
 
     for (const line of lines) {
@@ -1137,12 +1580,21 @@ export class ResumeParserService {
 
       // Try to split by known issuers
       for (const known of knownIssuers) {
-        const regex = new RegExp(`\\b${known.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'gi');
+        const regex = new RegExp(
+          `\\b${known.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`,
+          'gi',
+        );
         const matches = [...text.matchAll(regex)];
         if (matches.length > 0) {
           const match = matches[matches.length - 1];
-          const before = text.substring(0, match.index).replace(/[•·|—–-]\s*$/, '').trim();
-          const after = text.substring(match.index + match[0].length).replace(/[•·|—–-]\s*$/, '').trim();
+          const before = text
+            .substring(0, match.index)
+            .replace(/[•·|—–-]\s*$/, '')
+            .trim();
+          const after = text
+            .substring(match.index + match[0].length)
+            .replace(/[•·|—–-]\s*$/, '')
+            .trim();
           // Use the part before the issuer as the name, after as additional info
           if (before) {
             name = before;
@@ -1154,19 +1606,35 @@ export class ResumeParserService {
             name = match[0];
             issuer = null;
           }
-          if (issuer === 'aws' || issuer?.toLowerCase() === 'amazon web services') issuer = 'AWS';
+          if (
+            issuer === 'aws' ||
+            issuer?.toLowerCase() === 'amazon web services'
+          )
+            issuer = 'AWS';
           break;
         }
       }
 
       // Try to split by separators if no issuer found
       if (!issuer) {
-        const separators = ['issued by', 'certified by', 'through', '|', '•', '·', '—', '–'];
+        const separators = [
+          'issued by',
+          'certified by',
+          'through',
+          '|',
+          '•',
+          '·',
+          '—',
+          '–',
+        ];
         for (const sep of separators) {
           const idx = text.indexOf(sep);
           if (idx > 0) {
             const candidateName = text.substring(0, idx).trim();
-            const candidateIssuer = text.substring(idx + sep.length).replace(/\b\d{4}\b.*$/, '').trim();
+            const candidateIssuer = text
+              .substring(idx + sep.length)
+              .replace(/\b\d{4}\b.*$/, '')
+              .trim();
             if (candidateName && candidateName.length > 2) {
               name = candidateName;
               issuer = candidateIssuer || null;
@@ -1178,7 +1646,7 @@ export class ResumeParserService {
 
       // Clean up the name
       const date = this.extractCertDate(text);
-      let cleanedName = name
+      const cleanedName = name
         .replace(/^[-•*♦\s]+/, '')
         .replace(/\(\s*\)/g, '') // Remove empty parentheses
         .replace(/\s{2,}/g, ' ')
@@ -1214,10 +1682,16 @@ export class ResumeParserService {
     if (!content) return [];
 
     const results: ParsedLanguage[] = [];
-    const lines = content.split('\n').map(l => l.trim()).filter(Boolean);
+    const lines = content
+      .split('\n')
+      .map((l) => l.trim())
+      .filter(Boolean);
 
     for (const line of lines) {
-      const parts = line.split(/[,•·|;]+/).map(s => s.trim()).filter(Boolean);
+      const parts = line
+        .split(/[,•·|;]+/)
+        .map((s) => s.trim())
+        .filter(Boolean);
 
       for (const part of parts) {
         const lower = part.toLowerCase();
@@ -1227,7 +1701,9 @@ export class ResumeParserService {
           if (langRegex.test(lower)) {
             let proficiency: string | null = null;
 
-            for (const [profKey, profValue] of Object.entries(PROFICIENCY_MAP)) {
+            for (const [profKey, profValue] of Object.entries(
+              PROFICIENCY_MAP,
+            )) {
               const profRegex = new RegExp(`\\b${profKey}\\b`, 'i');
               if (profRegex.test(part)) {
                 proficiency = profValue;
@@ -1235,7 +1711,11 @@ export class ResumeParserService {
               }
             }
 
-            if (!results.some(r => r.language.toLowerCase() === langName.toLowerCase())) {
+            if (
+              !results.some(
+                (r) => r.language.toLowerCase() === langName.toLowerCase(),
+              )
+            ) {
               results.push({ language: langName, proficiency });
             }
             break;
@@ -1247,14 +1727,19 @@ export class ResumeParserService {
     return results;
   }
 
-  private buildLinks(contact: {
-    linkedin: string | null;
-    github: string | null;
-    website: string | null;
-  }, rawText: string, sections: Map<string, string>): ParsedLinks[] {
+  private buildLinks(
+    contact: {
+      linkedin: string | null;
+      github: string | null;
+      website: string | null;
+    },
+    rawText: string,
+    sections: Map<string, string>,
+  ): ParsedLinks[] {
     const links: ParsedLinks[] = [];
 
-    if (contact.linkedin) links.push({ title: 'LinkedIn', url: contact.linkedin });
+    if (contact.linkedin)
+      links.push({ title: 'LinkedIn', url: contact.linkedin });
     if (contact.github) links.push({ title: 'GitHub', url: contact.github });
     if (contact.website) links.push({ title: 'Website', url: contact.website });
 
@@ -1264,8 +1749,12 @@ export class ResumeParserService {
         const urls = [...content.matchAll(URL_RE)];
         for (const m of urls) {
           const url = m[0].toLowerCase();
-          if (!links.some(l => l.url.toLowerCase() === url)) {
-            const label = content.replace(url, '').replace(/^[-•*♦\d.)\s]+/, '').replace(/[:,;]\s*$/, '').trim();
+          if (!links.some((l) => l.url.toLowerCase() === url)) {
+            const label = content
+              .replace(url, '')
+              .replace(/^[-•*♦\d.)\s]+/, '')
+              .replace(/[:,;]\s*$/, '')
+              .trim();
             links.push({ title: label || url, url: m[0] });
           }
         }
@@ -1277,7 +1766,7 @@ export class ResumeParserService {
 
   private cleanupExperience(entries: ParsedExperience[]): ParsedExperience[] {
     const sorted = entries
-      .filter(e => e.title || e.company)
+      .filter((e) => e.title || e.company)
       .sort((a, b) => {
         if (a.current !== b.current) return a.current ? -1 : 1;
         const aStart = a.startDate || '0000-00';
@@ -1287,10 +1776,11 @@ export class ResumeParserService {
 
     const deduped: ParsedExperience[] = [];
     for (const entry of sorted) {
-      const isDup = deduped.some(e =>
-        e.title.toLowerCase() === entry.title.toLowerCase() &&
-        e.company.toLowerCase() === entry.company.toLowerCase() &&
-        e.startDate === entry.startDate,
+      const isDup = deduped.some(
+        (e) =>
+          e.title.toLowerCase() === entry.title.toLowerCase() &&
+          e.company.toLowerCase() === entry.company.toLowerCase() &&
+          e.startDate === entry.startDate,
       );
       if (!isDup) deduped.push(entry);
     }
@@ -1300,7 +1790,7 @@ export class ResumeParserService {
 
   private cleanupEducation(entries: ParsedEducation[]): ParsedEducation[] {
     return entries
-      .filter(e => e.institution || e.degree)
+      .filter((e) => e.institution || e.degree)
       .sort((a, b) => {
         const aEnd = a.endDate || a.startDate || '0000';
         const bEnd = b.endDate || b.startDate || '0000';
@@ -1316,7 +1806,7 @@ export class ResumeParserService {
         seen.set(key, skill);
       }
     }
-    return [...seen.values()].filter(s => s.length >= 2 && s.length <= 50);
+    return [...seen.values()].filter((s) => s.length >= 2 && s.length <= 50);
   }
 
   private calculateOverallConfidence(
@@ -1329,8 +1819,14 @@ export class ResumeParserService {
     const weights = [
       { value: name ? 1 : 0, weight: 0.15 },
       { value: email ? 1 : 0, weight: 0.15 },
-      { value: (experience.some(e => e.title && e.company)) ? 1 : 0, weight: 0.35 },
-      { value: (education.some(e => e.institution && e.degree)) ? 1 : 0, weight: 0.20 },
+      {
+        value: experience.some((e) => e.title && e.company) ? 1 : 0,
+        weight: 0.35,
+      },
+      {
+        value: education.some((e) => e.institution && e.degree) ? 1 : 0,
+        weight: 0.2,
+      },
       { value: skills.length >= 3 ? 1 : 0, weight: 0.15 },
     ];
 

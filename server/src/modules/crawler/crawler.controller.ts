@@ -12,7 +12,12 @@ import {
   NotFoundException,
   BadRequestException,
 } from '@nestjs/common';
-import { ApiTags, ApiBearerAuth, ApiOperation, ApiQuery } from '@nestjs/swagger';
+import {
+  ApiTags,
+  ApiBearerAuth,
+  ApiOperation,
+  ApiQuery,
+} from '@nestjs/swagger';
 import { PaginationQuery } from '../../common/decorators/pagination-query.decorator';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
@@ -34,8 +39,13 @@ export class CrawlerController {
     @Body('resumeId') resumeId: string,
     @CurrentUser() user: UserDocument,
   ) {
-    console.log('[Crawler] analyze called', { userId: user._id.toString(), portfolioUrl, resumeId });
-    if (!portfolioUrl) throw new BadRequestException('Portfolio URL is required');
+    console.log('[Crawler] analyze called', {
+      userId: user._id.toString(),
+      portfolioUrl,
+      resumeId,
+    });
+    if (!portfolioUrl)
+      throw new BadRequestException('Portfolio URL is required');
     const analysisId = await this.crawlerService.startAnalysis(
       user._id.toString(),
       portfolioUrl,
@@ -47,10 +57,7 @@ export class CrawlerController {
 
   @Get('status/:id')
   @ApiOperation({ summary: 'Poll analysis status' })
-  async status(
-    @Param('id') id: string,
-    @CurrentUser() user: UserDocument,
-  ) {
+  async status(@Param('id') id: string, @CurrentUser() user: UserDocument) {
     const job = await this.crawlerService.getJob(id);
     if (!job || job.userId.toString() !== user._id.toString()) {
       throw new NotFoundException('Analysis not found');
@@ -74,10 +81,7 @@ export class CrawlerController {
   @Delete(':id')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Delete an analysis' })
-  async remove(
-    @Param('id') id: string,
-    @CurrentUser() user: UserDocument,
-  ) {
+  async remove(@Param('id') id: string, @CurrentUser() user: UserDocument) {
     const deleted = await this.crawlerService.deleteJob(
       id,
       user._id.toString(),

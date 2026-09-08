@@ -125,13 +125,20 @@ describe('CrawlerService', () => {
   describe('deleteJob', () => {
     it('deletes a job owned by the user', async () => {
       model.findOne.mockReturnValue(
-        mockQuery({ _id: 'job-id', userId: 'user-id', screenshotKey: 'screenshot-key' }),
+        mockQuery({
+          _id: 'job-id',
+          userId: 'user-id',
+          screenshotKey: 'screenshot-key',
+        }),
       );
       model.deleteOne.mockReturnValue(mockQuery({ deletedCount: 1 }));
 
       const result = await service.deleteJob('job-id', 'user-id');
       expect(result).toBe(true);
-      expect(mockStorage.delete).toHaveBeenCalledWith('screenshot-key', 'image');
+      expect(mockStorage.delete).toHaveBeenCalledWith(
+        'screenshot-key',
+        'image',
+      );
     });
 
     it('returns false if job not found', async () => {

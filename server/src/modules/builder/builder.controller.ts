@@ -53,7 +53,11 @@ export class BuilderController {
     @Body() body: { wizardState: Record<string, unknown> },
     @CurrentUser() user: UserDocument,
   ) {
-    const resume = await this.builder.saveState(resumeId, user._id.toString(), body.wizardState);
+    const resume = await this.builder.saveState(
+      resumeId,
+      user._id.toString(),
+      body.wizardState,
+    );
     return resume;
   }
 
@@ -61,7 +65,8 @@ export class BuilderController {
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Generate summary with AI (SSE streaming)' })
   async generateSummary(
-    @Body() body: {
+    @Body()
+    body: {
       resumeId: string;
       targetRole: string;
       level: string;
@@ -74,7 +79,9 @@ export class BuilderController {
     @CurrentUser() user: UserDocument,
     @Res() res: Response,
   ) {
-    this.logger.log(`[generateSummary] userId=${user._id.toString()} role="${body.targetRole}"`);
+    this.logger.log(
+      `[generateSummary] userId=${user._id.toString()} role="${body.targetRole}"`,
+    );
     res.setHeader('Content-Type', 'text/event-stream');
     res.setHeader('Cache-Control', 'no-cache');
     res.setHeader('Connection', 'keep-alive');
@@ -99,9 +106,12 @@ export class BuilderController {
 
   @Post('generate-bullets')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Generate experience bullets with AI (SSE streaming)' })
+  @ApiOperation({
+    summary: 'Generate experience bullets with AI (SSE streaming)',
+  })
   async generateBullets(
-    @Body() body: {
+    @Body()
+    body: {
       resumeId: string;
       jobTitle: string;
       company: string;
@@ -113,7 +123,9 @@ export class BuilderController {
     @CurrentUser() user: UserDocument,
     @Res() res: Response,
   ) {
-    this.logger.log(`[generateBullets] userId=${user._id.toString()} jobTitle="${body.jobTitle}"`);
+    this.logger.log(
+      `[generateBullets] userId=${user._id.toString()} jobTitle="${body.jobTitle}"`,
+    );
     res.setHeader('Content-Type', 'text/event-stream');
     res.setHeader('Cache-Control', 'no-cache');
     res.setHeader('Connection', 'keep-alive');
@@ -138,10 +150,13 @@ export class BuilderController {
 
   @Post(':resumeId/chat')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Chat with AI resume builder (SSE streaming with action tags)' })
+  @ApiOperation({
+    summary: 'Chat with AI resume builder (SSE streaming with action tags)',
+  })
   async chat(
     @Param('resumeId') resumeId: string,
-    @Body() body: {
+    @Body()
+    body: {
       message: string;
       history?: Array<{ role: string; content: string }>;
       resumeSnapshot?: Record<string, unknown>;
@@ -152,7 +167,9 @@ export class BuilderController {
     @CurrentUser() user: UserDocument,
     @Res() res: Response,
   ) {
-    this.logger.log(`[chat] resumeId=${resumeId} userId=${user._id.toString()} message="${body.message?.slice(0, 80)}"`);
+    this.logger.log(
+      `[chat] resumeId=${resumeId} userId=${user._id.toString()} message="${body.message?.slice(0, 80)}"`,
+    );
     res.setHeader('Content-Type', 'text/event-stream');
     res.setHeader('Cache-Control', 'no-cache');
     res.setHeader('Connection', 'keep-alive');
@@ -178,7 +195,9 @@ export class BuilderController {
 
   @Post(':resumeId/finish')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Finalize builder session — save wizard data as resume fields' })
+  @ApiOperation({
+    summary: 'Finalize builder session — save wizard data as resume fields',
+  })
   async finish(
     @Param('resumeId') resumeId: string,
     @CurrentUser() user: UserDocument,
@@ -189,9 +208,12 @@ export class BuilderController {
 
   @Post('generate-project-description')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Generate project description with AI (SSE streaming)' })
+  @ApiOperation({
+    summary: 'Generate project description with AI (SSE streaming)',
+  })
   async generateProjectDescription(
-    @Body() body: {
+    @Body()
+    body: {
       resumeId: string;
       projectName: string;
       rawDescription: string;
@@ -226,7 +248,8 @@ export class BuilderController {
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Get AI-suggested skills for the target role' })
   async suggestSkills(
-    @Body() body: {
+    @Body()
+    body: {
       resumeId: string;
       targetRole: string;
       level: string;

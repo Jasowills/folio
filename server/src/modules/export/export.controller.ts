@@ -51,7 +51,9 @@ export class ExportController {
     @CurrentUser() user: UserDocument,
     @Res() res: Response,
   ) {
-    this.logger.log(`exportHtml: request for resume ${resumeId}, template=${template || 'default'}, color=${color || 'default'}`);
+    this.logger.log(
+      `exportHtml: request for resume ${resumeId}, template=${template || 'default'}, color=${color || 'default'}`,
+    );
 
     const html = await this.exportService.exportHtml(
       resumeId,

@@ -48,7 +48,6 @@ export default function ResearchBrief({ job, onReset, onUpgrade, upgradePending 
   const [upgradeUrl, setUpgradeUrl] = useState('')
 
   const b = job.brief
-  const hasRoleContext = !!job.roleContext?.roleTitle
 
   const tabs: { key: Tab; label: string }[] = [
     { key: 'overview', label: 'Overview' },

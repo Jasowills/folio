@@ -5,7 +5,12 @@ export type DiscoverPreferencesDocument = DiscoverPreferences & Document;
 
 @Schema({ timestamps: true })
 export class DiscoverPreferences {
-  @Prop({ required: true, type: MongooseSchema.Types.ObjectId, ref: 'User', unique: true })
+  @Prop({
+    required: true,
+    type: MongooseSchema.Types.ObjectId,
+    ref: 'User',
+    unique: true,
+  })
   userId!: Types.ObjectId;
 
   @Prop({ type: [String], default: [] })
@@ -44,14 +49,24 @@ export class DiscoverPreferences {
   @Prop({ type: [String], default: [] })
   hiddenJobIds!: string[];
 
-  @Prop({ type: [String], default: [
-    'greenhouse', 'lever', 'weworkremotely', 'remoteok',
-    'hn', 'ycombinator', 'twitter', 'techtree',
-  ]})
+  @Prop({
+    type: [String],
+    default: [
+      'greenhouse',
+      'lever',
+      'weworkremotely',
+      'remoteok',
+      'hn',
+      'ycombinator',
+      'twitter',
+      'techtree',
+    ],
+  })
   enabledSources!: string[];
 
   @Prop()
   lastVisitedAt?: Date;
 }
 
-export const DiscoverPreferencesSchema = SchemaFactory.createForClass(DiscoverPreferences);
+export const DiscoverPreferencesSchema =
+  SchemaFactory.createForClass(DiscoverPreferences);

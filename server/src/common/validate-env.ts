@@ -10,9 +10,18 @@ export function validateEnv() {
     ['CLIENT_URL', 'Client application URL'],
   ];
 
-  // OPENROUTER_API_KEY is required unless Ollama or Groq is configured
-  if (!process.env.OLLAMA_BASE_URL && !process.env.OPENROUTER_API_KEY && !process.env.GROQ_API_KEY) {
-    required.push(['OPENROUTER_API_KEY or GROQ_API_KEY', 'OpenRouter or Groq API key for AI calls — not needed if OLLAMA_BASE_URL is set']);
+  // OPENROUTER_API_KEY is required unless Ollama, Groq, or opencode is configured
+  if (
+    !process.env.OLLAMA_BASE_URL &&
+    !process.env.OPENROUTER_API_KEY &&
+    !process.env.GROQ_API_KEY &&
+    process.env.OPENCODE_ENABLED !== 'true' &&
+    !process.env.OPENCODE_BASE_URL
+  ) {
+    required.push([
+      'OPENROUTER_API_KEY or GROQ_API_KEY',
+      'OpenRouter or Groq API key for AI calls — not needed if OLLAMA_BASE_URL or OPENCODE is set',
+    ]);
   }
 
   const missing: string[] = [];
@@ -26,8 +35,8 @@ export function validateEnv() {
   if (missing.length > 0) {
     const msg =
       '\n❌ Missing required environment variables:\n  ' +
-        missing.join('\n  ') +
-        '\n\nSet them in server/.env or export them.\n';
+      missing.join('\n  ') +
+      '\n\nSet them in server/.env or export them.\n';
     if (process.env.NODE_ENV === 'production') {
       throw new Error(msg);
     }

@@ -19,12 +19,17 @@ export class BuiltInCrawler extends BaseCrawler {
       const html = await response.text();
 
       // Match job cards in the HTML
-      const cardRegex = /<div[^>]*class="[^"]*job-card[^"]*"[^>]*>([\s\S]*?)<\/div>\s*<\/div>\s*<\/div>\s*<\/div>/gi;
-      const titleRegex = /<h[23][^>]*class="[^"]*title[^"]*"[^>]*>([^<]+)<\/h[23]>/i;
-      const companyRegex = /<div[^>]*class="[^"]*company-name[^"]*"[^>]*>([^<]+)<\/div>/i;
-      const locationRegex = /<div[^>]*class="[^"]*location[^"]*"[^>]*>([^<]+)<\/div>/i;
+      const cardRegex =
+        /<div[^>]*class="[^"]*job-card[^"]*"[^>]*>([\s\S]*?)<\/div>\s*<\/div>\s*<\/div>\s*<\/div>/gi;
+      const titleRegex =
+        /<h[23][^>]*class="[^"]*title[^"]*"[^>]*>([^<]+)<\/h[23]>/i;
+      const companyRegex =
+        /<div[^>]*class="[^"]*company-name[^"]*"[^>]*>([^<]+)<\/div>/i;
+      const locationRegex =
+        /<div[^>]*class="[^"]*location[^"]*"[^>]*>([^<]+)<\/div>/i;
       const linkRegex = /<a[^>]*href="([^"]+)"[^>]*class="[^"]*title[^"]*"/i;
-      const descRegex = /<div[^>]*class="[^"]*description[^"]*"[^>]*>([\s\S]*?)<\/div>/i;
+      const descRegex =
+        /<div[^>]*class="[^"]*description[^"]*"[^>]*>([\s\S]*?)<\/div>/i;
       const dateRegex = /(\d+)\s+(hour|day|week|month|minute)s?\s+ago/i;
 
       let match: RegExpExecArray | null;
@@ -53,10 +58,14 @@ export class BuiltInCrawler extends BaseCrawler {
           const unit = dateMatch[2].toLowerCase();
           const now = Date.now();
           if (unit.startsWith('hour')) postedAt = new Date(now - num * 3600000);
-          else if (unit.startsWith('day')) postedAt = new Date(now - num * 86400000);
-          else if (unit.startsWith('week')) postedAt = new Date(now - num * 604800000);
-          else if (unit.startsWith('month')) postedAt = new Date(now - num * 2592000000);
-          else if (unit.startsWith('minute')) postedAt = new Date(now - num * 60000);
+          else if (unit.startsWith('day'))
+            postedAt = new Date(now - num * 86400000);
+          else if (unit.startsWith('week'))
+            postedAt = new Date(now - num * 604800000);
+          else if (unit.startsWith('month'))
+            postedAt = new Date(now - num * 2592000000);
+          else if (unit.startsWith('minute'))
+            postedAt = new Date(now - num * 60000);
         }
 
         jobs.push({

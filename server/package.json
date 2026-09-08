@@ -31,6 +31,7 @@
     "@nestjs/swagger": "^11.4.4",
     "@nestjs/throttler": "^6.5.0",
     "@nestjs/websockets": "^11.1.27",
+    "@opencode-ai/sdk": "^1.18.16",
     "@sentry/node": "^10.59.0",
     "bcrypt": "^6.0.0",
     "class-transformer": "^0.5.1",
@@ -88,6 +89,12 @@
       "js",
       "json",
       "ts"
+    ],
+    "moduleNameMapper": {
+      "^@opencode-ai/sdk/v2$": "<rootDir>/../../node_modules/@opencode-ai/sdk/dist/v2/index.js"
+    },
+    "setupFilesAfterEnv": [
+      "<rootDir>/../test/jest.setup.ts"
     ],
     "rootDir": "src",
     "testRegex": ".*\\.spec\\.ts$",

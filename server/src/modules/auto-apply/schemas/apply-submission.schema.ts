@@ -20,7 +20,11 @@ export class ApplySubmission {
   @Prop({ required: true, type: MongooseSchema.Types.ObjectId, ref: 'User' })
   userId!: Types.ObjectId;
 
-  @Prop({ required: true, type: MongooseSchema.Types.ObjectId, ref: 'JobListing' })
+  @Prop({
+    required: true,
+    type: MongooseSchema.Types.ObjectId,
+    ref: 'JobListing',
+  })
   jobListingId!: Types.ObjectId;
 
   @Prop({ required: true, type: MongooseSchema.Types.ObjectId, ref: 'Resume' })
@@ -29,9 +33,11 @@ export class ApplySubmission {
   @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'CoverLetter' })
   coverLetterId?: Types.ObjectId;
 
-  @Prop({ required: true, enum: [
-    'approved', 'filling', 'ready_for_review', 'submitted', 'failed',
-  ], default: 'approved' })
+  @Prop({
+    required: true,
+    enum: ['approved', 'filling', 'ready_for_review', 'submitted', 'failed'],
+    default: 'approved',
+  })
   status!: string;
 
   @Prop({ required: true })
@@ -40,7 +46,17 @@ export class ApplySubmission {
   @Prop({ required: true })
   applicationUrl!: string;
 
-  @Prop({ type: [{ fieldName: String, fieldValue: String, autoFilled: Boolean, editable: Boolean }], default: [] })
+  @Prop({
+    type: [
+      {
+        fieldName: String,
+        fieldValue: String,
+        autoFilled: Boolean,
+        editable: Boolean,
+      },
+    ],
+    default: [],
+  })
   filledFields?: ApplyField[];
 
   @Prop()
@@ -56,7 +72,8 @@ export class ApplySubmission {
   activityLog!: ActivityLogEntry[];
 }
 
-export const ApplySubmissionSchema = SchemaFactory.createForClass(ApplySubmission);
+export const ApplySubmissionSchema =
+  SchemaFactory.createForClass(ApplySubmission);
 
 ApplySubmissionSchema.index({ userId: 1, status: 1 });
 ApplySubmissionSchema.index({ userId: 1, jobListingId: 1 }, { unique: true });

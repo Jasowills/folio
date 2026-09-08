@@ -16,13 +16,24 @@ export class UserSignal {
   @Prop({ required: true, type: MongooseSchema.Types.ObjectId, ref: 'User' })
   userId!: Types.ObjectId;
 
-  @Prop({ required: true, type: MongooseSchema.Types.ObjectId, ref: 'JobListing' })
+  @Prop({
+    required: true,
+    type: MongooseSchema.Types.ObjectId,
+    ref: 'JobListing',
+  })
   jobListingId!: Types.ObjectId;
 
-  @Prop({ required: true, enum: [
-    'bad_seniority', 'wrong_domain', 'wrong_location',
-    'not_interested', 'salary_too_low', 'other',
-  ]})
+  @Prop({
+    required: true,
+    enum: [
+      'bad_seniority',
+      'wrong_domain',
+      'wrong_location',
+      'not_interested',
+      'salary_too_low',
+      'other',
+    ],
+  })
   dismissReason!: DismissReason;
 
   @Prop({ default: 1.0 })

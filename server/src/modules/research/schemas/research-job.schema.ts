@@ -20,12 +20,20 @@ export class ResearchJob {
     resumeId?: string;
   };
 
-  @Prop({ default: 'queued', enum: ['queued', 'crawling', 'analysing', 'completed', 'failed'] })
+  @Prop({
+    default: 'queued',
+    enum: ['queued', 'crawling', 'analysing', 'completed', 'failed'],
+  })
   status!: string;
 
   @Prop({ type: Object })
   crawlData?: {
-    pagesVisited: Array<{ url: string; title: string; text: string; crawledAt: Date }>;
+    pagesVisited: Array<{
+      url: string;
+      title: string;
+      text: string;
+      crawledAt: Date;
+    }>;
     pageCount: number;
     currentlyCrawling?: Array<{ url: string; title: string; startedAt: Date }>;
   };
@@ -50,7 +58,10 @@ export class ResearchJob {
     };
     questionsToAsk: Array<{ question: string; rationale: string }>;
     redFlags: Array<{ flag: string; source: string }> | null;
-    salaryRange: { estimate: string; confidence: 'high' | 'medium' | 'low' } | null;
+    salaryRange: {
+      estimate: string;
+      confidence: 'high' | 'medium' | 'low';
+    } | null;
   };
 
   @Prop()

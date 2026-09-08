@@ -5,5 +5,9 @@
   "transform": {
     "^.+\\.(t|j)s$": "ts-jest"
   },
-  "setupFiles": ["./e2e-setup.ts"]
+  "rootDir": "..",
+  "setupFiles": ["./test/e2e-setup.ts"],
+  "moduleNameMapper": {
+    "^@opencode-ai/sdk/v2$": "<rootDir>/../node_modules/@opencode-ai/sdk/dist/v2/index.js"
+  }
 }

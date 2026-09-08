@@ -5,12 +5,32 @@ export type JobListingDocument = JobListing & Document;
 
 @Schema({ timestamps: true })
 export class JobListing {
-  @Prop({ required: true, enum: [
-    'greenhouse', 'lever', 'workday', 'weworkremotely', 'remoteok',
-    'otta', 'hn', 'cryptojobslist', 'bitcoinerjobs', 'ycombinator',
-    'twitter', 'linkedin', 'manual', 'remotive', 'arc', 'wellfound',
-    'builtin', 'techtree', 'ashby', 'icims', 'smartrecruiters',
-  ]})
+  @Prop({
+    required: true,
+    enum: [
+      'greenhouse',
+      'lever',
+      'workday',
+      'weworkremotely',
+      'remoteok',
+      'otta',
+      'hn',
+      'cryptojobslist',
+      'bitcoinerjobs',
+      'ycombinator',
+      'twitter',
+      'linkedin',
+      'manual',
+      'remotive',
+      'arc',
+      'wellfound',
+      'builtin',
+      'techtree',
+      'ashby',
+      'icims',
+      'smartrecruiters',
+    ],
+  })
   source!: string;
 
   @Prop({ required: true })
@@ -65,7 +85,11 @@ export class JobListing {
   @Prop({ default: false })
   isExpired?: boolean;
 
-  @Prop({ type: String, enum: ['tech', 'non-tech', 'unknown'], default: 'unknown' })
+  @Prop({
+    type: String,
+    enum: ['tech', 'non-tech', 'unknown'],
+    default: 'unknown',
+  })
   techRelevance?: string;
 
   @Prop()

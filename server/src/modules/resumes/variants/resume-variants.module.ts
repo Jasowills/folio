@@ -2,7 +2,10 @@ import { Module } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
 import { ResumeVariant, ResumeVariantSchema } from './resume-variant.schema';
 import { Resume, ResumeSchema } from '../schemas/resume.schema';
-import { JobApplication, JobApplicationSchema } from '../../discover/schemas/job-application.schema';
+import {
+  JobApplication,
+  JobApplicationSchema,
+} from '../../discover/schemas/job-application.schema';
 import { ResumeVariantService } from './resume-variant.service';
 import { ResumeVariantController } from './resume-variant.controller';
 import { ResumeDiffService } from './resume-diff.service';

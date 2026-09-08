@@ -1,48 +1,52 @@
-import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose'
-import { Document, Types, Schema as MongooseSchema } from 'mongoose'
+import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
+import { Document, Types, Schema as MongooseSchema } from 'mongoose';
 
-export type FollowUpDocument = FollowUp & Document
+export type FollowUpDocument = FollowUp & Document;
 
 @Schema({ timestamps: true })
 export class FollowUp {
-  @Prop({ required: true, type: MongooseSchema.Types.ObjectId, ref: 'InterviewSession' })
-  sessionId!: Types.ObjectId
+  @Prop({
+    required: true,
+    type: MongooseSchema.Types.ObjectId,
+    ref: 'InterviewSession',
+  })
+  sessionId!: Types.ObjectId;
 
   @Prop({ required: true, type: MongooseSchema.Types.ObjectId, ref: 'User' })
-  userId!: Types.ObjectId
+  userId!: Types.ObjectId;
 
   @Prop()
-  recipientName?: string
+  recipientName?: string;
 
   @Prop()
-  recipientTitle?: string
+  recipientTitle?: string;
 
   @Prop()
-  companyName?: string
+  companyName?: string;
 
   @Prop()
-  role?: string
+  role?: string;
 
   @Prop({ default: 'draft' })
-  status!: 'draft' | 'generated' | 'edited' | 'sent' | 'replied'
+  status!: 'draft' | 'generated' | 'edited' | 'sent' | 'replied';
 
   @Prop()
-  draftContent?: string
+  draftContent?: string;
 
   @Prop()
-  sentContent?: string
+  sentContent?: string;
 
   @Prop()
-  generatedAt?: Date
+  generatedAt?: Date;
 
   @Prop()
-  sentAt?: Date
+  sentAt?: Date;
 
   @Prop()
-  repliedAt?: Date
+  repliedAt?: Date;
 
   @Prop()
-  replyContent?: string
+  replyContent?: string;
 }
 
-export const FollowUpSchema = SchemaFactory.createForClass(FollowUp)
+export const FollowUpSchema = SchemaFactory.createForClass(FollowUp);

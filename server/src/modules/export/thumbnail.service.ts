@@ -5,7 +5,8 @@ import * as path from 'node:path';
 
 const SAMPLE_DATA = {
   name: 'Alex Johnson',
-  summary: 'Experienced software engineer with expertise in React, Node.js, and cloud architecture.',
+  summary:
+    'Experienced software engineer with expertise in React, Node.js, and cloud architecture.',
   contact: {
     email: 'alex@example.com',
     phone: '(555) 123-4567',
@@ -63,26 +64,73 @@ const SAMPLE_DATA = {
     { title: 'GitHub', url: 'github.com/alexjohnson' },
     { title: 'LinkedIn', url: 'linkedin.com/in/alexjohnson' },
   ],
-  sectionOrder: ['summary', 'experience', 'education', 'skills', 'certifications', 'languages', 'links'],
-}
+  sectionOrder: [
+    'summary',
+    'experience',
+    'education',
+    'skills',
+    'certifications',
+    'languages',
+    'links',
+  ],
+};
 
 @Injectable()
 export class ThumbnailService {
   private readonly logger = new Logger(ThumbnailService.name);
 
-  async generateAll(clientUrl: string = 'http://localhost:5173'): Promise<string[]> {
-    const browser = await chromium.launch({ channel: 'chromium', headless: true });
-    const page = await browser.newPage({ viewport: { width: 800, height: 1100 } });
+  async generateAll(
+    clientUrl: string = 'http://localhost:5173',
+  ): Promise<string[]> {
+    const browser = await chromium.launch({
+      channel: 'chromium',
+      headless: true,
+    });
+    const page = await browser.newPage({
+      viewport: { width: 800, height: 1100 },
+    });
 
     const templateIds = [
-      'ledger', 'meridian', 'foundry', 'almanac', 'bureau', 'ironclad', 'northline', 'plainscript',
-      'halcyon', 'driftwood', 'paperwhite', 'fieldnote', 'vellum',
-      'meridian-split', 'compass', 'skyline', 'atlas', 'harbor',
-      'boardroom', 'summit', 'chairman', 'monarch', 'statesman',
-      'prism', 'canvas-bold', 'studio', 'palette', 'kinetic',
-      'terminal', 'commit', 'syntax', 'kernel', 'stack',
-      'thesis', 'faculty', 'curriculum', 'archive',
-      'portrait', 'frame', 'profile-card',
+      'ledger',
+      'meridian',
+      'foundry',
+      'almanac',
+      'bureau',
+      'ironclad',
+      'northline',
+      'plainscript',
+      'halcyon',
+      'driftwood',
+      'paperwhite',
+      'fieldnote',
+      'vellum',
+      'meridian-split',
+      'compass',
+      'skyline',
+      'atlas',
+      'harbor',
+      'boardroom',
+      'summit',
+      'chairman',
+      'monarch',
+      'statesman',
+      'prism',
+      'canvas-bold',
+      'studio',
+      'palette',
+      'kinetic',
+      'terminal',
+      'commit',
+      'syntax',
+      'kernel',
+      'stack',
+      'thesis',
+      'faculty',
+      'curriculum',
+      'archive',
+      'portrait',
+      'frame',
+      'profile-card',
     ];
 
     const outputDir = path.join(process.cwd(), 'public', 'thumbnails');

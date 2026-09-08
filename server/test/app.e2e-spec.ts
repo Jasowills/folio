@@ -113,15 +113,11 @@ describe('Folio API (e2e)', () => {
 
   describe('Auth endpoints', () => {
     it('returns 401 for token refresh without cookie', () => {
-      return request(app.getHttpServer())
-        .post('/api/auth/refresh')
-        .expect(401);
+      return request(app.getHttpServer()).post('/api/auth/refresh').expect(401);
     });
 
     it('returns 401 for logout without token', () => {
-      return request(app.getHttpServer())
-        .post('/api/auth/logout')
-        .expect(401);
+      return request(app.getHttpServer()).post('/api/auth/logout').expect(401);
     });
   });
 

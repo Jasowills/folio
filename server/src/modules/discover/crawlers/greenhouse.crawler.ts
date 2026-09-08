@@ -50,7 +50,10 @@ const GREENHOUSE_COMPANIES: GreenhouseCompany[] = [
   { name: 'Anthropic', boardUrl: 'https://boards.greenhouse.io/anthropic' },
   { name: 'OpenAI', boardUrl: 'https://boards.greenhouse.io/openai' },
   { name: 'Perplexity', boardUrl: 'https://boards.greenhouse.io/perplexity' },
-  { name: 'Hugging Face', boardUrl: 'https://boards.greenhouse.io/huggingface' },
+  {
+    name: 'Hugging Face',
+    boardUrl: 'https://boards.greenhouse.io/huggingface',
+  },
   { name: 'Replicate', boardUrl: 'https://boards.greenhouse.io/replicate' },
   { name: 'Modal', boardUrl: 'https://boards.greenhouse.io/modal' },
   { name: 'Airtable', boardUrl: 'https://boards.greenhouse.io/airtable' },
@@ -82,18 +85,26 @@ export class GreenhouseCrawler extends BaseCrawler {
     return allJobs;
   }
 
-  private extractJobsFromBoard(html: string, company: GreenhouseCompany): RawJob[] {
+  private extractJobsFromBoard(
+    html: string,
+    company: GreenhouseCompany,
+  ): RawJob[] {
     const jobs: RawJob[] = [];
-    const jobRegex = /<a[^>]*href=["']([^"']+\/jobs\/\d+)["'][^>]*>([\s\S]*?)<\/a>/gi;
+    const jobRegex =
+      /<a[^>]*href=["']([^"']+\/jobs\/\d+)["'][^>]*>([\s\S]*?)<\/a>/gi;
     let match: RegExpExecArray | null;
     const seenIds = new Set<string>();
 
     while ((match = jobRegex.exec(html)) !== null) {
       const url = match[1];
       const inner = match[2];
-      const titleMatch = inner.match(/<span[^>]*class=["'][^"']*(?:title|job-title)["'][^>]*>([^<]+)<\/span>/i)
-        || inner.match(/([^<>\n]+?)\s*<br/i);
-      const locationMatch = inner.match(/<span[^>]*class=["'][^"']*location["'][^>]*>([^<]+)<\/span>/i);
+      const titleMatch =
+        inner.match(
+          /<span[^>]*class=["'][^"']*(?:title|job-title)["'][^>]*>([^<]+)<\/span>/i,
+        ) || inner.match(/([^<>\n]+?)\s*<br/i);
+      const locationMatch = inner.match(
+        /<span[^>]*class=["'][^"']*location["'][^>]*>([^<]+)<\/span>/i,
+      );
       const title = titleMatch ? titleMatch[1].trim() : '';
       if (!title) continue;
 
@@ -107,10 +118,14 @@ export class GreenhouseCrawler extends BaseCrawler {
         roleTitle: title,
         companyName: company.name,
         location: locationMatch ? locationMatch[1].trim() : null,
-        isRemote: locationMatch ? locationMatch[1].toLowerCase().includes('remote') : false,
+        isRemote: locationMatch
+          ? locationMatch[1].toLowerCase().includes('remote')
+          : false,
         postedAt: null,
         descriptionRaw: '',
-        applicationUrl: url.startsWith('http') ? url : `${company.boardUrl}${url}`,
+        applicationUrl: url.startsWith('http')
+          ? url
+          : `${company.boardUrl}${url}`,
         isVerified: true,
       });
     }

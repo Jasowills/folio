@@ -29,7 +29,12 @@ export class AllExceptionsFilter implements ExceptionFilter {
   }
 
   catch(exception: unknown, host: ArgumentsHost) {
-    console.error('[ExceptionFilter]', exception instanceof Error ? exception.stack || exception.message : exception);
+    console.error(
+      '[ExceptionFilter]',
+      exception instanceof Error
+        ? exception.stack || exception.message
+        : exception,
+    );
     const ctx = host.switchToHttp();
     const response = ctx.getResponse<Response>();
 

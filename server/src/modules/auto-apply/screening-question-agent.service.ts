@@ -2,7 +2,10 @@ import { Injectable, Logger } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { AiService } from '../ai/ai.service';
-import { AnswersBankEntry, AnswersBankDocument } from './schemas/answers-bank.schema';
+import {
+  AnswersBankEntry,
+  AnswersBankDocument,
+} from './schemas/answers-bank.schema';
 import { AutoApplyProfileService } from '../auto-apply-profile/auto-apply-profile.service';
 import type { AutoApplyProfileDocument } from '../auto-apply-profile/auto-apply-profile.schema';
 
@@ -62,7 +65,8 @@ export class ScreeningQuestionAgent {
   private readonly logger = new Logger(ScreeningQuestionAgent.name);
 
   constructor(
-    @InjectModel(AnswersBankEntry.name) private answersBankModel: Model<AnswersBankDocument>,
+    @InjectModel(AnswersBankEntry.name)
+    private answersBankModel: Model<AnswersBankDocument>,
     private aiService: AiService,
     private profileService: AutoApplyProfileService,
   ) {}
@@ -78,7 +82,13 @@ export class ScreeningQuestionAgent {
 
     for (let i = 0; i < questions.length; i++) {
       const q = questions[i];
-      const answer = await this.resolveQuestion(userId, q.question, q.inputType, context, profile);
+      const answer = await this.resolveQuestion(
+        userId,
+        q.question,
+        q.inputType,
+        context,
+        profile,
+      );
       results[i] = answer;
     }
 
@@ -92,7 +102,10 @@ export class ScreeningQuestionAgent {
     context: ScreeningContext,
     profile: AutoApplyProfileDocument,
   ): Promise<AnsweredQuestion> {
-    const normalized = question.toLowerCase().replace(/[^\w\s]/g, '').trim();
+    const normalized = question
+      .toLowerCase()
+      .replace(/[^\w\s]/g, '')
+      .trim();
 
     // Tier 1: Custom Q&A bank from profile
     const customMatch = this.findCustomQaMatch(normalized, profile);
@@ -107,13 +120,23 @@ export class ScreeningQuestionAgent {
     // Tier 2: Logistics answers from profile (structured field mapping)
     const logisticsAnswer = this.mapToLogistics(question, profile);
     if (logisticsAnswer) {
-      return { question, answer: logisticsAnswer, source: 'logistics', category: this.inferCategory(question) };
+      return {
+        question,
+        answer: logisticsAnswer,
+        source: 'logistics',
+        category: this.inferCategory(question),
+      };
     }
 
     // Tier 3: Existing answers bank cache
     const cached = await this.findCachedAnswer(userId, normalized);
     if (cached) {
-      return { question, answer: cached.answer, source: 'cache', category: cached.category };
+      return {
+        question,
+        answer: cached.answer,
+        source: 'cache',
+        category: cached.category,
+      };
     }
 
     // Tier 4: LLM generation
@@ -123,13 +146,21 @@ export class ScreeningQuestionAgent {
     return { question, answer, source: 'ai', category };
   }
 
-  private findCustomQaMatch(normalized: string, profile: AutoApplyProfileDocument): (typeof profile.customQA)[0] | null {
+  private findCustomQaMatch(
+    normalized: string,
+    profile: AutoApplyProfileDocument,
+  ): (typeof profile.customQA)[0] | null {
     const words = normalized.split(/\s+/).filter((w) => w.length > 3);
     if (words.length === 0) return null;
 
     for (const entry of profile.customQA) {
-      const patternWords = entry.questionPattern.toLowerCase().split(/\s+/).filter((w) => w.length > 3);
-      const matchCount = patternWords.filter((pw) => words.some((w) => w.includes(pw) || pw.includes(w))).length;
+      const patternWords = entry.questionPattern
+        .toLowerCase()
+        .split(/\s+/)
+        .filter((w) => w.length > 3);
+      const matchCount = patternWords.filter((pw) =>
+        words.some((w) => w.includes(pw) || pw.includes(w)),
+      ).length;
       if (patternWords.length > 0 && matchCount / patternWords.length >= 0.6) {
         return entry;
       }
@@ -144,7 +175,10 @@ export class ScreeningQuestionAgent {
       .replace(/\{\{name\}\}/g, context.resumeData.name || '');
   }
 
-  private mapToLogistics(question: string, profile: AutoApplyProfileDocument): string | null {
+  private mapToLogistics(
+    question: string,
+    profile: AutoApplyProfileDocument,
+  ): string | null {
     const lower = question.toLowerCase();
     const l = profile.logisticsAnswers as any;
 
@@ -160,11 +194,20 @@ export class ScreeningQuestionAgent {
       return labels[l.availabilityToStart] || 'Flexible';
     }
 
-    if (/\b(visa|sponsor)\b/.test(lower) && !/\b(work.uthor|citizen)\b/.test(lower)) {
-      return l.visaSponsorshipNeeded ? 'Yes, I will require visa sponsorship' : 'No, I do not require visa sponsorship';
+    if (
+      /\b(visa|sponsor)\b/.test(lower) &&
+      !/\b(work.uthor|citizen)\b/.test(lower)
+    ) {
+      return l.visaSponsorshipNeeded
+        ? 'Yes, I will require visa sponsorship'
+        : 'No, I do not require visa sponsorship';
     }
 
-    if (/\b(work.uthorization|authorized|citizenship|right.to.work|work.permit|status)\b/.test(lower)) {
+    if (
+      /\b(work.uthorization|authorized|citizenship|right.to.work|work.permit|status)\b/.test(
+        lower,
+      )
+    ) {
       return l.workAuthorizationStatus || 'Authorized to work';
     }
 
@@ -179,12 +222,18 @@ export class ScreeningQuestionAgent {
 
     if (/\b(relocate|relocation|moving)\b/.test(lower)) {
       if (l.willingToRelocate) {
-        return l.relocationNotes ? `Yes, willing to relocate. ${l.relocationNotes}` : 'Yes, willing to relocate';
+        return l.relocationNotes
+          ? `Yes, willing to relocate. ${l.relocationNotes}`
+          : 'Yes, willing to relocate';
       }
       return 'Not willing to relocate at this time';
     }
 
-    if (/\b(remote|onsite|hybrid|location preference|work arrangement)\b/.test(lower)) {
+    if (
+      /\b(remote|onsite|hybrid|location preference|work arrangement)\b/.test(
+        lower,
+      )
+    ) {
       const labels: Record<string, string> = {
         remote_only: 'Remote only',
         hybrid_ok: 'Hybrid or remote',
@@ -194,22 +243,32 @@ export class ScreeningQuestionAgent {
       return labels[l.remotePreference] || 'Flexible';
     }
 
-    if (/\b(notice period|notice|handover|transition)\b/.test(lower) && !/\b(start|available|when)\b/.test(lower)) {
+    if (
+      /\b(notice period|notice|handover|transition)\b/.test(lower) &&
+      !/\b(start|available|when)\b/.test(lower)
+    ) {
       return l.noticePeriod || 'Standard notice period applies';
     }
 
     if (/\b(non.?compete|noncompete|restrictive.covenant)\b/.test(lower)) {
-      return l.hasNonCompete ? `Yes, subject to a non-compete agreement. ${l.nonCompeteNotes || ''}` : 'No';
+      return l.hasNonCompete
+        ? `Yes, subject to a non-compete agreement. ${l.nonCompeteNotes || ''}`
+        : 'No';
     }
 
     return null;
   }
 
-  private async findCachedAnswer(userId: string, normalized: string): Promise<AnswersBankEntry | null> {
-    return this.answersBankModel.findOne({
-      userId: new Types.ObjectId(userId),
-      normalizedQuestion: { $regex: this.fuzzyPattern(normalized) },
-    }).exec();
+  private async findCachedAnswer(
+    userId: string,
+    normalized: string,
+  ): Promise<AnswersBankEntry | null> {
+    return this.answersBankModel
+      .findOne({
+        userId: new Types.ObjectId(userId),
+        normalizedQuestion: { $regex: this.fuzzyPattern(normalized) },
+      })
+      .exec();
   }
 
   private fuzzyPattern(normalized: string): RegExp {
@@ -223,12 +282,25 @@ export class ScreeningQuestionAgent {
     return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   }
 
-  private async generateAnswer(question: string, context: ScreeningContext, profile: AutoApplyProfileDocument): Promise<string> {
+  private async generateAnswer(
+    question: string,
+    context: ScreeningContext,
+    profile: AutoApplyProfileDocument,
+  ): Promise<string> {
     const userMessage = this.buildPrompt(question, context, profile);
-    return this.aiService.chat(SCREENING_AGENT_SYSTEM, userMessage, undefined, 'text');
+    return this.aiService.chat(
+      SCREENING_AGENT_SYSTEM,
+      userMessage,
+      undefined,
+      'text',
+    );
   }
 
-  private buildPrompt(question: string, context: ScreeningContext, profile: AutoApplyProfileDocument): string {
+  private buildPrompt(
+    question: string,
+    context: ScreeningContext,
+    profile: AutoApplyProfileDocument,
+  ): string {
     const r = context.resumeData;
     const j = context.jobData;
     const p = context.personalization;
@@ -298,21 +370,44 @@ export class ScreeningQuestionAgent {
 
   private inferCategory(question: string): string {
     const lower = question.toLowerCase();
-    if (/\b(visa|sponsorship|work.uthorization|citizenship|permit|status)\b/.test(lower)) return 'visa';
-    if (/\b(salary|pay|compensation|rate|expect|range)\b/.test(lower)) return 'salary';
-    if (/\b(notice|start|available|when can you|immediate)\b/.test(lower)) return 'notice_period';
-    if (/\b(location|relocate|remote|onsite|hybrid|willing to travel)\b/.test(lower)) return 'location';
-    if (/\b(sponsor|sponsorship|visa.transfer|h1b|h-1b|opt|f1)\b/.test(lower)) return 'sponsorship';
+    if (
+      /\b(visa|sponsorship|work.uthorization|citizenship|permit|status)\b/.test(
+        lower,
+      )
+    )
+      return 'visa';
+    if (/\b(salary|pay|compensation|rate|expect|range)\b/.test(lower))
+      return 'salary';
+    if (/\b(notice|start|available|when can you|immediate)\b/.test(lower))
+      return 'notice_period';
+    if (
+      /\b(location|relocate|remote|onsite|hybrid|willing to travel)\b/.test(
+        lower,
+      )
+    )
+      return 'location';
+    if (/\b(sponsor|sponsorship|visa.transfer|h1b|h-1b|opt|f1)\b/.test(lower))
+      return 'sponsorship';
     return 'generic';
   }
 
-  private async saveToBank(userId: string, question: string, answer: string, category: string): Promise<void> {
-    const normalized = question.toLowerCase().replace(/[^\w\s]/g, '').trim();
+  private async saveToBank(
+    userId: string,
+    question: string,
+    answer: string,
+    category: string,
+  ): Promise<void> {
+    const normalized = question
+      .toLowerCase()
+      .replace(/[^\w\s]/g, '')
+      .trim();
     try {
-      const existing = await this.answersBankModel.findOne({
-        userId: new Types.ObjectId(userId),
-        normalizedQuestion: normalized,
-      }).exec();
+      const existing = await this.answersBankModel
+        .findOne({
+          userId: new Types.ObjectId(userId),
+          normalizedQuestion: normalized,
+        })
+        .exec();
       if (existing) {
         existing.answer = answer;
         existing.category = category;
@@ -331,7 +426,10 @@ export class ScreeningQuestionAgent {
         });
       }
     } catch (err) {
-      this.logger.debug('Failed to save answer to bank:', (err as Error).message);
+      this.logger.debug(
+        'Failed to save answer to bank:',
+        (err as Error).message,
+      );
     }
   }
 }

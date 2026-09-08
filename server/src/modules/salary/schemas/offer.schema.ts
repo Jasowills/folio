@@ -1,50 +1,50 @@
-import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose'
-import { Document, Types, Schema as MongooseSchema } from 'mongoose'
+import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
+import { Document, Types, Schema as MongooseSchema } from 'mongoose';
 
-export type OfferDocument = Offer & Document
+export type OfferDocument = Offer & Document;
 
 @Schema({ timestamps: true })
 export class Offer {
   @Prop({ required: true, type: MongooseSchema.Types.ObjectId, ref: 'User' })
-  userId!: Types.ObjectId
+  userId!: Types.ObjectId;
 
   @Prop({ required: true })
-  companyName!: string
+  companyName!: string;
 
   @Prop({ required: true })
-  roleTitle!: string
+  roleTitle!: string;
 
   @Prop()
-  location?: string
+  location?: string;
 
   @Prop()
-  baseSalary?: number
+  baseSalary?: number;
 
   @Prop()
-  equityValue?: number
+  equityValue?: number;
 
   @Prop()
-  bonusPercent?: number
+  bonusPercent?: number;
 
   @Prop({ type: [String] })
-  benefits?: string[]
+  benefits?: string[];
 
   @Prop({ type: Object })
-  otherTerms?: Record<string, unknown>
+  otherTerms?: Record<string, unknown>;
 
   @Prop()
-  deadline?: Date
+  deadline?: Date;
 
   @Prop({ default: 'pending' })
-  status!: 'pending' | 'negotiating' | 'accepted' | 'declined'
+  status!: 'pending' | 'negotiating' | 'accepted' | 'declined';
 
   @Prop({ default: 0 })
-  targetBaseSalary?: number
+  targetBaseSalary?: number;
 
   @Prop()
-  notes?: string
+  notes?: string;
 }
 
-export const OfferSchema = SchemaFactory.createForClass(Offer)
+export const OfferSchema = SchemaFactory.createForClass(Offer);
 
-OfferSchema.index({ userId: 1, status: 1 })
+OfferSchema.index({ userId: 1, status: 1 });

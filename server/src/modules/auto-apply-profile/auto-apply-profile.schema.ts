@@ -4,7 +4,10 @@ import { Document, Types } from 'mongoose';
 export type AutoApplyProfileDocument = AutoApplyProfile & Document;
 
 class LogisticsAnswers {
-  @Prop({ required: true, enum: ['immediately', 'two_weeks', 'one_month', 'custom'] })
+  @Prop({
+    required: true,
+    enum: ['immediately', 'two_weeks', 'one_month', 'custom'],
+  })
   availabilityToStart: string;
 
   @Prop()
@@ -31,7 +34,10 @@ class LogisticsAnswers {
   @Prop({ default: 'USD' })
   salaryCurrency: string;
 
-  @Prop({ required: true, enum: ['remote_only', 'hybrid_ok', 'onsite_ok', 'flexible'] })
+  @Prop({
+    required: true,
+    enum: ['remote_only', 'hybrid_ok', 'onsite_ok', 'flexible'],
+  })
   remotePreference: string;
 
   @Prop()
@@ -59,7 +65,10 @@ class CustomAnswerEntry {
 }
 
 class ApplicationStyle {
-  @Prop({ required: true, enum: ['formal', 'professional_warm', 'concise_direct', 'enthusiastic'] })
+  @Prop({
+    required: true,
+    enum: ['formal', 'professional_warm', 'concise_direct', 'enthusiastic'],
+  })
   tone: string;
 
   @Prop({ required: true, enum: ['brief', 'standard', 'detailed'] })
@@ -99,4 +108,5 @@ export class AutoApplyProfile {
   wizardStep: number;
 }
 
-export const AutoApplyProfileSchema = SchemaFactory.createForClass(AutoApplyProfile);
+export const AutoApplyProfileSchema =
+  SchemaFactory.createForClass(AutoApplyProfile);

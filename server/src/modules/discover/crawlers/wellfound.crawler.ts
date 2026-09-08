@@ -16,7 +16,7 @@ export class WellfoundCrawler extends BaseCrawler {
         this.logger.warn(`Wellfound/AngelList API returned ${response.status}`);
         return jobs;
       }
-      const data = await response.json() as any;
+      const data = await response.json();
       const list = data.jobs || [];
       if (!Array.isArray(list)) {
         this.logger.warn('Wellfound API returned unexpected format');

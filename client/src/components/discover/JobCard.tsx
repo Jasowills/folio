@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { useTrackJob, useDismissJob, useApplyOdds, type DismissReason } from '../../lib/queries'
-import { cn, decodeHtml, extractUrl } from '../../lib/utils'
-import { IconX, IconBookmark, IconBookmarkFilled, IconExternalLink } from '@tabler/icons-react'
+import { cn, decodeHtml } from '../../lib/utils'
+import { IconX, IconBookmark, IconBookmarkFilled } from '@tabler/icons-react'
 
 interface JobCardProps {
   job: any

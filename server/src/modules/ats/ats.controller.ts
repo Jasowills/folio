@@ -53,10 +53,7 @@ export class AtsController {
 
   @Get(':id')
   @ApiOperation({ summary: 'Get ATS score by id' })
-  async get(
-    @Param('id') id: string,
-    @CurrentUser() user: UserDocument,
-  ) {
+  async get(@Param('id') id: string, @CurrentUser() user: UserDocument) {
     return this.atsService.getById(id, user._id.toString());
   }
 }

@@ -11,7 +11,20 @@ export class HNCrawler extends BaseCrawler {
       const now = new Date();
       const year = now.getFullYear();
       const month = now.getMonth();
-      const monthNames = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+      const monthNames = [
+        'January',
+        'February',
+        'March',
+        'April',
+        'May',
+        'June',
+        'July',
+        'August',
+        'September',
+        'October',
+        'November',
+        'December',
+      ];
 
       const threadTitle = `Ask HN: Who is hiring? (${monthNames[month]} ${year})`;
       const searchUrl = `https://hn.algolia.com/api/v1/search?query=${encodeURIComponent(threadTitle)}&tags=story`;
@@ -61,7 +74,16 @@ export class HNCrawler extends BaseCrawler {
     return jobs;
   }
 
-  private parseComment(firstLine: string, fullText: string): { company: string; role: string; location?: string; isRemote: boolean; url?: string } | null {
+  private parseComment(
+    firstLine: string,
+    fullText: string,
+  ): {
+    company: string;
+    role: string;
+    location?: string;
+    isRemote: boolean;
+    url?: string;
+  } | null {
     const cleaned = firstLine.replace(/^\d+\.\s*/, '').trim();
 
     const pipeMatch = cleaned.match(/^([^|]+)\|([^|]+?)(?:\|(.+))?$/);
@@ -69,8 +91,11 @@ export class HNCrawler extends BaseCrawler {
       const company = pipeMatch[1].trim();
       const role = pipeMatch[2].trim();
       const rest = pipeMatch[3]?.trim();
-      const isRemote = (rest || '').toLowerCase().includes('remote') || cleaned.toLowerCase().includes('remote');
-      const location = rest && !isRemote ? rest.replace(/\([^)]*\)/g, '').trim() : undefined;
+      const isRemote =
+        (rest || '').toLowerCase().includes('remote') ||
+        cleaned.toLowerCase().includes('remote');
+      const location =
+        rest && !isRemote ? rest.replace(/\([^)]*\)/g, '').trim() : undefined;
 
       const urlMatch = fullText.match(/(https?:\/\/[^\s,)]+)/);
       return { company, role, location, isRemote, url: urlMatch?.[1] };
@@ -83,7 +108,8 @@ export class HNCrawler extends BaseCrawler {
       const locationMatch = rest.match(/\(([^)]+)\)/);
       const role = locationMatch ? rest.replace(/\([^)]+\)/, '').trim() : rest;
       const isRemote = cleaned.toLowerCase().includes('remote');
-      const location = locationMatch && !isRemote ? locationMatch[1] : undefined;
+      const location =
+        locationMatch && !isRemote ? locationMatch[1] : undefined;
 
       const urlMatch = fullText.match(/(https?:\/\/[^\s,)]+)/);
       return { company, role, location, isRemote, url: urlMatch?.[1] };

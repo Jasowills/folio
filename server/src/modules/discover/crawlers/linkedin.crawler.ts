@@ -25,11 +25,15 @@ export class LinkedInCrawler extends BaseCrawler {
         proxy: { server: proxyUrl },
       });
       const page = await browser.newPage();
-      await page.setUserAgent('Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
+      await page.setUserAgent(
+        'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+      );
       await page.goto(searchUrl, { waitUntil: 'networkidle', timeout: 30000 });
       await page.waitForTimeout(3000);
 
-      const jobCards = await page.$$('[class*="job-card"], [data-job-id], [class*="occludable-update"]');
+      const jobCards = await page.$$(
+        '[class*="job-card"], [data-job-id], [class*="occludable-update"]',
+      );
       const seen = new Set<string>();
 
       for (const card of jobCards.slice(0, 25)) {
@@ -41,7 +45,14 @@ export class LinkedInCrawler extends BaseCrawler {
           const lines = text.split('\n').filter((l) => l.trim());
           const title = lines[0] || '';
           const company = lines[1] || '';
-          const locationLine = lines.find((l) => l.includes(',') || l.match(/\b(Remote|United States|United Kingdom|Canada|Germany|France|Australia|India|Singapore|Japan|Netherlands|Ireland|Sweden|Denmark|Norway|Finland|Spain|Italy|Switzerland|Brazil|Mexico)\b/)) || null;
+          const locationLine =
+            lines.find(
+              (l) =>
+                l.includes(',') ||
+                l.match(
+                  /\b(Remote|United States|United Kingdom|Canada|Germany|France|Australia|India|Singapore|Japan|Netherlands|Ireland|Sweden|Denmark|Norway|Finland|Spain|Italy|Switzerland|Brazil|Mexico)\b/,
+                ),
+            ) || null;
           const isRemote = text.toLowerCase().includes('remote');
 
           if (!title || !company) continue;
@@ -49,8 +60,12 @@ export class LinkedInCrawler extends BaseCrawler {
           if (seen.has(key)) continue;
           seen.add(key);
 
-          const postedMatch = text.match(/(\d+)\s+(hour|day|week|minute|month)s?\s+ago/i);
-          const postedAt = postedMatch ? this.parseRelativeTime(parseInt(postedMatch[1]), postedMatch[2]) : new Date();
+          const postedMatch = text.match(
+            /(\d+)\s+(hour|day|week|minute|month)s?\s+ago/i,
+          );
+          const postedAt = postedMatch
+            ? this.parseRelativeTime(parseInt(postedMatch[1]), postedMatch[2])
+            : new Date();
 
           jobs.push({
             source: 'linkedin',
@@ -79,11 +94,20 @@ export class LinkedInCrawler extends BaseCrawler {
   private parseRelativeTime(amount: number, unit: string): Date {
     const now = Date.now();
     switch (unit.toLowerCase()) {
-      case 'minute': case 'minutes': return new Date(now - amount * 60000);
-      case 'hour': case 'hours': return new Date(now - amount * 3600000);
-      case 'day': case 'days': return new Date(now - amount * 86400000);
-      case 'week': case 'weeks': return new Date(now - amount * 604800000);
-      default: return new Date();
+      case 'minute':
+      case 'minutes':
+        return new Date(now - amount * 60000);
+      case 'hour':
+      case 'hours':
+        return new Date(now - amount * 3600000);
+      case 'day':
+      case 'days':
+        return new Date(now - amount * 86400000);
+      case 'week':
+      case 'weeks':
+        return new Date(now - amount * 604800000);
+      default:
+        return new Date();
     }
   }
 }

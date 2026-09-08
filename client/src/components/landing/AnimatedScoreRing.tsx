@@ -13,7 +13,7 @@ export default function AnimatedScoreRing({
   score,
   size = 88,
   strokeWidth = 6,
-  color = '#0F6E56',
+  color = '#4F46E5',
   label,
 }: ScoreRingProps) {
   const ref = useRef(null)
@@ -29,7 +29,7 @@ export default function AnimatedScoreRing({
           cx={size / 2}
           cy={size / 2}
           r={radius}
-          stroke="#E5E0D8"
+          stroke="#E2E8F0"
           strokeWidth={strokeWidth}
           fill="none"
         />

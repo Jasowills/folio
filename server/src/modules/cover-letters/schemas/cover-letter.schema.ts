@@ -20,7 +20,10 @@ export class CoverLetter {
   @Prop()
   jobDescription?: string;
 
-  @Prop({ default: 'professional', enum: ['professional', 'confident', 'creative'] })
+  @Prop({
+    default: 'professional',
+    enum: ['professional', 'confident', 'creative'],
+  })
   tone!: string;
 
   @Prop()

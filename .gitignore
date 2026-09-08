@@ -10,3 +10,6 @@ dist/
 coverage/
 .vercel
 .env*
+.crewel/
+adversary-results/
+adversary-*.mjs

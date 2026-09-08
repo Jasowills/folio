@@ -21,19 +21,37 @@ export class JobApplication {
   @Prop({ required: true, type: MongooseSchema.Types.ObjectId, ref: 'User' })
   userId!: Types.ObjectId;
 
-  @Prop({ required: true, type: MongooseSchema.Types.ObjectId, ref: 'JobListing' })
+  @Prop({
+    required: true,
+    type: MongooseSchema.Types.ObjectId,
+    ref: 'JobListing',
+  })
   jobListingId!: Types.ObjectId;
 
   @Prop({ required: true, type: MongooseSchema.Types.ObjectId, ref: 'Resume' })
   resumeId!: Types.ObjectId;
 
-  @Prop({ required: true, enum: [
-    'saved', 'tailoring', 'approved', 'filling',
-    'ready_for_review', 'submitted', 'failed',
-    'applied', 'phone_screen',
-    'technical', 'final_round', 'offer', 'accepted',
-    'rejected', 'ghosted',
-  ], default: 'saved' })
+  @Prop({
+    required: true,
+    enum: [
+      'saved',
+      'tailoring',
+      'approved',
+      'filling',
+      'ready_for_review',
+      'submitted',
+      'failed',
+      'applied',
+      'phone_screen',
+      'technical',
+      'final_round',
+      'offer',
+      'accepted',
+      'rejected',
+      'ghosted',
+    ],
+    default: 'saved',
+  })
   stage!: string;
 
   @Prop()
@@ -57,13 +75,16 @@ export class JobApplication {
   @Prop({ type: String, default: '' })
   notes!: string;
 
-  @Prop({ type: Object, default: {
-    resumeTailored: false,
-    coverLetterGenerated: false,
-    companyResearched: false,
-    interviewPracticed: false,
-    followUpSent: false,
-  }})
+  @Prop({
+    type: Object,
+    default: {
+      resumeTailored: false,
+      coverLetterGenerated: false,
+      companyResearched: false,
+      interviewPracticed: false,
+      followUpSent: false,
+    },
+  })
   checklistState!: ChecklistState;
 
   @Prop({ type: [{ action: String, timestamp: Date }], default: [] })
@@ -76,7 +97,8 @@ export class JobApplication {
   isDeleted?: boolean;
 }
 
-export const JobApplicationSchema = SchemaFactory.createForClass(JobApplication);
+export const JobApplicationSchema =
+  SchemaFactory.createForClass(JobApplication);
 
 JobApplicationSchema.index({ userId: 1, stage: 1 });
 JobApplicationSchema.index({ userId: 1, jobListingId: 1 }, { unique: true });

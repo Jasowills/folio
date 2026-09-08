@@ -16,7 +16,7 @@ export class TwitterCrawler extends BaseCrawler {
 
     const roleQuery = targetRole || 'software engineer';
     const query = encodeURIComponent(
-      `("we're hiring" OR "now hiring" OR "join our team") ${roleQuery} -filter:retweets lang:en`
+      `("we're hiring" OR "now hiring" OR "join our team") ${roleQuery} -filter:retweets lang:en`,
     );
 
     try {
@@ -26,7 +26,7 @@ export class TwitterCrawler extends BaseCrawler {
           headers: {
             Authorization: `Bearer ${bearerToken}`,
           },
-        }
+        },
       );
       if (!response.ok) {
         this.logger.warn(`Twitter API returned ${response.status}`);
@@ -34,10 +34,13 @@ export class TwitterCrawler extends BaseCrawler {
       }
       const data = await response.json();
       const tweets = data.data || [];
-      const users = (data.includes?.users || []).reduce((acc: Record<string, string>, u: any) => {
-        acc[u.id] = u.name;
-        return acc;
-      }, {});
+      const users = (data.includes?.users || []).reduce(
+        (acc: Record<string, string>, u: any) => {
+          acc[u.id] = u.name;
+          return acc;
+        },
+        {},
+      );
 
       const seen = new Set<string>();
       for (const tweet of tweets) {
@@ -71,10 +74,21 @@ export class TwitterCrawler extends BaseCrawler {
     return jobs;
   }
 
-  private parseTweet(text: string, authorName: string): { company: string; role: string; location?: string; isRemote: boolean; url?: string } | null {
+  private parseTweet(
+    text: string,
+    authorName: string,
+  ): {
+    company: string;
+    role: string;
+    location?: string;
+    isRemote: boolean;
+    url?: string;
+  } | null {
     const urlMatch = text.match(/(https?:\/\/[^\s,)]+)/);
     const isRemote = text.toLowerCase().includes('remote');
-    const locationMatch = text.match(/\b(in|at|for)\s+([A-Z][A-Za-z\s]+?)(?:,\s*([A-Z]{2}))?(?:\s*[.!]|$)/);
+    const locationMatch = text.match(
+      /\b(in|at|for)\s+([A-Z][A-Za-z\s]+?)(?:,\s*([A-Z]{2}))?(?:\s*[.!]|$)/,
+    );
 
     const rolePatterns = [
       /(?:hiring|looking for|seeking|hired)\s+(?:a|an|a\s+remote)?\s*([A-Za-z][A-Za-z\s\/]+?(?:Engineer|Designer|Developer|Manager|Lead|Architect|Scientist|Analyst|Coordinator|Specialist|Director|Head|VP|Intern))/i,
@@ -83,13 +97,21 @@ export class TwitterCrawler extends BaseCrawler {
     let role: string | null = null;
     for (const pattern of rolePatterns) {
       const m = text.match(pattern);
-      if (m) { role = m[1].trim(); break; }
+      if (m) {
+        role = m[1].trim();
+        break;
+      }
     }
 
     const company = authorName;
 
     if (!role) return null;
 
-    return { company: company.replace(/\b(Inc|LLC|Ltd|Corp)\.?$/i, '').trim(), role, isRemote, url: urlMatch?.[1] };
+    return {
+      company: company.replace(/\b(Inc|LLC|Ltd|Corp)\.?$/i, '').trim(),
+      role,
+      isRemote,
+      url: urlMatch?.[1],
+    };
   }
 }

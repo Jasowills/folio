@@ -66,7 +66,7 @@ export default function FollowUpPanel({ sessionId }: Props) {
     <div className="space-y-3">
       <div className="flex items-center justify-between">
         <h3 className="text-sm font-semibold text-ink">Follow-Up</h3>
-        <span className={`text-[11px] px-2 py-0.5 rounded-full ${active.status === 'sent' ? 'bg-success-light text-success' : active.status === 'edited' ? 'bg-warning-light text-warning' : 'bg-muted/10 text-muted'}`}>
+        <span className={`text-[11px] px-2 py-0.5 rounded-full ${active.status === 'edited' ? 'bg-warning-light text-warning' : 'bg-muted/10 text-muted'}`}>
           {active.status}
         </span>
       </div>

@@ -1,8 +1,16 @@
-import { Injectable, NotFoundException, BadRequestException, Logger } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+  Logger,
+} from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { Resume, ResumeDocument } from './schemas/resume.schema';
-import { GuestResult, GuestResultDocument } from './schemas/guest-result.schema';
+import {
+  GuestResult,
+  GuestResultDocument,
+} from './schemas/guest-result.schema';
 import { AiService } from '../ai/ai.service';
 import { ResumeParserService, ParsedResume } from './resume-parser.service';
 import {
@@ -28,12 +36,16 @@ export class ResumesService {
 
   constructor(
     @InjectModel(Resume.name) private resumeModel: Model<ResumeDocument>,
-    @InjectModel(GuestResult.name) private guestResultModel: Model<GuestResultDocument>,
+    @InjectModel(GuestResult.name)
+    private guestResultModel: Model<GuestResultDocument>,
     private aiService: AiService,
     private resumeParser: ResumeParserService,
   ) {}
 
-  async setGuestResult(token: string, data: Record<string, unknown>): Promise<void> {
+  async setGuestResult(
+    token: string,
+    data: Record<string, unknown>,
+  ): Promise<void> {
     await this.guestResultModel.findOneAndUpdate(
       { token },
       { token, data, expiresAt: new Date(Date.now() + this.GUEST_TTL_MS) },
@@ -48,7 +60,7 @@ export class ResumesService {
       await this.guestResultModel.deleteOne({ token });
       return null;
     }
-    return entry.data as Record<string, unknown>;
+    return entry.data;
   }
 
   async create(userId: string): Promise<ResumeDocument> {
@@ -98,10 +110,14 @@ export class ResumesService {
     if (cloudinaryPublicId) resume.cloudinaryPublicId = cloudinaryPublicId;
 
     let parsed = await this.resumeParser.parse(rawText);
-    this.logger.log(`uploadFile: rule-based parse done — name="${parsed.name}", exp=${parsed.experience.length}, edu=${parsed.education.length}, skills=${parsed.skills.length}, certs=${parsed.certifications.length}, langs=${parsed.languages.length}, confidence=${parsed.confidence}`);
+    this.logger.log(
+      `uploadFile: rule-based parse done — name="${parsed.name}", exp=${parsed.experience.length}, edu=${parsed.education.length}, skills=${parsed.skills.length}, certs=${parsed.certifications.length}, langs=${parsed.languages.length}, confidence=${parsed.confidence}`,
+    );
 
     parsed = await this.enrichWithAi(parsed, rawText);
-    this.logger.log(`uploadFile: after AI enrichment — name="${parsed.name}", exp=${parsed.experience.length}, edu=${parsed.education.length}, skills=${parsed.skills.length}`);
+    this.logger.log(
+      `uploadFile: after AI enrichment — name="${parsed.name}", exp=${parsed.experience.length}, edu=${parsed.education.length}, skills=${parsed.skills.length}`,
+    );
 
     resume.set({
       name: parsed.name,
@@ -119,18 +135,19 @@ export class ResumesService {
     return resume.save();
   }
 
-  async analyzeResume(
-    id: string,
-    userId: string,
-  ): Promise<ResumeDocument> {
+  async analyzeResume(id: string, userId: string): Promise<ResumeDocument> {
     const resume = await this.findById(id, userId);
     const rawText = resume.rawText || '';
 
     let parsed = await this.resumeParser.parse(rawText);
-    this.logger.log(`analyzeResume: rule-based parse done — name="${parsed.name}", exp=${parsed.experience.length}, edu=${parsed.education.length}, skills=${parsed.skills.length}`);
+    this.logger.log(
+      `analyzeResume: rule-based parse done — name="${parsed.name}", exp=${parsed.experience.length}, edu=${parsed.education.length}, skills=${parsed.skills.length}`,
+    );
 
     parsed = await this.enrichWithAi(parsed, rawText);
-    this.logger.log(`analyzeResume: after AI enrichment — name="${parsed.name}", exp=${parsed.experience.length}, edu=${parsed.education.length}, skills=${parsed.skills.length}`);
+    this.logger.log(
+      `analyzeResume: after AI enrichment — name="${parsed.name}", exp=${parsed.experience.length}, edu=${parsed.education.length}, skills=${parsed.skills.length}`,
+    );
 
     resume.set({
       name: parsed.name,
@@ -147,7 +164,9 @@ export class ResumesService {
     await this.runAnalysis(resume, rawText);
     await this.saveVersion(resume);
 
-    return this.resumeModel.findByIdAndUpdate(id, resume.toJSON(), { returnDocument: 'after' }).exec() as unknown as Promise<ResumeDocument>;
+    return this.resumeModel
+      .findByIdAndUpdate(id, resume.toJSON(), { returnDocument: 'after' })
+      .exec() as unknown as Promise<ResumeDocument>;
   }
 
   async analyzeWithProgress(
@@ -161,7 +180,9 @@ export class ResumesService {
 
     onProgress('extracting', 'Extracting resume data...');
     const parsed = await this.resumeParser.parse(rawText);
-    this.logger.log(`analyzeWithProgress: parsed name="${parsed.name}", exp=${parsed.experience.length}, edu=${parsed.education.length}, skills=${parsed.skills.length}`);
+    this.logger.log(
+      `analyzeWithProgress: parsed name="${parsed.name}", exp=${parsed.experience.length}, edu=${parsed.education.length}, skills=${parsed.skills.length}`,
+    );
 
     resume.set({
       name: parsed.name,
@@ -179,7 +200,9 @@ export class ResumesService {
     await this.runAnalysis(resume, rawText, onProgress);
     await this.saveVersion(resume);
 
-    await this.resumeModel.findByIdAndUpdate(id, resume.toJSON(), { returnDocument: 'after' }).exec();
+    await this.resumeModel
+      .findByIdAndUpdate(id, resume.toJSON(), { returnDocument: 'after' })
+      .exec();
     return resume;
   }
 
@@ -194,42 +217,83 @@ export class ResumesService {
 
     try {
       this.logger.log('enrichWithAi: calling AI extraction');
-      const aiResult = await this.aiService.chat(RESUME_EXTRACTION_SYSTEM, rawText);
+      const aiResult = await this.aiService.chat(
+        RESUME_EXTRACTION_SYSTEM,
+        rawText,
+      );
 
       if (!aiResult || Object.keys(aiResult).length === 0) {
-        this.logger.log('enrichWithAi: AI returned empty result, using rule-based parse');
+        this.logger.log(
+          'enrichWithAi: AI returned empty result, using rule-based parse',
+        );
         return parsed;
       }
 
       const merged = { ...parsed };
 
       // ── Name: prefer AI ──
-      if (aiResult.name && typeof aiResult.name === 'string' && aiResult.name.length > 2) {
-        this.logger.log(`enrichWithAi: name — parser="${parsed.name}", ai="${aiResult.name}"`);
-        merged.name = aiResult.name as string;
+      if (
+        aiResult.name &&
+        typeof aiResult.name === 'string' &&
+        aiResult.name.length > 2
+      ) {
+        this.logger.log(
+          `enrichWithAi: name — parser="${parsed.name}", ai="${aiResult.name}"`,
+        );
+        merged.name = aiResult.name;
       }
 
       // ── Contact: prefer AI (better at extracting URLs/emails from text) ──
       if (aiResult.contact && typeof aiResult.contact === 'object') {
         const aiContact = aiResult.contact as Record<string, unknown>;
-        if (!merged.contact) merged.contact = { email: null, phone: null, location: null, linkedin: null, website: null, github: null };
-        for (const field of ['email', 'phone', 'location', 'linkedin', 'website', 'github'] as const) {
-          if (aiContact[field] && typeof aiContact[field] === 'string' && aiContact[field] !== null) {
-            const aiVal = aiContact[field] as string;
-            this.logger.log(`enrichWithAi: contact.${field} — parser="${parsed.contact[field]}", ai="${aiVal}"`);
+        if (!merged.contact)
+          merged.contact = {
+            email: null,
+            phone: null,
+            location: null,
+            linkedin: null,
+            website: null,
+            github: null,
+          };
+        for (const field of [
+          'email',
+          'phone',
+          'location',
+          'linkedin',
+          'website',
+          'github',
+        ] as const) {
+          if (
+            aiContact[field] &&
+            typeof aiContact[field] === 'string' &&
+            aiContact[field] !== null
+          ) {
+            const aiVal = aiContact[field];
+            this.logger.log(
+              `enrichWithAi: contact.${field} — parser="${parsed.contact[field]}", ai="${aiVal}"`,
+            );
             merged.contact[field] = aiVal;
           }
         }
       }
 
       // ── Summary: prefer AI ──
-      if (aiResult.summary && typeof aiResult.summary === 'string' && aiResult.summary.length > 20) {
-        this.logger.log(`enrichWithAi: summary — parser="${parsed.summary?.slice(0, 50)}", ai="${(aiResult.summary as string).slice(0, 50)}"`);
-        merged.summary = aiResult.summary as string;
+      if (
+        aiResult.summary &&
+        typeof aiResult.summary === 'string' &&
+        aiResult.summary.length > 20
+      ) {
+        this.logger.log(
+          `enrichWithAi: summary — parser="${parsed.summary?.slice(0, 50)}", ai="${aiResult.summary.slice(0, 50)}"`,
+        );
+        merged.summary = aiResult.summary;
       }
 
       // ── Experience: AI primary, parser validates structure ──
-      if (Array.isArray(aiResult.experience) && aiResult.experience.length > 0) {
+      if (
+        Array.isArray(aiResult.experience) &&
+        aiResult.experience.length > 0
+      ) {
         const aiExp = aiResult.experience as Array<Record<string, unknown>>;
 
         // Match AI entries to parser entries by title/company/dates
@@ -237,8 +301,12 @@ export class ResumesService {
         const usedParser = new Set<number>();
 
         for (const aiEntry of aiExp) {
-          const aiTitle = String(aiEntry.title || '').toLowerCase().trim();
-          const aiCompany = String(aiEntry.company || '').toLowerCase().trim();
+          const aiTitle = String(aiEntry.title || '')
+            .toLowerCase()
+            .trim();
+          const aiCompany = String(aiEntry.company || '')
+            .toLowerCase()
+            .trim();
           const aiStart = String(aiEntry.startDate || '').trim();
           const aiEnd = String(aiEntry.endDate || '').trim();
 
@@ -254,18 +322,38 @@ export class ResumesService {
 
             let score = 0;
             // Title match
-            if (aiTitle && pTitle && (pTitle.includes(aiTitle) || aiTitle.includes(pTitle))) score += 3;
+            if (
+              aiTitle &&
+              pTitle &&
+              (pTitle.includes(aiTitle) || aiTitle.includes(pTitle))
+            )
+              score += 3;
             else if (aiTitle && pTitle) {
               const tw = aiTitle.split(/\s+/);
               const pw = pTitle.split(/\s+/);
-              const common = tw.filter(w => pw.includes(w)).length;
-              score += common / Math.max(tw.length, pw.length) * 2;
+              const common = tw.filter((w) => pw.includes(w)).length;
+              score += (common / Math.max(tw.length, pw.length)) * 2;
             }
             // Company match
-            if (aiCompany && pCompany && (pCompany.includes(aiCompany) || aiCompany.includes(pCompany))) score += 3;
+            if (
+              aiCompany &&
+              pCompany &&
+              (pCompany.includes(aiCompany) || aiCompany.includes(pCompany))
+            )
+              score += 3;
             // Date proximity
-            if (aiStart && p.startDate && aiStart.slice(0, 4) === p.startDate.slice(0, 4)) score += 1;
-            if (aiEnd && p.endDate && aiEnd.slice(0, 4) === p.endDate.slice(0, 4)) score += 1;
+            if (
+              aiStart &&
+              p.startDate &&
+              aiStart.slice(0, 4) === p.startDate.slice(0, 4)
+            )
+              score += 1;
+            if (
+              aiEnd &&
+              p.endDate &&
+              aiEnd.slice(0, 4) === p.endDate.slice(0, 4)
+            )
+              score += 1;
 
             if (score > bestScore) {
               bestScore = score;
@@ -294,10 +382,14 @@ export class ResumesService {
             current: Boolean(e.current),
             bullets: Array.isArray(e.bullets) ? e.bullets.map(String) : [],
           }));
-          this.logger.log(`enrichWithAi: experience — parser=${parsed.experience.length}, ai=${aiExp.length}, matched=${matchedAi.length}, final=${merged.experience.length}`);
+          this.logger.log(
+            `enrichWithAi: experience — parser=${parsed.experience.length}, ai=${aiExp.length}, matched=${matchedAi.length}, final=${merged.experience.length}`,
+          );
         } else {
           // No valid AI entries — keep parser
-          this.logger.log(`enrichWithAi: experience — no AI entries matched parser, keeping parser results`);
+          this.logger.log(
+            `enrichWithAi: experience — no AI entries matched parser, keeping parser results`,
+          );
         }
       }
 
@@ -309,9 +401,15 @@ export class ResumesService {
         const usedParser = new Set<number>();
 
         for (const aiEntry of aiEdu) {
-          const aiInst = String(aiEntry.institution || '').toLowerCase().trim();
-          const aiDeg = String(aiEntry.degree || '').toLowerCase().trim();
-          const aiField = String(aiEntry.field || '').toLowerCase().trim();
+          const aiInst = String(aiEntry.institution || '')
+            .toLowerCase()
+            .trim();
+          const aiDeg = String(aiEntry.degree || '')
+            .toLowerCase()
+            .trim();
+          const aiField = String(aiEntry.field || '')
+            .toLowerCase()
+            .trim();
 
           let bestScore = 0;
           let bestIdx = -1;
@@ -323,9 +421,21 @@ export class ResumesService {
             const pDeg = p.degree.toLowerCase().trim();
 
             let score = 0;
-            if (aiInst && pInst && (pInst.includes(aiInst) || aiInst.includes(pInst))) score += 4;
-            if (aiDeg && pDeg && (pDeg.includes(aiDeg) || aiDeg.includes(pDeg))) score += 2;
-            if (aiField && p.field && (p.field.toLowerCase().includes(aiField) || aiField.includes(p.field.toLowerCase()))) score += 1;
+            if (
+              aiInst &&
+              pInst &&
+              (pInst.includes(aiInst) || aiInst.includes(pInst))
+            )
+              score += 4;
+            if (aiDeg && pDeg && (pDeg.includes(aiDeg) || aiDeg.includes(pDeg)))
+              score += 2;
+            if (
+              aiField &&
+              p.field &&
+              (p.field.toLowerCase().includes(aiField) ||
+                aiField.includes(p.field.toLowerCase()))
+            )
+              score += 1;
 
             if (score > bestScore) {
               bestScore = score;
@@ -350,26 +460,39 @@ export class ResumesService {
             endDate: (e.endDate as string) || null,
             gpa: (e.gpa as string) || null,
           }));
-          this.logger.log(`enrichWithAi: education — parser=${parsed.education.length}, ai=${aiEdu.length}, matched=${matchedAi.length}, final=${merged.education.length}`);
+          this.logger.log(
+            `enrichWithAi: education — parser=${parsed.education.length}, ai=${aiEdu.length}, matched=${matchedAi.length}, final=${merged.education.length}`,
+          );
         }
       }
 
       // ── Skills: union ──
       if (Array.isArray(aiResult.skills)) {
-        const aiSkills = (aiResult.skills as string[]).filter((s): s is string => typeof s === 'string');
+        const aiSkills = (aiResult.skills as string[]).filter(
+          (s): s is string => typeof s === 'string',
+        );
         if (aiSkills.length > 0) {
           const combined = new Set([...parsed.skills, ...aiSkills]);
           merged.skills = [...combined];
-          this.logger.log(`enrichWithAi: skills — parser=${parsed.skills.length}, ai=${aiSkills.length}, merged=${merged.skills.length}`);
+          this.logger.log(
+            `enrichWithAi: skills — parser=${parsed.skills.length}, ai=${aiSkills.length}, merged=${merged.skills.length}`,
+          );
         }
       }
 
       // ── Certifications: prefer AI, deduplicate by normalized name ──
       if (Array.isArray(aiResult.certifications)) {
-        const aiCerts = aiResult.certifications as Array<Record<string, unknown>>;
+        const aiCerts = aiResult.certifications as Array<
+          Record<string, unknown>
+        >;
         if (aiCerts.length > 0) {
           const normalizeCert = (name: string) =>
-            name.replace(/^[-•*♦\d.)\s]+/, '').replace(/\(.*?\)/g, '').replace(/\s+/g, ' ').trim().toLowerCase();
+            name
+              .replace(/^[-•*♦\d.)\s]+/, '')
+              .replace(/\(.*?\)/g, '')
+              .replace(/\s+/g, ' ')
+              .trim()
+              .toLowerCase();
 
           // Use AI certs as the primary list
           merged.certifications = [];
@@ -378,7 +501,11 @@ export class ResumesService {
             const name = String(c.name || '');
             const norm = normalizeCert(name);
             if (name && norm && !seen.has(norm)) {
-              merged.certifications.push({ name, issuer: (c.issuer as string) || null, date: (c.date as string) || null });
+              merged.certifications.push({
+                name,
+                issuer: (c.issuer as string) || null,
+                date: (c.date as string) || null,
+              });
               seen.add(norm);
             }
           }
@@ -392,13 +519,17 @@ export class ResumesService {
             }
           }
 
-          this.logger.log(`enrichWithAi: certifications — parser=${parsed.certifications.length}, ai=${aiCerts.length}, final=${merged.certifications.length}`);
+          this.logger.log(
+            `enrichWithAi: certifications — parser=${parsed.certifications.length}, ai=${aiCerts.length}, final=${merged.certifications.length}`,
+          );
         }
       }
 
       return merged;
     } catch (err) {
-      this.logger.warn(`enrichWithAi: failed — ${(err as Error).message}, falling back to rule-based parse`);
+      this.logger.warn(
+        `enrichWithAi: failed — ${(err as Error).message}, falling back to rule-based parse`,
+      );
       return parsed;
     }
   }
@@ -410,10 +541,14 @@ export class ResumesService {
 
     this.logger.log(`reExtract: re-running parser on resume ${id}`);
     let parsed = await this.resumeParser.parse(rawText);
-    this.logger.log(`reExtract: rule-based parse done — name="${parsed.name}", exp=${parsed.experience.length}, edu=${parsed.education.length}, skills=${parsed.skills.length}, certs=${parsed.certifications.length}, langs=${parsed.languages.length}`);
+    this.logger.log(
+      `reExtract: rule-based parse done — name="${parsed.name}", exp=${parsed.experience.length}, edu=${parsed.education.length}, skills=${parsed.skills.length}, certs=${parsed.certifications.length}, langs=${parsed.languages.length}`,
+    );
 
     parsed = await this.enrichWithAi(parsed, rawText);
-    this.logger.log(`reExtract: after AI enrichment — name="${parsed.name}", exp=${parsed.experience.length}, edu=${parsed.education.length}, skills=${parsed.skills.length}, certs=${parsed.certifications.length}, langs=${parsed.languages.length}`);
+    this.logger.log(
+      `reExtract: after AI enrichment — name="${parsed.name}", exp=${parsed.experience.length}, edu=${parsed.education.length}, skills=${parsed.skills.length}, certs=${parsed.certifications.length}, langs=${parsed.languages.length}`,
+    );
 
     resume.set({
       name: parsed.name,
@@ -436,21 +571,35 @@ export class ResumesService {
     fileUrl?: string,
     cloudinaryPublicId?: string,
   ): Promise<Record<string, unknown>> {
-    this.logger.log(`guestExtractFromText: rawText length = ${rawText.length}, first 200 chars: "${rawText.slice(0, 200).replace(/\n/g, '\\n')}"`);
+    this.logger.log(
+      `guestExtractFromText: rawText length = ${rawText.length}, first 200 chars: "${rawText.slice(0, 200).replace(/\n/g, '\\n')}"`,
+    );
 
     const parsed = await this.resumeParser.parse(rawText);
-    this.logger.log(`guestExtractFromText: parsed name="${parsed.name}", exp=${parsed.experience.length}, edu=${parsed.education.length}, skills=${parsed.skills.length}`);
+    this.logger.log(
+      `guestExtractFromText: parsed name="${parsed.name}", exp=${parsed.experience.length}, edu=${parsed.education.length}, skills=${parsed.skills.length}`,
+    );
 
     if (!parsed.isResume) {
-      throw new BadRequestException('The uploaded file does not appear to be a resume. Please upload a resume, CV, or professional profile.');
+      throw new BadRequestException(
+        'The uploaded file does not appear to be a resume. Please upload a resume, CV, or professional profile.',
+      );
     }
 
-    const todayStr = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+    const todayStr = new Date().toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+    });
     const TODAY = `Today is ${todayStr}.`;
     const structured = parsed as unknown as Record<string, unknown>;
 
-    this.logger.log(`guestExtractFromText: contact extracted — email=${!!parsed.contact.email}, phone=${!!parsed.contact.phone}, linkedin=${parsed.contact.linkedin || 'null'}, website=${parsed.contact.website || 'null'}, github=${parsed.contact.github || 'null'}`);
-    this.logger.log(`guestExtractFromText: raw text mentions — linkedin=${/\blinkedin\b/i.test(rawText)}, github=${/\bgithub\b/i.test(rawText)}, portfolio=${/\bportfolio\b/i.test(rawText)}`);
+    this.logger.log(
+      `guestExtractFromText: contact extracted — email=${!!parsed.contact.email}, phone=${!!parsed.contact.phone}, linkedin=${parsed.contact.linkedin || 'null'}, website=${parsed.contact.website || 'null'}, github=${parsed.contact.github || 'null'}`,
+    );
+    this.logger.log(
+      `guestExtractFromText: raw text mentions — linkedin=${/\blinkedin\b/i.test(rawText)}, github=${/\bgithub\b/i.test(rawText)}, portfolio=${/\bportfolio\b/i.test(rawText)}`,
+    );
 
     const linkNote = this.buildLinkContextNote(rawText);
 
@@ -459,33 +608,45 @@ export class ResumesService {
     // Extract role from parsed experience instead of AI guessing
     const currentEntry = parsed.experience.find((e) => e.current);
     const title = currentEntry?.title || parsed.experience[0]?.title || '';
-    const company = currentEntry?.company || parsed.experience[0]?.company || '';
+    const company =
+      currentEntry?.company || parsed.experience[0]?.company || '';
     const detectedRole = title || 'unknown';
 
     const seniority = (() => {
       const lower = title.toLowerCase();
-      if (/^(chief|ceo|cfo|cto|coo|vice president|vp|director|head of|principal|partner|owner|founder)/.test(lower)) return 'lead';
-      if (/^(senior|sr|lead|staff|principal|architect)/.test(lower)) return 'senior';
-      if (/^(junior|jr|associate|assistant|entry|graduate|intern)/.test(lower)) return 'entry';
+      if (
+        /^(chief|ceo|cfo|cto|coo|vice president|vp|director|head of|principal|partner|owner|founder)/.test(
+          lower,
+        )
+      )
+        return 'lead';
+      if (/^(senior|sr|lead|staff|principal|architect)/.test(lower))
+        return 'senior';
+      if (/^(junior|jr|associate|assistant|entry|graduate|intern)/.test(lower))
+        return 'entry';
       return 'mid';
     })();
 
     await stagger(500);
 
     const [rawRedFlagsResult, qualityResult] = await (async () => {
-      const redFlagsResult = await this.aiService.chat(
-        RED_FLAG_SYSTEM,
-        `${linkNote}${TODAY} Detected role: ${detectedRole} (${seniority})
+      const redFlagsResult = await this.aiService
+        .chat(
+          RED_FLAG_SYSTEM,
+          `${linkNote}${TODAY} Detected role: ${detectedRole} (${seniority})
 Check this resume for red flags:
 Raw Text:\n${rawText.slice(0, 8000)}\n\nStructured Data:\n${JSON.stringify(structured)}`,
-      ).catch(() => ({ flags: [] }));
+        )
+        .catch(() => ({ flags: [] }));
       await stagger(1000);
-      const qualityResult = await this.aiService.chat(
-        RESUME_QUALITY_SYSTEM,
-        `${linkNote}${TODAY} Detected target role: ${detectedRole} (${seniority})
+      const qualityResult = await this.aiService
+        .chat(
+          RESUME_QUALITY_SYSTEM,
+          `${linkNote}${TODAY} Detected target role: ${detectedRole} (${seniority})
 Evaluate the presentation quality of this resume:
 Raw Text:\n${rawText.slice(0, 10000)}\n\nStructured Data:\n${JSON.stringify(structured)}`,
-      ).catch(() => ({}));
+        )
+        .catch(() => ({}));
       return [redFlagsResult, qualityResult] as const;
     })();
 
@@ -497,12 +658,16 @@ Raw Text:\n${rawText.slice(0, 10000)}\n\nStructured Data:\n${JSON.stringify(stru
       ),
     };
 
-    this.logger.log(`guestExtractFromText: role="${detectedRole}", seniority="${seniority}"`);
-    this.logger.log(`guestExtractFromText: quality overall=${(qualityResult as any)?.overallQuality}, flags=${(redFlagsResult.flags as any[])?.length}`);
+    this.logger.log(
+      `guestExtractFromText: role="${detectedRole}", seniority="${seniority}"`,
+    );
+    this.logger.log(
+      `guestExtractFromText: quality overall=${(qualityResult as any)?.overallQuality}, flags=${redFlagsResult.flags?.length}`,
+    );
 
     const score = this.computeOverallScore(
       seniority,
-      (redFlagsResult.flags as any[]) || [],
+      redFlagsResult.flags || [],
       (qualityResult as any)?.overallQuality,
     );
     this.logger.log(`guestExtractFromText: computed score = ${score}`);
@@ -513,7 +678,7 @@ Raw Text:\n${rawText.slice(0, 10000)}\n\nStructured Data:\n${JSON.stringify(stru
       fileUrl: fileUrl || '',
       cloudinaryPublicId: cloudinaryPublicId || '',
       score,
-      redFlags: (redFlagsResult.flags as any[]) || [],
+      redFlags: redFlagsResult.flags || [],
       detectedRole: {
         role: detectedRole,
         seniority,
@@ -537,42 +702,58 @@ Raw Text:\n${rawText.slice(0, 10000)}\n\nStructured Data:\n${JSON.stringify(stru
     return { token, ...result };
   }
 
-  private async downloadWithRetry(url: string, maxAttempts = 3): Promise<Buffer> {
+  private async downloadWithRetry(
+    url: string,
+    maxAttempts = 3,
+  ): Promise<Buffer> {
     const agent = new https.Agent({ maxVersion: 'TLSv1.2', keepAlive: true });
     for (let attempt = 1; attempt <= maxAttempts; attempt++) {
       try {
         const buffer = await new Promise<Buffer>((resolve, reject) => {
-          https.get(url, { agent, timeout: 30000 }, (res) => {
-            if (!res.statusCode || res.statusCode >= 400) {
-              reject(new Error(`HTTP ${res.statusCode}`));
-              return;
-            }
-            const chunks: Buffer[] = [];
-            res.on('data', (c) => chunks.push(c));
-            res.on('end', () => resolve(Buffer.concat(chunks)));
-          }).on('error', reject).on('timeout', function () {
-            this.destroy();
-            reject(new Error('timeout'));
-          });
+          https
+            .get(url, { agent, timeout: 30000 }, (res) => {
+              if (!res.statusCode || res.statusCode >= 400) {
+                reject(new Error(`HTTP ${res.statusCode}`));
+                return;
+              }
+              const chunks: Buffer[] = [];
+              res.on('data', (c) => chunks.push(c));
+              res.on('end', () => resolve(Buffer.concat(chunks)));
+            })
+            .on('error', reject)
+            .on('timeout', function () {
+              this.destroy();
+              reject(new Error('timeout'));
+            });
         });
-        this.logger.log(`downloadWithRetry: downloaded ${buffer.length} bytes from ${url}`);
+        this.logger.log(
+          `downloadWithRetry: downloaded ${buffer.length} bytes from ${url}`,
+        );
         return buffer;
       } catch (err: any) {
-        this.logger.warn(`downloadWithRetry: attempt ${attempt}/${maxAttempts} failed for ${url} — ${err.message}`);
-        if (attempt === maxAttempts) throw new Error(`Failed to fetch PDF: ${err.message}`);
+        this.logger.warn(
+          `downloadWithRetry: attempt ${attempt}/${maxAttempts} failed for ${url} — ${err.message}`,
+        );
+        if (attempt === maxAttempts)
+          throw new Error(`Failed to fetch PDF: ${err.message}`);
       }
     }
     throw new Error('Failed to fetch PDF');
   }
 
-  async extractLayout(id: string, userId: string): Promise<Record<string, unknown>> {
+  async extractLayout(
+    id: string,
+    userId: string,
+  ): Promise<Record<string, unknown>> {
     const resume = await this.findById(id, userId);
     if (!resume.fileUrl) {
       throw new BadRequestException('No PDF file for this resume');
     }
 
     const url = resume.fileUrl;
-    this.logger.log(`extractLayout: downloading PDF for resume ${id} from ${url}`);
+    this.logger.log(
+      `extractLayout: downloading PDF for resume ${id} from ${url}`,
+    );
     const buffer = await this.downloadWithRetry(url);
 
     const tempFile = path.join(
@@ -581,8 +762,19 @@ Raw Text:\n${rawText.slice(0, 10000)}\n\nStructured Data:\n${JSON.stringify(stru
     );
     try {
       fs.writeFileSync(tempFile, buffer);
-      const pythonScript = path.resolve(__dirname, '..', '..', '..', 'scripts', 'extract_pdf.py');
-      const { stdout } = await execFileAsync('python3', [pythonScript, '--mode', 'layout', tempFile], { timeout: 60000 });
+      const pythonScript = path.resolve(
+        __dirname,
+        '..',
+        '..',
+        '..',
+        'scripts',
+        'extract_pdf.py',
+      );
+      const { stdout } = await execFileAsync(
+        'python3',
+        [pythonScript, '--mode', 'layout', tempFile],
+        { timeout: 60000 },
+      );
       const result = JSON.parse(stdout);
       if (result.error) throw new Error(result.error);
 
@@ -590,7 +782,9 @@ Raw Text:\n${rawText.slice(0, 10000)}\n\nStructured Data:\n${JSON.stringify(stru
       resume.layoutDocumentUpdatedAt = new Date();
       await resume.save();
 
-      this.logger.log(`extractLayout: layout extracted — ${result.pageCount} pages, ${result.pages.reduce((s: number, p: any) => s + p.blocks.length, 0)} blocks`);
+      this.logger.log(
+        `extractLayout: layout extracted — ${result.pageCount} pages, ${result.pages.reduce((s: number, p: any) => s + p.blocks.length, 0)} blocks`,
+      );
       return result;
     } finally {
       if (fs.existsSync(tempFile)) fs.unlinkSync(tempFile);
@@ -600,28 +794,46 @@ Raw Text:\n${rawText.slice(0, 10000)}\n\nStructured Data:\n${JSON.stringify(stru
   async renderHtml(id: string, userId: string): Promise<string> {
     const resume = await this.findById(id, userId);
     const doc = resume.layoutDocument as Record<string, any> | undefined;
-    if (!doc || !doc.pages) throw new BadRequestException('No layout document available');
+    if (!doc || !doc.pages)
+      throw new BadRequestException('No layout document available');
 
     const cssColor = (block: any) => block.color || 'rgb(0,0,0)';
 
-    const pagesHtml = doc.pages.map((page: any) => {
-      const blocksHtml = (page.blocks || [])
-        .filter((b: any) => b.text.trim())
-        .map((b: any) => {
-          const originalFont = b.originalFontFamily || b.fontFamily;
-          const fontName = originalFont?.toLowerCase() || '';
-          const fontFamily =
-            fontName.includes('helvetica') || fontName.includes('arial') ? '"Helvetica Neue", Helvetica, Arial, sans-serif' :
-            fontName.includes('calibri') ? 'Calibri, "Helvetica Neue", Arial, sans-serif' :
-            fontName.includes('verdana') ? 'Verdana, Geneva, sans-serif' :
-            fontName.includes('tahoma') ? 'Tahoma, Geneva, sans-serif' :
-            fontName.includes('times') || fontName.includes('georgia') || fontName.includes('garamond') || fontName.includes('palatino') || fontName.includes('baskerville') || fontName.includes('serif') ? 'Georgia, "Times New Roman", serif' :
-            fontName.includes('courier') || fontName.includes('mono') || fontName.includes('consolas') || fontName.includes('monospace') ? '"Courier New", monospace' :
-            b.fontFamily === 'serif' ? 'Georgia, "Times New Roman", serif' :
-            b.fontFamily === 'monospace' ? '"Courier New", monospace' :
-            '"Helvetica Neue", Helvetica, Arial, sans-serif';
+    const pagesHtml = doc.pages
+      .map((page: any) => {
+        const blocksHtml = (page.blocks || [])
+          .filter((b: any) => b.text.trim())
+          .map((b: any) => {
+            const originalFont = b.originalFontFamily || b.fontFamily;
+            const fontName = originalFont?.toLowerCase() || '';
+            const fontFamily =
+              fontName.includes('helvetica') || fontName.includes('arial')
+                ? '"Helvetica Neue", Helvetica, Arial, sans-serif'
+                : fontName.includes('calibri')
+                  ? 'Calibri, "Helvetica Neue", Arial, sans-serif'
+                  : fontName.includes('verdana')
+                    ? 'Verdana, Geneva, sans-serif'
+                    : fontName.includes('tahoma')
+                      ? 'Tahoma, Geneva, sans-serif'
+                      : fontName.includes('times') ||
+                          fontName.includes('georgia') ||
+                          fontName.includes('garamond') ||
+                          fontName.includes('palatino') ||
+                          fontName.includes('baskerville') ||
+                          fontName.includes('serif')
+                        ? 'Georgia, "Times New Roman", serif'
+                        : fontName.includes('courier') ||
+                            fontName.includes('mono') ||
+                            fontName.includes('consolas') ||
+                            fontName.includes('monospace')
+                          ? '"Courier New", monospace'
+                          : b.fontFamily === 'serif'
+                            ? 'Georgia, "Times New Roman", serif'
+                            : b.fontFamily === 'monospace'
+                              ? '"Courier New", monospace'
+                              : '"Helvetica Neue", Helvetica, Arial, sans-serif';
 
-          return `<div style="
+            return `<div style="
             position:absolute;
             left:${b.x}pt;
             top:${b.y}pt;
@@ -639,9 +851,10 @@ Raw Text:\n${rawText.slice(0, 10000)}\n\nStructured Data:\n${JSON.stringify(stru
             padding:0;
             margin:0;
           ">${this.esc(b.text)}</div></div></div>`;
-        }).join('\n');
+          })
+          .join('\n');
 
-      return `<div style="
+        return `<div style="
         position:relative;
         width:${page.width}pt;
         height:${page.height}pt;
@@ -649,7 +862,8 @@ Raw Text:\n${rawText.slice(0, 10000)}\n\nStructured Data:\n${JSON.stringify(stru
         overflow:hidden;
         margin:0 auto 32px auto;
       ">${blocksHtml}</div>`;
-    }).join('\n');
+      })
+      .join('\n');
 
     return `<!DOCTYPE html>
 <html>
@@ -675,16 +889,19 @@ Raw Text:\n${rawText.slice(0, 10000)}\n\nStructured Data:\n${JSON.stringify(stru
   ): Promise<{ variations: string[] }> {
     const resume = await this.findById(id, userId);
     const userMessage = `Resume context (optional): ${context || 'N/A'}\n\nBullet to rewrite: "${bullet}"`;
-    const result = await this.aiService.chat(BULLET_REWRITER_SYSTEM, userMessage);
+    const result = await this.aiService.chat(
+      BULLET_REWRITER_SYSTEM,
+      userMessage,
+    );
     const raw = result.variations;
-    const variations = Array.isArray(raw) ? raw.filter((v): v is string => typeof v === 'string') : [];
+    const variations = Array.isArray(raw)
+      ? raw.filter((v): v is string => typeof v === 'string')
+      : [];
     return { variations };
   }
 
   async delete(id: string, userId: string): Promise<void> {
-    const result = await this.resumeModel
-      .deleteOne({ _id: id, userId })
-      .exec();
+    const result = await this.resumeModel.deleteOne({ _id: id, userId }).exec();
     if (!result.deletedCount) throw new NotFoundException('Resume not found');
   }
 
@@ -699,10 +916,12 @@ Raw Text:\n${rawText.slice(0, 10000)}\n\nStructured Data:\n${JSON.stringify(stru
     const stagger = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
     onProgress?.('role', 'Detecting target role...');
-    const roleResult = await this.aiService.chat(
-      ROLE_DETECTION_SYSTEM,
-      `${TODAY} Analyze this resume for target role:\n${JSON.stringify(structured)}`,
-    ).catch(() => ({}));
+    const roleResult = await this.aiService
+      .chat(
+        ROLE_DETECTION_SYSTEM,
+        `${TODAY} Analyze this resume for target role:\n${JSON.stringify(structured)}`,
+      )
+      .catch(() => ({}));
     const detectedRole = (roleResult as any)?.role || 'unknown';
     const seniority = (roleResult as any)?.seniority || 'mid';
     onProgress?.('role_complete', 'Target role detected');
@@ -712,23 +931,27 @@ Raw Text:\n${rawText.slice(0, 10000)}\n\nStructured Data:\n${JSON.stringify(stru
     const linkNote = this.buildLinkContextNote(rawText);
 
     onProgress?.('quality', 'Evaluating resume quality...');
-    const qualityResult = await this.aiService.chat(
-      RESUME_QUALITY_SYSTEM,
-      `${linkNote}${TODAY} Detected target role: ${detectedRole} (${seniority})
+    const qualityResult = await this.aiService
+      .chat(
+        RESUME_QUALITY_SYSTEM,
+        `${linkNote}${TODAY} Detected target role: ${detectedRole} (${seniority})
 Evaluate the presentation quality of this resume:
 Raw Text:\n${rawText.slice(0, 5000)}\n\nStructured Data:\n${JSON.stringify(structured)}`,
-    ).catch(() => ({}));
+      )
+      .catch(() => ({}));
     onProgress?.('quality_complete', 'Quality evaluated');
 
     await stagger(1000);
 
     onProgress?.('redflags', 'Checking for red flags...');
-    const rawRedFlagsResult = await this.aiService.chat(
-      RED_FLAG_SYSTEM,
-      `${linkNote}${TODAY} Detected role: ${detectedRole} (${seniority})
+    const rawRedFlagsResult = await this.aiService
+      .chat(
+        RED_FLAG_SYSTEM,
+        `${linkNote}${TODAY} Detected role: ${detectedRole} (${seniority})
 Check this resume for red flags:
 Raw Text:\n${rawText.slice(0, 3000)}\n\nStructured Data:\n${JSON.stringify(structured)}`,
-    ).catch(() => ({ flags: [] }));
+      )
+      .catch(() => ({ flags: [] }));
     const filteredFlags = this.filterLinkFlags(
       rawText,
       this.filterFutureDateFlags((rawRedFlagsResult.flags as any[]) || []),
@@ -753,10 +976,10 @@ Raw Text:\n${rawText.slice(0, 3000)}\n\nStructured Data:\n${JSON.stringify(struc
       suggestions: (qualityResult as any)?.suggestions || [],
     };
 
-    resume.redFlags = (filteredFlags as any[]) || [];
+    resume.redFlags = filteredFlags || [];
     resume.score = this.computeOverallScore(
       seniority,
-      (filteredFlags as any[]) || [],
+      filteredFlags || [],
       (qualityResult as any)?.overallQuality,
     );
 
@@ -769,17 +992,38 @@ Raw Text:\n${rawText.slice(0, 3000)}\n\nStructured Data:\n${JSON.stringify(struc
     qualityScore?: number,
   ): number {
     const base = 50;
-    const severityWeights: Record<string, number> = { high: 12, medium: 6, low: 2 };
+    const severityWeights: Record<string, number> = {
+      high: 12,
+      medium: 6,
+      low: 2,
+    };
     const redFlagPenalty = Math.min(
-      (redFlags || []).reduce((sum, f) => sum + (severityWeights[f.severity] || 0), 0),
+      (redFlags || []).reduce(
+        (sum, f) => sum + (severityWeights[f.severity] || 0),
+        0,
+      ),
       40,
     );
-    const qualityBonus = qualityScore ? Math.round((qualityScore - 50) * 0.5) : 0;
-    const seniorityBonus = seniority === 'executive' ? 5 : seniority === 'lead' ? 3 : seniority === 'senior' ? 2 : 0;
-    return Math.max(15, Math.min(100, base - redFlagPenalty + qualityBonus + seniorityBonus));
+    const qualityBonus = qualityScore
+      ? Math.round((qualityScore - 50) * 0.5)
+      : 0;
+    const seniorityBonus =
+      seniority === 'executive'
+        ? 5
+        : seniority === 'lead'
+          ? 3
+          : seniority === 'senior'
+            ? 2
+            : 0;
+    return Math.max(
+      15,
+      Math.min(100, base - redFlagPenalty + qualityBonus + seniorityBonus),
+    );
   }
 
-  private normalizeContactUrls(data: { contact?: Record<string, string | null | undefined> }): void {
+  private normalizeContactUrls(data: {
+    contact?: Record<string, string | null | undefined>;
+  }): void {
     if (!data.contact) return;
     const urlFields: Array<{ key: string; domain: string }> = [
       { key: 'linkedin', domain: 'linkedin.com/in/' },
@@ -792,7 +1036,10 @@ Raw Text:\n${rawText.slice(0, 3000)}\n\nStructured Data:\n${JSON.stringify(struc
       let normalized = val.trim();
       if (normalized.startsWith('/')) {
         normalized = `https://${domain}${normalized.replace(/^\//, '')}`;
-      } else if (!normalized.startsWith('http://') && !normalized.startsWith('https://')) {
+      } else if (
+        !normalized.startsWith('http://') &&
+        !normalized.startsWith('https://')
+      ) {
         if (domain) {
           const path = domain.replace(/\/$/, '');
           if (normalized.includes(path)) {
@@ -831,15 +1078,35 @@ Raw Text:\n${rawText.slice(0, 3000)}\n\nStructured Data:\n${JSON.stringify(struc
    */
   private filterFutureDateFlags(flags: any[]): any[] {
     const today = new Date();
-    const monthNames = ['january', 'february', 'march', 'april', 'may', 'june', 'july', 'august', 'september', 'october', 'november', 'december'];
+    const monthNames = [
+      'january',
+      'february',
+      'march',
+      'april',
+      'may',
+      'june',
+      'july',
+      'august',
+      'september',
+      'october',
+      'november',
+      'december',
+    ];
 
     return flags.filter((flag) => {
       const msg = ((flag?.message as string) || '').toLowerCase();
       // Only check flags that mention "future"
-      if (!msg.includes('future') && !msg.includes('ahead') && !msg.includes('not yet')) return true;
+      if (
+        !msg.includes('future') &&
+        !msg.includes('ahead') &&
+        !msg.includes('not yet')
+      )
+        return true;
 
       // Try to extract month year patterns like "July 2025", "May 2026", etc.
-      const monthYear = msg.match(/\b(january|february|march|april|may|june|july|august|september|october|november|december)\s+(\d{4})\b/i);
+      const monthYear = msg.match(
+        /\b(january|february|march|april|may|june|july|august|september|october|november|december)\s+(\d{4})\b/i,
+      );
       if (!monthYear) return true;
 
       const monthIndex = monthNames.indexOf(monthYear[1].toLowerCase());
@@ -849,7 +1116,9 @@ Raw Text:\n${rawText.slice(0, 3000)}\n\nStructured Data:\n${JSON.stringify(struc
       const flagDate = new Date(year, monthIndex, 1);
       // If the date is ≤ today, it's NOT in the future — discard this false positive
       if (flagDate <= today) {
-        this.logger.log(`filterFutureDateFlags: discarding flag about "${monthYear[0]}" — ${flagDate.toISOString()} is not in the future`);
+        this.logger.log(
+          `filterFutureDateFlags: discarding flag about "${monthYear[0]}" — ${flagDate.toISOString()} is not in the future`,
+        );
         return false;
       }
       return true;
@@ -866,39 +1135,63 @@ Raw Text:\n${rawText.slice(0, 3000)}\n\nStructured Data:\n${JSON.stringify(struc
     const hasLinkedIn = /\blinkedin\b/i.test(lower);
     const hasGitHub = /\bgithub\b/i.test(lower);
     const hasPortfolio = /\bportfolio\b/i.test(lower);
-    const hasWebsite = /\bwebsite\b/i.test(lower) || /\bpersonal\s+(site|website)\b/i.test(lower);
+    const hasWebsite =
+      /\bwebsite\b/i.test(lower) ||
+      /\bpersonal\s+(site|website)\b/i.test(lower);
 
     const filtered = flags.filter((flag) => {
       const msg = ((flag?.message as string) || '').toLowerCase();
       // If the flag mentions linkedin being missing but raw text has the label
-      if (hasLinkedIn && /linkedin/i.test(msg) && /missing|not found|no url|not provided|absent/i.test(msg)) {
-        this.logger.log(`filterLinkFlags: discarding LinkedIn flag — label found in raw text`);
+      if (
+        hasLinkedIn &&
+        /linkedin/i.test(msg) &&
+        /missing|not found|no url|not provided|absent/i.test(msg)
+      ) {
+        this.logger.log(
+          `filterLinkFlags: discarding LinkedIn flag — label found in raw text`,
+        );
         return false;
       }
-      if (hasGitHub && /github/i.test(msg) && /missing|not found|no url|not provided|absent/i.test(msg)) {
-        this.logger.log(`filterLinkFlags: discarding GitHub flag — label found in raw text`);
+      if (
+        hasGitHub &&
+        /github/i.test(msg) &&
+        /missing|not found|no url|not provided|absent/i.test(msg)
+      ) {
+        this.logger.log(
+          `filterLinkFlags: discarding GitHub flag — label found in raw text`,
+        );
         return false;
       }
-      if ((hasPortfolio || hasWebsite) && (/portfolio/i.test(msg) || /website/i.test(msg)) && /missing|not found|no url|not provided|absent/i.test(msg)) {
-        this.logger.log(`filterLinkFlags: discarding portfolio/website flag — label found in raw text`);
+      if (
+        (hasPortfolio || hasWebsite) &&
+        (/portfolio/i.test(msg) || /website/i.test(msg)) &&
+        /missing|not found|no url|not provided|absent/i.test(msg)
+      ) {
+        this.logger.log(
+          `filterLinkFlags: discarding portfolio/website flag — label found in raw text`,
+        );
         return false;
       }
       return true;
     });
 
     if (filtered.length !== flags.length) {
-      this.logger.log(`filterLinkFlags: removed ${flags.length - filtered.length} link-related flags`);
+      this.logger.log(
+        `filterLinkFlags: removed ${flags.length - filtered.length} link-related flags`,
+      );
     }
     return filtered;
   }
 
-  private async detectRedFlags(
-    resume: ResumeDocument,
-  ): Promise<void> {
+  private async detectRedFlags(resume: ResumeDocument): Promise<void> {
     const role = resume.detectedRole?.role || 'unknown';
     const seniority = resume.detectedRole?.seniority || 'mid';
     const rawText = resume.rawText || '';
-    const todayStr = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+    const todayStr = new Date().toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+    });
     const linkNote = this.buildLinkContextNote(rawText);
     const result = await this.aiService.chat(
       RED_FLAG_SYSTEM,
@@ -914,7 +1207,11 @@ Raw Text:\n${rawText.slice(0, 3000)}\n\nStructured Data:\n${JSON.stringify(resum
   }
 
   private esc(s: string): string {
-    return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    return s
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
   }
 
   private async saveVersion(resume: ResumeDocument): Promise<void> {
@@ -923,7 +1220,7 @@ Raw Text:\n${rawText.slice(0, 3000)}\n\nStructured Data:\n${JSON.stringify(resum
 
     if (!resume.versions) resume.versions = [];
     resume.versions.push({
-      structured: snapshot as unknown as Record<string, unknown>,
+      structured: snapshot,
       createdAt: new Date(),
     });
   }

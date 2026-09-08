@@ -1,12 +1,23 @@
 import {
-  Controller, Get, Post, Patch, Delete, Body, Param,
-  UseGuards, Req,
+  Controller,
+  Get,
+  Post,
+  Patch,
+  Delete,
+  Body,
+  Param,
+  UseGuards,
+  Req,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
+import { Throttle } from '@nestjs/throttler';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { ApplyFlowService } from './apply-flow.service';
 import {
-  ApproveJobsDto, ConfirmSubmissionDto, StoreAnswerDto, UpdateAutoApplyConfigDto,
+  ApproveJobsDto,
+  ConfirmSubmissionDto,
+  StoreAnswerDto,
+  UpdateAutoApplyConfigDto,
 } from './dto/auto-apply.dto';
 
 @ApiTags('Auto-Apply')
@@ -19,17 +30,29 @@ export class AutoApplyController {
   // ─── Submissions ───
 
   @Post('approve')
+  @Throttle({ short: { limit: 20, ttl: 1000 } })
   async approveJobs(@Req() req: any, @Body() dto: ApproveJobsDto) {
-    return this.applyFlow.approveJobs(req.user._id, dto.jobIds, dto.resumeId, dto.coverLetter);
+    return this.applyFlow.approveJobs(
+      req.user._id,
+      dto.jobIds,
+      dto.resumeId,
+      dto.coverLetter,
+    );
   }
 
   @Post(':submissionId/fill')
-  async fillApplication(@Req() req: any, @Param('submissionId') submissionId: string) {
+  async fillApplication(
+    @Req() req: any,
+    @Param('submissionId') submissionId: string,
+  ) {
     return this.applyFlow.fillApplication(req.user._id, submissionId);
   }
 
   @Get(':submissionId/preview')
-  async getPreview(@Req() req: any, @Param('submissionId') submissionId: string) {
+  async getPreview(
+    @Req() req: any,
+    @Param('submissionId') submissionId: string,
+  ) {
     return this.applyFlow.getPreview(req.user._id, submissionId);
   }
 
@@ -39,11 +62,18 @@ export class AutoApplyController {
     @Param('submissionId') submissionId: string,
     @Body() dto: ConfirmSubmissionDto,
   ) {
-    return this.applyFlow.confirmAndSubmit(req.user._id, submissionId, dto.updatedFields);
+    return this.applyFlow.confirmAndSubmit(
+      req.user._id,
+      submissionId,
+      dto.updatedFields,
+    );
   }
 
   @Post(':submissionId/retry')
-  async retrySubmission(@Req() req: any, @Param('submissionId') submissionId: string) {
+  async retrySubmission(
+    @Req() req: any,
+    @Param('submissionId') submissionId: string,
+  ) {
     return this.applyFlow.retrySubmission(req.user._id, submissionId);
   }
 
@@ -61,7 +91,12 @@ export class AutoApplyController {
 
   @Post('answers')
   async storeAnswer(@Req() req: any, @Body() dto: StoreAnswerDto) {
-    return this.applyFlow.storeAnswer(req.user._id, dto.question, dto.answer, dto.category);
+    return this.applyFlow.storeAnswer(
+      req.user._id,
+      dto.question,
+      dto.answer,
+      dto.category,
+    );
   }
 
   @Delete('answers/:answerId')
@@ -85,7 +120,10 @@ export class AutoApplyController {
   // ─── Submission-specific (after static routes) ───
 
   @Get(':submissionId')
-  async getSubmission(@Req() req: any, @Param('submissionId') submissionId: string) {
+  async getSubmission(
+    @Req() req: any,
+    @Param('submissionId') submissionId: string,
+  ) {
     return this.applyFlow.getSubmissionById(req.user._id, submissionId);
   }
 }

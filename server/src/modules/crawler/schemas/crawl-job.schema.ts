@@ -14,7 +14,10 @@ export class CrawlJob {
   @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'Resume' })
   resumeId?: Types.ObjectId;
 
-  @Prop({ default: 'pending', enum: ['pending', 'running', 'completed', 'failed'] })
+  @Prop({
+    default: 'pending',
+    enum: ['pending', 'running', 'completed', 'failed'],
+  })
   status!: string;
 
   @Prop()

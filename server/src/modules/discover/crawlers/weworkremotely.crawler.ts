@@ -16,9 +16,12 @@ export class WeWorkRemotelyCrawler extends BaseCrawler {
   async crawl(): Promise<RawJob[]> {
     const jobs: RawJob[] = [];
     try {
-      const response = await fetch('https://weworkremotely.com/remote-jobs.rss', {
-        headers: { 'User-Agent': 'Folio/1.0' },
-      });
+      const response = await fetch(
+        'https://weworkremotely.com/remote-jobs.rss',
+        {
+          headers: { 'User-Agent': 'Folio/1.0' },
+        },
+      );
       if (!response.ok) return jobs;
       const xml = await response.text();
       const items = this.parseRSS(xml);
@@ -52,7 +55,9 @@ export class WeWorkRemotelyCrawler extends BaseCrawler {
     while ((match = itemRegex.exec(xml)) !== null) {
       const block = match[1];
       const getTag = (tag: string) => {
-        const m = new RegExp(`<${tag}[^>]*>([\\s\\S]*?)<\\/${tag}>`, 'i').exec(block);
+        const m = new RegExp(`<${tag}[^>]*>([\\s\\S]*?)<\\/${tag}>`, 'i').exec(
+          block,
+        );
         return m ? m[1].trim() : undefined;
       };
       const getCategory = () => {
@@ -73,14 +78,20 @@ export class WeWorkRemotelyCrawler extends BaseCrawler {
     return items;
   }
 
-  private parseTitle(title: string): { roleTitle?: string; companyName?: string } {
+  private parseTitle(title: string): {
+    roleTitle?: string;
+    companyName?: string;
+  } {
     const match = title.match(/^(.+?)\s+(?:-|at|—)\s+(.+)$/);
     if (match) {
       return { roleTitle: match[1].trim(), companyName: match[2].trim() };
     }
     const colonMatch = title.match(/^([^:]+):\s*(.+)$/);
     if (colonMatch) {
-      return { companyName: colonMatch[1].trim(), roleTitle: colonMatch[2].trim() };
+      return {
+        companyName: colonMatch[1].trim(),
+        roleTitle: colonMatch[2].trim(),
+      };
     }
     return {};
   }

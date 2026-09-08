@@ -1,99 +1,106 @@
-import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose'
-import { Document, Types, Schema as MongooseSchema } from 'mongoose'
+import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
+import { Document, Types, Schema as MongooseSchema } from 'mongoose';
 
-export type InterviewSessionDocument = InterviewSession & Document
+export type InterviewSessionDocument = InterviewSession & Document;
 
 export interface InterviewQuestionPlan {
-  order: number
-  phase: 'opening' | 'behavioural' | 'technical' | 'system_design' | 'case_study' | 'closing'
-  topic: string
-  basedOn: 'resume' | 'role' | 'company' | 'general'
-  resumeReference: string | null
-  primaryQuestion: string
-  followUpTriggers: Array<{ condition: string; followUp: string }>
-  estimatedMinutes: number
-  evaluationCriteria: string[]
+  order: number;
+  phase:
+    | 'opening'
+    | 'behavioural'
+    | 'technical'
+    | 'system_design'
+    | 'case_study'
+    | 'closing';
+  topic: string;
+  basedOn: 'resume' | 'role' | 'company' | 'general';
+  resumeReference: string | null;
+  primaryQuestion: string;
+  followUpTriggers: Array<{ condition: string; followUp: string }>;
+  estimatedMinutes: number;
+  evaluationCriteria: string[];
 }
 
 export interface InterviewerPersona {
-  interviewerName: string
-  interviewerTitle: string
+  interviewerName: string;
+  interviewerTitle: string;
   personality: {
-    tone: 'warm' | 'neutral' | 'rigorous'
-    followUpStyle: 'probing' | 'supportive' | 'challenging'
-    pacePreference: 'fast' | 'measured'
-  }
-  evaluationPriorities: string[]
-  openingStyle: string
+    tone: 'warm' | 'neutral' | 'rigorous';
+    followUpStyle: 'probing' | 'supportive' | 'challenging';
+    pacePreference: 'fast' | 'measured';
+  };
+  evaluationPriorities: string[];
+  openingStyle: string;
   companyContext: {
-    mission: string | null
-    values: string[]
-    recentNews: string | null
-    productFocus: string | null
-    interviewStyleSignal: string
-  }
-  questionPlan: InterviewQuestionPlan[]
+    mission: string | null;
+    values: string[];
+    recentNews: string | null;
+    productFocus: string | null;
+    interviewStyleSignal: string;
+  };
+  questionPlan: InterviewQuestionPlan[];
 }
 
 @Schema({ timestamps: true })
 export class InterviewSession {
   @Prop({ required: true, type: MongooseSchema.Types.ObjectId, ref: 'User' })
-  userId!: Types.ObjectId
+  userId!: Types.ObjectId;
 
   @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'Resume', required: true })
-  resumeId!: Types.ObjectId
+  resumeId!: Types.ObjectId;
 
   @Prop({ required: true })
-  role!: string
+  role!: string;
 
   @Prop({ required: true })
-  level!: string
+  level!: string;
 
   @Prop({ type: Object })
   company?: {
-    name: string
-    url?: string
-    researchData?: Record<string, unknown>
-  }
+    name: string;
+    url?: string;
+    researchData?: Record<string, unknown>;
+  };
 
   @Prop({ type: [String], required: true })
-  interviewTypes!: string[]
+  interviewTypes!: string[];
 
   @Prop({ type: [String] })
-  techStack?: string[]
+  techStack?: string[];
 
   @Prop({ default: false })
-  includesCoding?: boolean
+  includesCoding?: boolean;
 
   @Prop({ default: 'mixed' })
-  difficulty?: string
+  difficulty?: string;
 
   @Prop({ required: true })
-  plannedDuration!: number
+  plannedDuration!: number;
 
   @Prop({ default: 'setup' })
-  status!: 'setup' | 'in_progress' | 'paused' | 'completed' | 'abandoned'
+  status!: 'setup' | 'in_progress' | 'paused' | 'completed' | 'abandoned';
 
   @Prop({ type: Object })
-  interviewerPersona?: InterviewerPersona
+  interviewerPersona?: InterviewerPersona;
 
   @Prop({ type: [{ type: Object }] })
-  questionPlan?: InterviewQuestionPlan[]
+  questionPlan?: InterviewQuestionPlan[];
 
   @Prop()
-  startedAt?: Date
+  startedAt?: Date;
 
   @Prop()
-  endedAt?: Date
+  endedAt?: Date;
 
   @Prop()
-  actualDuration?: number
+  actualDuration?: number;
 
   @Prop({ default: 0 })
-  pausesRemaining?: number
+  pausesRemaining?: number;
 
   @Prop({ default: 0 })
-  pauseSecondsRemaining?: number
+  pauseSecondsRemaining?: number;
 }
 
-export const InterviewSessionSchema = SchemaFactory.createForClass(InterviewSession)
+export const InterviewSessionSchema =
+  SchemaFactory.createForClass(InterviewSession);

@@ -16,7 +16,7 @@ export class RemotiveCrawler extends BaseCrawler {
         this.logger.warn(`Remotive API returned ${response.status}`);
         return jobs;
       }
-      const data = await response.json() as any;
+      const data = await response.json();
       const list = data.jobs;
       if (!Array.isArray(list)) {
         this.logger.warn('Remotive API returned unexpected format');
@@ -25,7 +25,9 @@ export class RemotiveCrawler extends BaseCrawler {
 
       for (const item of list) {
         if (!item.id || !item.title || !item.company_name) continue;
-        const date = item.publication_date ? new Date(item.publication_date) : null;
+        const date = item.publication_date
+          ? new Date(item.publication_date)
+          : null;
         jobs.push({
           source: 'remotive',
           sourceId: `remotive-${item.id}`,

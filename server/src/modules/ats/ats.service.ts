@@ -31,8 +31,17 @@ export class AtsService {
     }
 
     const resumeJson = resume.toJSON();
-    const roleContext = resume.detectedRole || { role: 'unknown', seniority: 'mid', industries: [], confidence: 0 };
-    const quality = resume.quality || { overallQuality: 50, professionalismScore: 50, readabilityScore: 50 };
+    const roleContext = resume.detectedRole || {
+      role: 'unknown',
+      seniority: 'mid',
+      industries: [],
+      confidence: 0,
+    };
+    const quality = resume.quality || {
+      overallQuality: 50,
+      professionalismScore: 50,
+      readabilityScore: 50,
+    };
 
     const prompt = `Job Description:\n${description || 'No description provided'}\n\nResume:\n${JSON.stringify(resumeJson)}\n\nCandidate Context:
 - Detected Role: ${roleContext.role}
@@ -44,13 +53,18 @@ export class AtsService {
 
 Score this candidate against the job description. Use your role-specific knowledge (${roleContext.role}) to identify the most relevant keywords and evaluate seniority fit.`;
 
-    const result = (await this.aiService.chat(
-      ATS_SCORING_SYSTEM,
-      prompt,
-    )) as {
+    const result = (await this.aiService.chat(ATS_SCORING_SYSTEM, prompt)) as {
       score?: number;
-      matchedKeywords?: Array<{ keyword: string; category: string; importance: string }>;
-      missingKeywords?: Array<{ keyword: string; category: string; importance: string }>;
+      matchedKeywords?: Array<{
+        keyword: string;
+        category: string;
+        importance: string;
+      }>;
+      missingKeywords?: Array<{
+        keyword: string;
+        category: string;
+        importance: string;
+      }>;
       sectionScores?: Record<string, number>;
       suggestions?: string[];
       seniorityMatch?: string;
@@ -75,12 +89,20 @@ Score this candidate against the job description. Use your role-specific knowled
       score: result.score ?? 0,
       matchedKeywords: (result.matchedKeywords ?? []) as any,
       missingKeywords: (result.missingKeywords ?? []) as any,
-      sectionScores: { ...result.sectionScores, certifications: result.sectionScores?.certifications ?? 0 } as any,
+      sectionScores: {
+        ...result.sectionScores,
+        certifications: result.sectionScores?.certifications ?? 0,
+      },
       suggestions: result.suggestions ?? [],
       seniorityMatch: result.seniorityMatch,
       roleContext: (result.roleContext || {
         detectedRole: roleContext.role,
-        confidenceLevel: roleContext.confidence > 70 ? 'high' : roleContext.confidence > 40 ? 'medium' : 'low',
+        confidenceLevel:
+          roleContext.confidence > 70
+            ? 'high'
+            : roleContext.confidence > 40
+              ? 'medium'
+              : 'low',
       }) as any,
       resumeQuality: {
         overallQuality: quality.overallQuality,

@@ -7,7 +7,7 @@ const jobs = [
     company: 'Figma',
     role: 'Senior Product Designer',
     score: 79,
-    scoreColor: '#0F6E56',
+    scoreColor: '#4F46E5',
     posted: '2h ago',
     badge: null as string | null,
     keywords: ['Figma', 'Prototyping', 'User Research'],
@@ -16,7 +16,7 @@ const jobs = [
     company: 'Stripe',
     role: 'UX Design Lead',
     score: 61,
-    scoreColor: '#BA7517',
+    scoreColor: '#D97706',
     posted: '1d ago',
     badge: null as string | null,
     keywords: ['Design Systems', 'Prototyping'],
@@ -25,7 +25,7 @@ const jobs = [
     company: 'Linear',
     role: 'Product Designer',
     score: 88,
-    scoreColor: '#0F6E56',
+    scoreColor: '#4F46E5',
     posted: '4h ago',
     badge: 'New',
     keywords: ['Figma', 'User Research'],
@@ -96,7 +96,7 @@ function JobCards() {
                 </div>
                 <div className="relative flex items-center justify-center shrink-0">
                   <svg width={i === 2 ? 36 : 28} height={i === 2 ? 36 : 28} className="transform -rotate-90">
-                    <circle cx={i === 2 ? 18 : 14} cy={i === 2 ? 18 : 14} r={i === 2 ? 13 : 10} stroke="#E5E0D8" strokeWidth="2.5" fill="none" />
+                    <circle cx={i === 2 ? 18 : 14} cy={i === 2 ? 18 : 14} r={i === 2 ? 13 : 10} stroke="#E2E8F0" strokeWidth="2.5" fill="none" />
                     <motion.circle
                       cx={i === 2 ? 18 : 14} cy={i === 2 ? 18 : 14} r={i === 2 ? 13 : 10}
                       stroke={job.scoreColor}
@@ -195,7 +195,7 @@ export default function JobDiscoverSection() {
     <SectionWrapper className="bg-surface">
       <div className="relative">
       <Drift duration={5} delay={0.5} className="top-[8%] right-[4%]">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#0F6E56" strokeWidth="1.5" opacity="0.1">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#4F46E5" strokeWidth="1.5" opacity="0.1">
           <circle cx="11" cy="11" r="8" /><path d="m21 21-4.35-4.35" />
         </svg>
       </Drift>

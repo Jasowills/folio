@@ -5,7 +5,12 @@ export type AutoApplyConfigDocument = AutoApplyConfig & Document;
 
 @Schema({ timestamps: true })
 export class AutoApplyConfig {
-  @Prop({ required: true, type: MongooseSchema.Types.ObjectId, ref: 'User', unique: true })
+  @Prop({
+    required: true,
+    type: MongooseSchema.Types.ObjectId,
+    ref: 'User',
+    unique: true,
+  })
   userId!: Types.ObjectId;
 
   @Prop({ default: true })
@@ -22,7 +27,12 @@ export class AutoApplyConfig {
 
   // Personalization
   @Prop()
-  applicationStyle?: 'professional' | 'enthusiastic' | 'concise' | 'detailed' | 'technical';
+  applicationStyle?:
+    | 'professional'
+    | 'enthusiastic'
+    | 'concise'
+    | 'detailed'
+    | 'technical';
 
   @Prop()
   availableFrom?: string;
@@ -58,4 +68,5 @@ export class AutoApplyConfig {
   websiteUrl?: string;
 }
 
-export const AutoApplyConfigSchema = SchemaFactory.createForClass(AutoApplyConfig);
+export const AutoApplyConfigSchema =
+  SchemaFactory.createForClass(AutoApplyConfig);

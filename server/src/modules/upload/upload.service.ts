@@ -1,7 +1,4 @@
-import {
-  Injectable,
-  BadRequestException,
-} from '@nestjs/common';
+import { Injectable, BadRequestException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { randomUUID } from 'node:crypto';
@@ -43,16 +40,21 @@ export class UploadService {
       resourceType: 'raw',
     });
 
-    const upload = await this.uploadModel.create({
-      userId,
-      originalName: file.originalname,
-      key: publicId,
-      url,
-      mimeType: file.mimetype,
-      size: file.size,
-    });
-
-    return upload;
+    try {
+      const upload = await this.uploadModel.create({
+        userId,
+        originalName: file.originalname,
+        key: publicId,
+        url,
+        mimeType: file.mimetype,
+        size: file.size,
+      });
+      return upload;
+    } catch (err) {
+      // ADV-0001: compensate orphaned Cloudinary asset if DB fails
+      await this.storage.delete(publicId, 'raw').catch(() => {});
+      throw err;
+    }
   }
 
   async getUserUploads(userId: string, page: number, limit: number) {
@@ -82,7 +84,9 @@ export class UploadService {
   async uploadPhoto(userId: string, file: Express.Multer.File) {
     if (!file) throw new BadRequestException('No file provided');
     if (!PHOTO_MIMES.has(file.mimetype)) {
-      throw new BadRequestException('Only JPEG, PNG, and WebP images are allowed');
+      throw new BadRequestException(
+        'Only JPEG, PNG, and WebP images are allowed',
+      );
     }
     if (file.size > PHOTO_MAX_SIZE) {
       throw new BadRequestException('Photo exceeds 2MB limit');

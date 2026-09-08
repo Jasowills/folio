@@ -1,22 +1,19 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Optional } from '@nestjs/common';
 import { AiCacheService } from './ai-cache.service';
+import { OpencodeService } from './opencode.service';
 
 interface ChatMessage {
   role: 'system' | 'user';
   content: string;
 }
 
-interface OpenRouterRequest {
-  model: string;
-  max_tokens: number;
-  stream: boolean;
-  messages: ChatMessage[];
-  response_format?: { type: 'json_object' };
-}
-
 interface OpenRouterResponse {
   choices: { message: { content: string } }[];
-  usage?: { prompt_tokens: number; completion_tokens: number; total_tokens: number };
+  usage?: {
+    prompt_tokens: number;
+    completion_tokens: number;
+    total_tokens: number;
+  };
 }
 
 const CACHE_TTL: Record<string, number> = {
@@ -37,7 +34,10 @@ const DEFAULT_CHAT_TTL = 10 * 60_000;
 const CIRCUIT_BREAKER_TTL = 30_000;
 
 /** Daily token budget for OpenRouter free tier */
-const DAILY_TOKEN_BUDGET = parseInt(process.env.OPENROUTER_DAILY_BUDGET || '500000', 10);
+const DAILY_TOKEN_BUDGET = parseInt(
+  process.env.OPENROUTER_DAILY_BUDGET || '500000',
+  10,
+);
 
 @Injectable()
 export class AiService {
@@ -46,7 +46,22 @@ export class AiService {
   /** dateString (YYYY-MM-DD) → total tokens used that day */
   private dailyUsage = new Map<string, number>();
 
-  constructor(private cache: AiCacheService) {}
+  constructor(
+    private cache: AiCacheService,
+    @Optional() private opencode?: OpencodeService,
+  ) {}
+
+  private get opencodeConfigured(): boolean {
+    return !!this.opencode?.enabled;
+  }
+
+  private get opencodeModel(): string {
+    return process.env.OPENCODE_MODEL || '';
+  }
+
+  get opencodeStatus(): string {
+    return this.opencode?.status || 'disabled';
+  }
 
   private isOnCooldown(key: string): boolean {
     const until = this.cooldowns.get(key);
@@ -84,7 +99,9 @@ export class AiService {
   }
 
   private get openrouterFallbackModel(): string {
-    return process.env.OPENROUTER_FALLBACK_MODEL || 'google/gemma-4-31b-it:free';
+    return (
+      process.env.OPENROUTER_FALLBACK_MODEL || 'google/gemma-4-31b-it:free'
+    );
   }
 
   private get maxTokens(): number {
@@ -119,11 +136,17 @@ export class AiService {
   private checkDailyBudget(): void {
     const used = this.dailyUsage.get(this.todayKey()) || 0;
     if (used >= DAILY_TOKEN_BUDGET) {
-      this.logger.warn(`Daily token budget exhausted (${used}/${DAILY_TOKEN_BUDGET})`);
-      throw new Error(`Token budget exceeded: ${used}/${DAILY_TOKEN_BUDGET} tokens used today. Try again tomorrow.`);
+      this.logger.warn(
+        `Daily token budget exhausted (${used}/${DAILY_TOKEN_BUDGET})`,
+      );
+      throw new Error(
+        `Token budget exceeded: ${used}/${DAILY_TOKEN_BUDGET} tokens used today. Try again tomorrow.`,
+      );
     }
     if (used > DAILY_TOKEN_BUDGET * 0.8) {
-      this.logger.warn(`Daily token budget at ${Math.round(used / DAILY_TOKEN_BUDGET * 100)}% (${used}/${DAILY_TOKEN_BUDGET})`);
+      this.logger.warn(
+        `Daily token budget at ${Math.round((used / DAILY_TOKEN_BUDGET) * 100)}% (${used}/${DAILY_TOKEN_BUDGET})`,
+      );
     }
   }
 
@@ -131,20 +154,37 @@ export class AiService {
     const today = this.todayKey();
     const used = this.dailyUsage.get(today) || 0;
     this.dailyUsage.set(today, used + tokens);
-    this.logger.log(`Token usage: ${used + tokens}/${DAILY_TOKEN_BUDGET} today`);
+    this.logger.log(
+      `Token usage: ${used + tokens}/${DAILY_TOKEN_BUDGET} today`,
+    );
   }
 
   private promptCategory(system: string): string {
-    if (system.includes('resume data extraction and gap-filling')) return 'extraction';
+    if (system.includes('resume data extraction and gap-filling'))
+      return 'extraction';
     if (system.includes('career analyst')) return 'roleDetection';
     if (system.includes('resume design expert')) return 'quality';
-    if (system.includes('expert recruiter') && system.includes('identify issues')) return 'redFlag';
-    if (system.includes('ATS') && system.includes('Seniority')) return 'atsScoring';
-    if (system.includes('senior recruiter') && system.includes('career coach')) return 'review';
+    if (
+      system.includes('expert recruiter') &&
+      system.includes('identify issues')
+    )
+      return 'redFlag';
+    if (system.includes('ATS') && system.includes('Seniority'))
+      return 'atsScoring';
+    if (system.includes('senior recruiter') && system.includes('career coach'))
+      return 'review';
     if (system.includes('resume writer')) return 'bulletRewriter';
     if (system.includes('cover letter writer')) return 'coverLetter';
-    if (system.includes('senior technical recruiter') && system.includes('portfolio')) return 'portfolio';
-    if (system.includes('interview coach') || system.includes('interview evaluator')) return 'interview';
+    if (
+      system.includes('senior technical recruiter') &&
+      system.includes('portfolio')
+    )
+      return 'portfolio';
+    if (
+      system.includes('interview coach') ||
+      system.includes('interview evaluator')
+    )
+      return 'interview';
     return 'default';
   }
 
@@ -175,7 +215,13 @@ export class AiService {
     model?: string,
     format: 'json' | 'text' = 'json',
   ): Promise<Record<string, unknown> | string> {
-    const resolvedModel = model || (this.ollamaConfigured ? this.ollamaDefaultModel : this.openrouterDefaultModel);
+    const resolvedModel =
+      model ||
+      (this.opencodeConfigured
+        ? this.opencodeModel
+        : this.ollamaConfigured
+          ? this.ollamaDefaultModel
+          : this.openrouterDefaultModel);
     const cacheKey = this.cache.makeKey(system, user, resolvedModel);
 
     if (format === 'text') {
@@ -184,13 +230,19 @@ export class AiService {
         { role: 'user', content: user },
       ];
       const isValidText = (raw: string): boolean => {
-        const trimmed = raw.trim()
-        if (trimmed.length < 5) return false
-        if (trimmed.startsWith('{') || trimmed.startsWith('[')) return false
-        if (/"(userId|response|text|message|interviewerResponse|role|content)"\s*:/.test(trimmed)) return false
-        if (trimmed.length > 0 && trimmed[0] === '"' && trimmed.includes('":')) return false
-        return true
-      }
+        const trimmed = raw.trim();
+        if (trimmed.length < 5) return false;
+        if (trimmed.startsWith('{') || trimmed.startsWith('[')) return false;
+        if (
+          /"(userId|response|text|message|interviewerResponse|role|content)"\s*:/.test(
+            trimmed,
+          )
+        )
+          return false;
+        if (trimmed.length > 0 && trimmed[0] === '"' && trimmed.includes('":'))
+          return false;
+        return true;
+      };
       return this.callWithRetry(messages, model, 2048, isValidText, 'text');
     }
 
@@ -208,7 +260,11 @@ export class AiService {
         new Promise<null>((r) => setTimeout(() => r(null), 15_000)),
       ]);
       if (result) return result;
-      this.logger.debug('Dedup: in-flight request timed out, making new call');
+      // ADV-0003: avoid double-billing on slow provider - surface retryable error instead of second call
+      this.logger.warn('Dedup: in-flight request timed out after 15s, rejecting duplicate to avoid double-billing');
+      throw new Error(
+        'Duplicate request still in progress, please retry shortly',
+      );
     }
 
     const promise = this.callAi(system, user, model);
@@ -234,21 +290,50 @@ export class AiService {
       { role: 'user', content: user },
     ];
 
-    const providers: Array<{ provider: 'ollama' | 'openrouter' | 'groq'; baseUrl: string; model: string }> = [];
+    if (this.opencodeConfigured) {
+      try {
+        this.logger.log('[stream] using opencode provider');
+        return await this.opencode!.stream(system, user, { model });
+      } catch (err) {
+        this.logger.warn(
+          `Stream fallback: opencode failed: ${(err as Error).message}`,
+        );
+      }
+    }
+
+    const providers: Array<{
+      provider: 'ollama' | 'openrouter' | 'groq';
+      baseUrl: string;
+      model: string;
+    }> = [];
 
     if (this.groqConfigured) {
-      providers.push({ provider: 'groq', baseUrl: this.groqBaseUrl, model: model || this.groqDefaultModel });
+      providers.push({
+        provider: 'groq',
+        baseUrl: this.groqBaseUrl,
+        model: model || this.groqDefaultModel,
+      });
     }
     if (this.ollamaConfigured) {
-      providers.push({ provider: 'ollama', baseUrl: this.ollamaBaseUrl, model: model || this.ollamaDefaultModel });
+      providers.push({
+        provider: 'ollama',
+        baseUrl: this.ollamaBaseUrl,
+        model: model || this.ollamaDefaultModel,
+      });
     }
-    providers.push({ provider: 'openrouter', baseUrl: this.openrouterBaseUrl, model: model || this.openrouterDefaultModel });
+    providers.push({
+      provider: 'openrouter',
+      baseUrl: this.openrouterBaseUrl,
+      model: model || this.openrouterDefaultModel,
+    });
 
     for (const { provider, baseUrl, model: m } of providers) {
       try {
         return await this.streamFromProvider(provider, baseUrl, m, messages);
       } catch (err) {
-        this.logger.warn(`Stream fallback: ${provider} failed: ${(err as Error).message}`);
+        this.logger.warn(
+          `Stream fallback: ${provider} failed: ${(err as Error).message}`,
+        );
       }
     }
 
@@ -283,7 +368,7 @@ export class AiService {
         max_tokens: this.maxTokens,
         stream: true,
         messages,
-      } as OpenRouterRequest),
+      }),
     });
 
     if (!res.ok || !res.body) {
@@ -304,18 +389,32 @@ export class AiService {
     ];
 
     const category = this.promptCategory(system);
-    const maxTokens = category === 'extraction' || category === 'interview' ? this.extractionMaxTokens : this.maxTokens;
+    const maxTokens =
+      category === 'extraction' || category === 'interview'
+        ? this.extractionMaxTokens
+        : this.maxTokens;
 
-    const raw = await this.callWithRetry(messages, model, maxTokens, (text) => {
-      const parsed = this.parseJson(text);
-      return Object.keys(parsed).length > 0;
-    }, 'json');
+    const raw = await this.callWithRetry(
+      messages,
+      model,
+      maxTokens,
+      (text) => {
+        const parsed = this.parseJson(text);
+        return Object.keys(parsed).length > 0;
+      },
+      'json',
+    );
     if (category === 'interview' || category === 'atsScoring') {
-      this.logger.log(`[callAi] raw response (first 800 chars): ${raw.slice(0, 800)}`);
+      this.logger.log(
+        `[callAi] raw response (first 800 chars): ${raw.slice(0, 800)}`,
+      );
     }
     const parsed = this.parseJson(raw);
     if (category === 'atsScoring') {
-      this.logger.log(`[callAi] parsed keys: ${Object.keys(parsed).join(', ')}`, parsed);
+      this.logger.log(
+        `[callAi] parsed keys: ${Object.keys(parsed).join(', ')}`,
+        parsed,
+      );
     }
     return parsed;
   }
@@ -350,10 +449,42 @@ export class AiService {
       const msg = (err as Error)?.message || String(err);
       this.setCooldown(key, CIRCUIT_BREAKER_TTL);
       if (msg.includes('429') || msg.includes('402')) {
-        this.logger.warn(`${provider}/${model} rate-limited, circuit open for 30s`);
+        this.logger.warn(
+          `${provider}/${model} rate-limited, circuit open for 30s`,
+        );
       } else {
         this.logger.warn(`${provider}/${model} error: ${msg}`);
       }
+      return null;
+    }
+  }
+
+  private async tryOpencode(
+    messages: ChatMessage[],
+    model?: string,
+    validate?: (raw: string) => boolean,
+  ): Promise<string | null> {
+    if (!this.opencodeConfigured || !this.opencode) return null;
+    const key = this.providerKey('opencode', model || this.opencodeModel);
+    if (this.isOnCooldown(key)) {
+      this.logger.debug('Skipping opencode (circuit open)');
+      return null;
+    }
+    const system = messages.find((m) => m.role === 'system')?.content || '';
+    const user = messages
+      .filter((m) => m.role === 'user')
+      .map((m) => m.content)
+      .join('\n\n');
+    if (!system && !user) return null;
+    try {
+      const text = await this.opencode.chat(system, user, { model });
+      if (validate && !validate(text)) return null;
+      return text;
+    } catch (err) {
+      this.setCooldown(key, CIRCUIT_BREAKER_TTL);
+      this.logger.warn(
+        `opencode/${model || this.opencodeModel} error: ${(err as Error).message}`,
+      );
       return null;
     }
   }
@@ -369,49 +500,107 @@ export class AiService {
     const tokens = maxTokens ?? this.maxTokens;
 
     const primaryProvider = usesOllama ? 'ollama' : 'openrouter';
-    const primaryModel = model || (usesOllama ? this.ollamaDefaultModel : this.openrouterDefaultModel);
+    const primaryModel =
+      model ||
+      (usesOllama ? this.ollamaDefaultModel : this.openrouterDefaultModel);
     const fallbackModel = this.openrouterFallbackModel;
 
     const valid = (raw: string | null): raw is string =>
       raw !== null && (!validate || validate(raw));
 
     for (let attempt = 1; attempt <= 3; attempt++) {
+      // Try opencode brain first when configured
+      const r0 = await this.tryOpencode(messages, model, validate);
+      if (valid(r0)) return r0;
+
       // Try primary provider
-      const r1 = await this.tryProvider(primaryProvider, primaryModel, messages, tokens, format);
+      const r1 = await this.tryProvider(
+        primaryProvider,
+        primaryModel,
+        messages,
+        tokens,
+        format,
+      );
       if (valid(r1)) return r1;
 
       // If Ollama is primary, try Groq next (OpenRouter consistently 402s)
       if (usesOllama) {
         if (this.groqConfigured) {
-          const r2 = await this.tryProvider('groq', this.groqDefaultModel, messages, tokens, format);
+          const r2 = await this.tryProvider(
+            'groq',
+            this.groqDefaultModel,
+            messages,
+            tokens,
+            format,
+          );
           if (valid(r2)) return r2;
-          const r3 = await this.tryProvider('groq', this.groqFallbackModel, messages, tokens, format);
+          const r3 = await this.tryProvider(
+            'groq',
+            this.groqFallbackModel,
+            messages,
+            tokens,
+            format,
+          );
           if (valid(r3)) return r3;
         }
-        const r4 = await this.tryProvider('openrouter', this.openrouterDefaultModel, messages, tokens, format);
+        const r4 = await this.tryProvider(
+          'openrouter',
+          this.openrouterDefaultModel,
+          messages,
+          tokens,
+          format,
+        );
         if (valid(r4)) return r4;
-        const r5 = await this.tryProvider('openrouter', fallbackModel, messages, tokens, format);
+        const r5 = await this.tryProvider(
+          'openrouter',
+          fallbackModel,
+          messages,
+          tokens,
+          format,
+        );
         if (valid(r5)) return r5;
       } else {
         // OpenRouter is primary — try Groq before OpenRouter fallback
-        const r2 = await this.tryProvider('openrouter', fallbackModel, messages, tokens, format);
+        const r2 = await this.tryProvider(
+          'openrouter',
+          fallbackModel,
+          messages,
+          tokens,
+          format,
+        );
         if (valid(r2)) return r2;
         if (this.groqConfigured) {
-          const r3 = await this.tryProvider('groq', this.groqDefaultModel, messages, tokens, format);
+          const r3 = await this.tryProvider(
+            'groq',
+            this.groqDefaultModel,
+            messages,
+            tokens,
+            format,
+          );
           if (valid(r3)) return r3;
-          const r4 = await this.tryProvider('groq', this.groqFallbackModel, messages, tokens, format);
+          const r4 = await this.tryProvider(
+            'groq',
+            this.groqFallbackModel,
+            messages,
+            tokens,
+            format,
+          );
           if (valid(r4)) return r4;
         }
       }
 
       if (attempt < 3) {
         const delay = 3000 + Math.random() * 2000;
-        this.logger.debug(`Retry ${attempt + 1}/3 after ${Math.round(delay)}ms`);
+        this.logger.debug(
+          `Retry ${attempt + 1}/3 after ${Math.round(delay)}ms`,
+        );
         await new Promise((r) => setTimeout(r, delay));
       }
     }
 
-    throw new Error('AI service is currently unavailable. All providers exhausted. Please try again later.');
+    throw new Error(
+      'AI service is currently unavailable. All providers exhausted. Please try again later.',
+    );
   }
 
   private async callOpenRouter(
@@ -444,7 +633,7 @@ export class AiService {
           max_tokens: effectiveMaxTokens,
           stream: false,
           messages,
-        } as OpenRouterRequest),
+        }),
       });
 
       finish();
@@ -453,9 +642,13 @@ export class AiService {
         const body = await res.text().catch(() => '');
         if (res.status === 429) {
           const retryAfter = res.headers.get('Retry-After');
-          throw new Error(`429 rate limited${retryAfter ? `:${retryAfter}` : ''}${body ? ` — ${body.slice(0, 100)}` : ''}`);
+          throw new Error(
+            `429 rate limited${retryAfter ? `:${retryAfter}` : ''}${body ? ` — ${body.slice(0, 100)}` : ''}`,
+          );
         }
-        throw new Error(`OpenRouter API error: ${res.status}${body ? ` — ${body.slice(0, 200)}` : ''}`);
+        throw new Error(
+          `OpenRouter API error: ${res.status}${body ? ` — ${body.slice(0, 200)}` : ''}`,
+        );
       }
 
       const data = (await res.json()) as OpenRouterResponse;
@@ -479,7 +672,7 @@ export class AiService {
     messages: ChatMessage[],
     maxTokens?: number,
   ): Promise<string> {
-      const url = `${this.groqBaseUrl}/chat/completions`;
+    const url = `${this.groqBaseUrl}/chat/completions`;
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 60_000);
 
@@ -508,9 +701,13 @@ export class AiService {
       if (!res.ok) {
         const body = await res.text().catch(() => '');
         if (res.status === 429) {
-          throw new Error(`429 rate limited${body ? ` — ${body.slice(0, 100)}` : ''}`);
+          throw new Error(
+            `429 rate limited${body ? ` — ${body.slice(0, 100)}` : ''}`,
+          );
         }
-        throw new Error(`Groq API error: ${res.status}${body ? ` — ${body.slice(0, 200)}` : ''}`);
+        throw new Error(
+          `Groq API error: ${res.status}${body ? ` — ${body.slice(0, 200)}` : ''}`,
+        );
       }
 
       const data = (await res.json()) as OpenRouterResponse;
@@ -524,16 +721,16 @@ export class AiService {
     }
   }
 
-  async chatForBuilder(
-    system: string,
-    user: string,
-  ): Promise<string> {
+  async chatForBuilder(system: string, user: string): Promise<string> {
     const messages: ChatMessage[] = [
       { role: 'system', content: system },
       { role: 'user', content: user },
     ];
 
-    const builderProviders: Array<{ provider: 'groq' | 'openrouter'; model: string }> = [
+    const builderProviders: Array<{
+      provider: 'groq' | 'openrouter';
+      model: string;
+    }> = [
       { provider: 'groq', model: this.groqDefaultModel },
       { provider: 'groq', model: this.groqFallbackModel },
       { provider: 'openrouter', model: this.groqDefaultModel },
@@ -541,6 +738,9 @@ export class AiService {
     ];
 
     for (let attempt = 1; attempt <= 3; attempt++) {
+      const r0 = await this.tryOpencode(messages);
+      if (r0 !== null) return r0;
+
       for (const { provider, model } of builderProviders) {
         if (provider === 'groq' && !this.groqConfigured) continue;
         const result = await this.tryProvider(provider, model, messages, 2048);
@@ -549,44 +749,59 @@ export class AiService {
 
       if (attempt < 3) {
         const delay = 3000 + Math.random() * 2000;
-        this.logger.debug(`[chatForBuilder] Retry ${attempt + 1}/3 after ${Math.round(delay)}ms`);
+        this.logger.debug(
+          `[chatForBuilder] Retry ${attempt + 1}/3 after ${Math.round(delay)}ms`,
+        );
         await new Promise((r) => setTimeout(r, delay));
       }
     }
 
-    throw new Error('AI service is currently unavailable. All providers exhausted. Please try again later.');
+    throw new Error(
+      'AI service is currently unavailable. All providers exhausted. Please try again later.',
+    );
   }
 
-  async chatForInterview(
-    system: string,
-    user: string,
-  ): Promise<string> {
+  async chatForInterview(system: string, user: string): Promise<string> {
     const messages: ChatMessage[] = [
       { role: 'system', content: system },
       { role: 'user', content: user },
     ];
 
-    const interviewProviders: Array<{ provider: 'groq' | 'openrouter'; model: string }> = [
+    const interviewProviders: Array<{
+      provider: 'groq' | 'openrouter';
+      model: string;
+    }> = [
       { provider: 'groq', model: this.groqDefaultModel },
       { provider: 'groq', model: this.groqFallbackModel },
       { provider: 'openrouter', model: this.openrouterFallbackModel },
     ];
 
     for (let attempt = 1; attempt <= 3; attempt++) {
+      const r0 = await this.tryOpencode(messages);
+      if (r0 !== null) return r0;
+
       for (const { provider, model } of interviewProviders) {
         if (provider === 'groq' && !this.groqConfigured) continue;
-        const result = await this.tryProviderForInterview(provider, model, messages);
+        const result = await this.tryProviderForInterview(
+          provider,
+          model,
+          messages,
+        );
         if (result !== null) return result;
       }
 
       if (attempt < 3) {
         const delay = 3000 + Math.random() * 2000;
-        this.logger.debug(`[chatForInterview] Retry ${attempt + 1}/3 after ${Math.round(delay)}ms`);
+        this.logger.debug(
+          `[chatForInterview] Retry ${attempt + 1}/3 after ${Math.round(delay)}ms`,
+        );
         await new Promise((r) => setTimeout(r, delay));
       }
     }
 
-    throw new Error('AI service is currently unavailable. All providers exhausted. Please try again later.');
+    throw new Error(
+      'AI service is currently unavailable. All providers exhausted. Please try again later.',
+    );
   }
 
   private async tryProviderForInterview(
@@ -608,12 +823,15 @@ export class AiService {
       return await this.callOpenRouter(model, messages, 2048);
     } catch (err) {
       const msg = (err as Error)?.message || String(err);
-      const is429 = msg.includes('429');
-      if (is429) {
-        this.setCooldown(key, CIRCUIT_BREAKER_TTL);
-        this.logger.warn(`${provider}/${model} rate-limited, circuit open for 30s`);
+      // ADV-0002: open circuit on any provider error (500/timeout) to avoid hammering
+      this.setCooldown(key, CIRCUIT_BREAKER_TTL);
+      if (msg.includes('429') || msg.includes('402')) {
+        this.logger.warn(
+          `${provider}/${model} rate-limited, circuit open for 30s`,
+        );
+      } else {
+        this.logger.warn(`${provider}/${model} error: ${msg} — circuit open for 30s`);
       }
-      if (!is429) this.logger.warn(`${provider}/${model} error: ${msg}`);
       return null;
     }
   }
@@ -654,14 +872,16 @@ export class AiService {
         signal: controller.signal,
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body as unknown as OpenRouterRequest),
+        body: JSON.stringify(body),
       });
 
       finish();
 
       if (!res.ok) {
         const body = await res.text().catch(() => '');
-        throw new Error(`Ollama API error: ${res.status}${body ? ` — ${body.slice(0, 200)}` : ''}`);
+        throw new Error(
+          `Ollama API error: ${res.status}${body ? ` — ${body.slice(0, 200)}` : ''}`,
+        );
       }
 
       const data = (await res.json()) as OpenRouterResponse;
@@ -678,24 +898,42 @@ export class AiService {
   private parseJson(raw: string): Record<string, unknown> {
     if (!raw) return {};
 
-    const cleaned = raw.replace(/```json\s*/g, '').replace(/```\s*/g, '').trim();
+    const cleaned = raw
+      .replace(/```json\s*/g, '')
+      .replace(/```\s*/g, '')
+      .trim();
 
     // Escape control characters that appear inside JSON string values
     // The llama3.2:1b model often emits literal newlines inside strings
     const escapeJsonStrings = (s: string): string => {
-      let out = ''
-      let inStr = false
-      let esc = false
+      let out = '';
+      let inStr = false;
+      let esc = false;
       for (let i = 0; i < s.length; i++) {
-        const ch = s[i]
-        if (esc) { esc = false; out += ch; continue }
-        if (ch === '\\' && inStr) { esc = true; out += ch; continue }
-        if (ch === '"') { inStr = !inStr; out += ch; continue }
-        if (inStr && (ch === '\n' || ch === '\r' || ch === '\t')) { out += ' '; continue }
-        out += ch
+        const ch = s[i];
+        if (esc) {
+          esc = false;
+          out += ch;
+          continue;
+        }
+        if (ch === '\\' && inStr) {
+          esc = true;
+          out += ch;
+          continue;
+        }
+        if (ch === '"') {
+          inStr = !inStr;
+          out += ch;
+          continue;
+        }
+        if (inStr && (ch === '\n' || ch === '\r' || ch === '\t')) {
+          out += ' ';
+          continue;
+        }
+        out += ch;
       }
-      return out
-    }
+      return out;
+    };
 
     const start = cleaned.indexOf('{');
     if (start === -1) {
@@ -708,17 +946,23 @@ export class AiService {
         const parsed = JSON.parse(str);
         if (typeof parsed === 'object' && parsed !== null) return parsed;
       } catch (e) {
-        this.logger.debug(`parseJson: JSON.parse failed — ${(e as Error).message.slice(0, 80)}`);
+        this.logger.debug(
+          `parseJson: JSON.parse failed — ${(e as Error).message.slice(0, 80)}`,
+        );
       }
       return null;
     };
 
     // The 1B model sometimes wraps JSON in a JSON string (starts/ends with ")
     // e.g. "{"firstName":"Kavya"}" — unwrap it before parsing
-    if (cleaned.startsWith('"') && cleaned.endsWith('"') && cleaned.indexOf('{') === 1) {
+    if (
+      cleaned.startsWith('"') &&
+      cleaned.endsWith('"') &&
+      cleaned.indexOf('{') === 1
+    ) {
       const inner = cleaned.slice(1, -1);
-      const parsed = tryParse(inner)
-      if (parsed) return parsed
+      const parsed = tryParse(inner);
+      if (parsed) return parsed;
     }
 
     // Try every complete JSON object in the response, not just the first one
@@ -731,11 +975,16 @@ export class AiService {
         if (cleaned[i] === '{') depth++;
         else if (cleaned[i] === '}') {
           depth--;
-          if (depth === 0) { end = i + 1; break; }
+          if (depth === 0) {
+            end = i + 1;
+            break;
+          }
         }
       }
       if (end !== -1) {
-        const parsed = tryParse(escapeJsonStrings(cleaned.slice(searchStart, end)));
+        const parsed = tryParse(
+          escapeJsonStrings(cleaned.slice(searchStart, end)),
+        );
         if (parsed) return parsed;
         searchStart = cleaned.indexOf('{', end);
       } else {
@@ -779,10 +1028,21 @@ export class AiService {
     const body = cleaned.slice(start);
     for (let i = body.length - 1; i > 0; i--) {
       const ch = body[i];
-      if (ch === '}' || ch === ']' || ch === '"' || /\d/.test(ch) || (ch === 'e' && (body.substring(i - 3, i + 1) === 'true' || body.substring(i - 4, i + 1) === 'false')) || (ch === 'l' && body.substring(i - 3, i + 1) === 'null')) {
+      if (
+        ch === '}' ||
+        ch === ']' ||
+        ch === '"' ||
+        /\d/.test(ch) ||
+        (ch === 'e' &&
+          (body.substring(i - 3, i + 1) === 'true' ||
+            body.substring(i - 4, i + 1) === 'false')) ||
+        (ch === 'l' && body.substring(i - 3, i + 1) === 'null')
+      ) {
         const parsed = tryParse(escapeJsonStrings(body.substring(0, i + 1)));
         if (parsed) {
-          this.logger.debug(`parseJson: recovered via progressive fallback (length: ${i + 1})`);
+          this.logger.debug(
+            `parseJson: recovered via progressive fallback (length: ${i + 1})`,
+          );
           return parsed;
         }
       }

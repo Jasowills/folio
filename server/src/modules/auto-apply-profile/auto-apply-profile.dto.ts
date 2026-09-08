@@ -1,4 +1,13 @@
-import { IsString, IsBoolean, IsOptional, IsNumber, IsEnum, IsArray, Min, Max } from 'class-validator';
+import {
+  IsString,
+  IsBoolean,
+  IsOptional,
+  IsNumber,
+  IsEnum,
+  IsArray,
+  Min,
+  Max,
+} from 'class-validator';
 
 export class UpdateLogisticsDto {
   @IsEnum(['immediately', 'two_weeks', 'one_month', 'custom'])

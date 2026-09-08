@@ -1,39 +1,39 @@
-import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose'
-import { Document, Types, Schema as MongooseSchema } from 'mongoose'
+import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
+import { Document, Types, Schema as MongooseSchema } from 'mongoose';
 
-export type ConnectionDocument = Connection & Document
+export type ConnectionDocument = Connection & Document;
 
 @Schema({ timestamps: true })
 export class Connection {
   @Prop({ required: true, type: MongooseSchema.Types.ObjectId, ref: 'User' })
-  userId!: Types.ObjectId
+  userId!: Types.ObjectId;
 
   @Prop({ required: true })
-  firstName!: string
+  firstName!: string;
 
   @Prop()
-  lastName?: string
+  lastName?: string;
 
   @Prop()
-  email?: string
+  email?: string;
 
   @Prop()
-  companyName?: string
+  companyName?: string;
 
   @Prop()
-  position?: string
+  position?: string;
 
   @Prop()
-  connectedOn?: Date
+  connectedOn?: Date;
 
   @Prop({ type: [String] })
-  tags?: string[]
+  tags?: string[];
 
   @Prop({ default: 'imported' })
-  status!: 'active' | 'contacted' | 'not_interested'
+  status!: 'active' | 'contacted' | 'not_interested';
 }
 
-export const ConnectionSchema = SchemaFactory.createForClass(Connection)
+export const ConnectionSchema = SchemaFactory.createForClass(Connection);
 
-ConnectionSchema.index({ userId: 1, companyName: 1 })
-ConnectionSchema.index({ userId: 1, status: 1 })
+ConnectionSchema.index({ userId: 1, companyName: 1 });
+ConnectionSchema.index({ userId: 1, status: 1 });

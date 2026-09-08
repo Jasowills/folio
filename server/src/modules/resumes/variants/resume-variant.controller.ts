@@ -1,5 +1,11 @@
 import {
-  Controller, Get, Post, Param, Body, Query, UseGuards,
+  Controller,
+  Get,
+  Post,
+  Param,
+  Body,
+  Query,
+  UseGuards,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags, ApiOperation } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
@@ -17,7 +23,8 @@ export class ResumeVariantController {
   @ApiOperation({ summary: 'Create a resume variant (tailored version)' })
   async create(
     @Param('baseResumeId') baseResumeId: string,
-    @Body() body: {
+    @Body()
+    body: {
       templateId: string;
       tailoredData: Record<string, unknown>;
       tailoredForJobId?: string;
@@ -40,15 +47,17 @@ export class ResumeVariantController {
     @Param('baseResumeId') baseResumeId: string,
     @CurrentUser() user: any,
   ) {
-    return this.variantService.findByBaseResume(user._id.toString(), baseResumeId);
+    return this.variantService.findByBaseResume(
+      user._id.toString(),
+      baseResumeId,
+    );
   }
 
   @Get('resume-variants/:id/render')
-  @ApiOperation({ summary: 'Resolve variant diff against base, return full ResumeData' })
-  async render(
-    @Param('id') id: string,
-    @CurrentUser() user: any,
-  ) {
+  @ApiOperation({
+    summary: 'Resolve variant diff against base, return full ResumeData',
+  })
+  async render(@Param('id') id: string, @CurrentUser() user: any) {
     return this.variantService.render(user._id.toString(), id);
   }
 

@@ -8,7 +8,11 @@ export class ApplyOddsAssessment {
   @Prop({ required: true, type: MongooseSchema.Types.ObjectId, ref: 'User' })
   userId!: Types.ObjectId;
 
-  @Prop({ required: true, type: MongooseSchema.Types.ObjectId, ref: 'JobListing' })
+  @Prop({
+    required: true,
+    type: MongooseSchema.Types.ObjectId,
+    ref: 'JobListing',
+  })
   jobId!: Types.ObjectId;
 
   @Prop({ type: Number, required: false })
@@ -17,10 +21,18 @@ export class ApplyOddsAssessment {
   @Prop({ type: Number, required: false })
   listingAgeDays?: number;
 
-  @Prop({ type: String, enum: ['low', 'medium', 'high', 'unknown'], default: 'unknown' })
+  @Prop({
+    type: String,
+    enum: ['low', 'medium', 'high', 'unknown'],
+    default: 'unknown',
+  })
   estimatedCompetitionLevel!: string;
 
-  @Prop({ type: String, enum: ['strong_apply', 'apply', 'long_shot', 'skip'], required: true })
+  @Prop({
+    type: String,
+    enum: ['strong_apply', 'apply', 'long_shot', 'skip'],
+    required: true,
+  })
   recommendation!: string;
 
   @Prop({ type: [String], default: [] })
@@ -30,6 +42,7 @@ export class ApplyOddsAssessment {
   generatedAt!: Date;
 }
 
-export const ApplyOddsAssessmentSchema = SchemaFactory.createForClass(ApplyOddsAssessment);
+export const ApplyOddsAssessmentSchema =
+  SchemaFactory.createForClass(ApplyOddsAssessment);
 
 ApplyOddsAssessmentSchema.index({ userId: 1, jobId: 1 }, { unique: true });

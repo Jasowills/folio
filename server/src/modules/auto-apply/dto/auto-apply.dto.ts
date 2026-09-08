@@ -1,5 +1,15 @@
 import { Type } from 'class-transformer';
-import { IsArray, IsBoolean, IsNumber, IsObject, IsOptional, IsString, Min, Max, IsIn } from 'class-validator';
+import {
+  IsArray,
+  IsBoolean,
+  IsNumber,
+  IsObject,
+  IsOptional,
+  IsString,
+  Min,
+  Max,
+  IsIn,
+} from 'class-validator';
 
 export class ApproveJobsDto {
   @IsArray()
@@ -30,7 +40,14 @@ export class StoreAnswerDto {
   answer!: string;
 
   @IsString()
-  @IsIn(['visa', 'salary', 'notice_period', 'location', 'sponsorship', 'generic'])
+  @IsIn([
+    'visa',
+    'salary',
+    'notice_period',
+    'location',
+    'sponsorship',
+    'generic',
+  ])
   category!: string;
 }
 

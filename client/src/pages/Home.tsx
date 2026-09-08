@@ -271,28 +271,61 @@ export default function Home() {
           </span>
 
           {/* Hero */}
-          <div className="min-h-screen flex flex-col items-center justify-center px-6 relative z-10">
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
-              className="text-center max-w-2xl"
-            >
-              <span className="label-uppercase text-teal mb-5 block tracking-[0.15em]">
-                ATS scores, AI rewrites, job matches
-              </span>
-              <HeroHeadline />
-              <p className="font-body text-body-lg text-muted mt-4 max-w-lg mx-auto leading-relaxed">
-                Drop your resume. See what recruiters and ATS systems see in under 30 seconds. No account needed.
-              </p>
-            </motion.div>
+          <div className="min-h-screen flex flex-col justify-center px-6 relative z-10 pt-28 pb-16">
+            <div className="grid lg:grid-cols-[1.05fr_0.95fr] gap-12 lg:gap-16 items-center max-w-6xl mx-auto w-full">
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
+              >
+                <span className="inline-flex items-center gap-2 rounded-full bg-teal-light border border-teal/15 px-3 py-1 mb-6">
+                  <span className="h-1.5 w-1.5 rounded-full bg-teal" />
+                  <span className="label-uppercase text-teal tracking-[0.12em]">
+                    ATS scores · AI rewrites · job matches
+                  </span>
+                </span>
+                <HeroHeadline />
+                <p className="font-body text-body-lg text-muted mt-5 max-w-md leading-relaxed">
+                  Drop your resume. See what recruiters and ATS systems see in under 30 seconds. No account needed.
+                </p>
+              </motion.div>
+
+              <motion.div
+                initial={{ opacity: 0, scale: 0.97 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1], delay: 0.15 }}
+                className="relative"
+              >
+                <div className="absolute -inset-6 bg-gradient-to-tr from-teal/10 via-transparent to-amber/10 rounded-[2rem] blur-2xl" />
+                <div className="relative rounded-2xl overflow-hidden border border-border shadow-resume">
+                  <img
+                    src="https://images.unsplash.com/photo-1586281380349-632531db7ed4?auto=format&fit=crop&w=1400&q=80"
+                    alt="A polished resume resting on a desk beside a laptop"
+                    loading="lazy"
+                    className="w-full h-[420px] lg:h-[520px] object-cover"
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-ink/25 via-transparent to-transparent" />
+
+                  <div className="absolute bottom-4 left-4 right-4 flex items-end justify-between gap-3">
+                    <div className="rounded-xl bg-surface/95 backdrop-blur px-4 py-3 shadow-card border border-border">
+                      <p className="label-uppercase text-muted">ATS score</p>
+                      <p className="font-display text-h3 text-ink leading-tight">92<span className="text-sm text-success">/100</span></p>
+                    </div>
+                    <div className="hidden sm:flex items-center gap-2 rounded-xl bg-surface/95 backdrop-blur px-4 py-3 shadow-card border border-border">
+                      <span className="h-2 w-2 rounded-full bg-success" />
+                      <p className="text-xs font-medium text-ink">12 keywords matched</p>
+                    </div>
+                  </div>
+                </div>
+              </motion.div>
+            </div>
 
             <motion.div
               id="upload"
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.2, duration: 0.5 }}
-              className="mt-8 w-full max-w-lg scroll-mt-24"
+              transition={{ delay: 0.3, duration: 0.5 }}
+              className="mt-12 w-full max-w-lg mx-auto scroll-mt-24"
             >
               <UploadZone onFile={handleFile} />
             </motion.div>
@@ -300,7 +333,7 @@ export default function Home() {
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
-              transition={{ delay: 0.4, duration: 0.5 }}
+              transition={{ delay: 0.45, duration: 0.5 }}
               className="flex flex-wrap items-center justify-center gap-x-6 gap-y-1 mt-8"
             >
               {['ATS Score', null, 'Bullet Rewriter', null, 'Cover Letter', null, 'Portfolio Check'].map((item, i) =>

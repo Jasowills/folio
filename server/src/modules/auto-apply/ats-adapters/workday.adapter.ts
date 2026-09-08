@@ -24,19 +24,28 @@ export class WorkdayAdapter {
     try {
       browser = await chromium.launch({ headless: true });
       const page = await browser.newPage();
-      await page.goto(applicationUrl, { waitUntil: 'networkidle', timeout: 30000 });
+      await page.goto(applicationUrl, {
+        waitUntil: 'networkidle',
+        timeout: 30000,
+      });
 
       const fields: ApplyField[] = [];
       const screeningQuestions: { question: string; inputType: string }[] = [];
 
       // Workday may have an "Apply" or "Start" button to click first
-      const startButton = await page.$('button[aria-label*="Apply"], button[data-automation-id*="apply"], button:has-text("Apply"), button:has-text("Start")');
+      const startButton = await page.$(
+        'button[aria-label*="Apply"], button[data-automation-id*="apply"], button:has-text("Apply"), button:has-text("Start")',
+      );
       if (startButton) {
         await startButton.click();
         await page.waitForTimeout(2000);
       }
 
-      await page.waitForSelector('input[name], .wd-form, [data-automation-id]', { timeout: 15000 }).catch(() => {});
+      await page
+        .waitForSelector('input[name], .wd-form, [data-automation-id]', {
+          timeout: 15000,
+        })
+        .catch(() => {});
 
       // Full name
       if (userData?.fullName) {
@@ -49,14 +58,26 @@ export class WorkdayAdapter {
           'input[name*="first" i]',
           'input[aria-label*="first" i]',
         ]);
-        if (filledFirst) fields.push({ fieldName: 'first_name', fieldValue: firstName, autoFilled: true, editable: true });
+        if (filledFirst)
+          fields.push({
+            fieldName: 'first_name',
+            fieldValue: firstName,
+            autoFilled: true,
+            editable: true,
+          });
 
         const filledLast = await this.fillField(page, lastName, [
           'input[data-automation-id*="lastName"]',
           'input[name*="last" i]',
           'input[aria-label*="last" i]',
         ]);
-        if (filledLast) fields.push({ fieldName: 'last_name', fieldValue: lastName, autoFilled: true, editable: true });
+        if (filledLast)
+          fields.push({
+            fieldName: 'last_name',
+            fieldValue: lastName,
+            autoFilled: true,
+            editable: true,
+          });
       }
 
       // Email
@@ -66,7 +87,13 @@ export class WorkdayAdapter {
           'input[name*="email" i]',
           'input[type="email"]',
         ]);
-        if (filled) fields.push({ fieldName: 'email', fieldValue: userData.email, autoFilled: true, editable: true });
+        if (filled)
+          fields.push({
+            fieldName: 'email',
+            fieldValue: userData.email,
+            autoFilled: true,
+            editable: true,
+          });
       }
 
       // Phone
@@ -76,7 +103,13 @@ export class WorkdayAdapter {
           'input[name*="phone" i]',
           'input[aria-label*="phone" i]',
         ]);
-        if (filled) fields.push({ fieldName: 'phone', fieldValue: userData.phone, autoFilled: true, editable: true });
+        if (filled)
+          fields.push({
+            fieldName: 'phone',
+            fieldValue: userData.phone,
+            autoFilled: true,
+            editable: true,
+          });
       }
 
       // LinkedIn
@@ -86,7 +119,13 @@ export class WorkdayAdapter {
           'input[name*="linked" i]',
           'input[aria-label*="linked" i]',
         ]);
-        if (filled) fields.push({ fieldName: 'linkedin_url', fieldValue: userData.linkedinUrl, autoFilled: true, editable: true });
+        if (filled)
+          fields.push({
+            fieldName: 'linkedin_url',
+            fieldValue: userData.linkedinUrl,
+            autoFilled: true,
+            editable: true,
+          });
       }
 
       // Resume upload
@@ -95,7 +134,12 @@ export class WorkdayAdapter {
           const fileInput = await page.$('input[type="file"]');
           if (fileInput) {
             await fileInput.setInputFiles(resumeUrl);
-            fields.push({ fieldName: 'resume', fieldValue: resumeUrl, autoFilled: true, editable: false });
+            fields.push({
+              fieldName: 'resume',
+              fieldValue: resumeUrl,
+              autoFilled: true,
+              editable: false,
+            });
           }
         } catch {
           this.logger.debug('Resume upload field not found');
@@ -109,11 +153,19 @@ export class WorkdayAdapter {
           'textarea[name*="cover" i]',
           'textarea[aria-label*="cover" i]',
         ]);
-        if (filled) fields.push({ fieldName: 'cover_letter', fieldValue: coverLetterContent, autoFilled: true, editable: true });
+        if (filled)
+          fields.push({
+            fieldName: 'cover_letter',
+            fieldValue: coverLetterContent,
+            autoFilled: true,
+            editable: true,
+          });
       }
 
       // Detect screening questions
-      const questionEls = await page.$$('[data-automation-id*="question"], .wd-question, .form-group, label, [class*="question"]');
+      const questionEls = await page.$$(
+        '[data-automation-id*="question"], .wd-question, .form-group, label, [class*="question"]',
+      );
       for (const el of questionEls) {
         const text = await el.textContent().catch(() => '');
         if (text && text.trim().length > 5) {
@@ -122,9 +174,14 @@ export class WorkdayAdapter {
           let inputType = 'text';
           if (selectInside) inputType = 'select';
           else if (inputInside) {
-            inputType = await inputInside.getAttribute('type').catch(() => 'text') || 'text';
+            inputType =
+              (await inputInside.getAttribute('type').catch(() => 'text')) ||
+              'text';
           }
-          screeningQuestions.push({ question: text.trim().slice(0, 200), inputType });
+          screeningQuestions.push({
+            question: text.trim().slice(0, 200),
+            inputType,
+          });
         }
       }
 
@@ -132,13 +189,22 @@ export class WorkdayAdapter {
     } catch (err) {
       const message = (err as Error).message;
       this.logger.error(`Workday fill failed: ${message}`);
-      return { success: false, fields: [], screeningQuestions: [], error: message };
+      return {
+        success: false,
+        fields: [],
+        screeningQuestions: [],
+        error: message,
+      };
     } finally {
       if (browser) await browser.close();
     }
   }
 
-  private async fillField(page: any, value: string, selectors: string[]): Promise<boolean> {
+  private async fillField(
+    page: any,
+    value: string,
+    selectors: string[],
+  ): Promise<boolean> {
     for (const selector of selectors) {
       try {
         const el = await page.$(selector);

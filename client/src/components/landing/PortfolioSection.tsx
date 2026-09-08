@@ -21,7 +21,7 @@ function PortfolioMockup() {
       {/* Score ring header */}
       <div className="flex items-center gap-5 mb-5 pb-5 border-b border-border/30">
         <div className="relative flex items-center justify-center">
-          <AnimatedScoreRing score={70} size={72} strokeWidth={5} color="#BA7517" />
+          <AnimatedScoreRing score={70} size={72} strokeWidth={5} color="#D97706" />
         </div>
         <div>
           <p className="font-display text-h4 text-ink">Portfolio alignment</p>
@@ -74,7 +74,7 @@ export default function PortfolioSection() {
     <SectionWrapper className="bg-paper">
       <div className="relative">
       <Drift duration={5.8} delay={0.2} className="top-[12%] left-[6%]">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#1A1A1A" strokeWidth="1.5" opacity="0.07">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#0F172A" strokeWidth="1.5" opacity="0.07">
           <circle cx="12" cy="12" r="10" /><line x1="2" y1="12" x2="22" y2="12" /><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
         </svg>
       </Drift>

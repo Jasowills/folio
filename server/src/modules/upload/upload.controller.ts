@@ -61,10 +61,7 @@ export class UploadController {
   @Delete(':id')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Delete an upload' })
-  async remove(
-    @Param('id') id: string,
-    @CurrentUser() user: UserDocument,
-  ) {
+  async remove(@Param('id') id: string, @CurrentUser() user: UserDocument) {
     const deleted = await this.uploadService.deleteUpload(
       id,
       user._id.toString(),
@@ -76,7 +73,9 @@ export class UploadController {
   @Post('photo')
   @UseInterceptors(FileInterceptor('file'))
   @HttpCode(HttpStatus.CREATED)
-  @ApiOperation({ summary: 'Upload a profile photo (JPEG, PNG, WebP, max 2MB)' })
+  @ApiOperation({
+    summary: 'Upload a profile photo (JPEG, PNG, WebP, max 2MB)',
+  })
   @ApiConsumes('multipart/form-data')
   async uploadPhoto(
     @UploadedFile() file: Express.Multer.File,

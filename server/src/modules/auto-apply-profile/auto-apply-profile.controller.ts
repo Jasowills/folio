@@ -1,8 +1,24 @@
-import { Controller, Get, Put, Post, Patch, Delete, Body, Param, Req, UseGuards } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Put,
+  Post,
+  Patch,
+  Delete,
+  Body,
+  Param,
+  Req,
+  UseGuards,
+} from '@nestjs/common';
 import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { AutoApplyProfileService } from './auto-apply-profile.service';
-import { UpdateLogisticsDto, CreateCustomQaDto, UpdateCustomQaDto, UpdateStyleDto } from './auto-apply-profile.dto';
+import {
+  UpdateLogisticsDto,
+  CreateCustomQaDto,
+  UpdateCustomQaDto,
+  UpdateStyleDto,
+} from './auto-apply-profile.dto';
 
 @ApiTags('Auto-Apply Profile')
 @ApiBearerAuth()
@@ -27,7 +43,11 @@ export class AutoApplyProfileController {
   }
 
   @Patch('custom-qa/:qaId')
-  async updateCustomQa(@Req() req: any, @Param('qaId') qaId: string, @Body() dto: UpdateCustomQaDto) {
+  async updateCustomQa(
+    @Req() req: any,
+    @Param('qaId') qaId: string,
+    @Body() dto: UpdateCustomQaDto,
+  ) {
     return this.profileService.updateCustomQa(req.user._id, qaId, dto);
   }
 

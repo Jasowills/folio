@@ -94,7 +94,7 @@ export default function DiscoverFeed() {
 
   const displayJobs = cursor ? [...allJobs, ...jobs] : jobs
 
-  const loadMoreRef = useRef<() => void>()
+  const loadMoreRef = useRef<(() => void) | null>(null)
   const handleLoadMore = useCallback(() => {
     if (data?.cursor && !isFetching) {
       setAllJobs(displayJobs)

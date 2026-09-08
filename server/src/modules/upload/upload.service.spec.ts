@@ -77,7 +77,10 @@ describe('UploadService', () => {
       expect(result.size).toBe(1024 * 500);
       expect(storage.upload).toHaveBeenCalledWith(
         mockFile.buffer,
-        expect.objectContaining({ folder: 'folio-uploads', resourceType: 'raw' }),
+        expect.objectContaining({
+          folder: 'folio-uploads',
+          resourceType: 'raw',
+        }),
       );
       expect(model.create).toHaveBeenCalledWith({
         userId: 'user-id',
@@ -90,9 +93,9 @@ describe('UploadService', () => {
     });
 
     it('rejects null file', async () => {
-      await expect(
-        service.uploadFile('user-id', null as any),
-      ).rejects.toThrow(BadRequestException);
+      await expect(service.uploadFile('user-id', null as any)).rejects.toThrow(
+        BadRequestException,
+      );
     });
 
     it('rejects disallowed mime type', async () => {

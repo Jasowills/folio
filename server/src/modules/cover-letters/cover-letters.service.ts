@@ -1,7 +1,10 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
-import { CoverLetter, CoverLetterDocument } from './schemas/cover-letter.schema';
+import {
+  CoverLetter,
+  CoverLetterDocument,
+} from './schemas/cover-letter.schema';
 import { AiService } from '../ai/ai.service';
 import { COVER_LETTER_SYSTEM } from '../ai/prompts';
 import { ResumesService } from '../resumes/resumes.service';
@@ -39,7 +42,12 @@ export class CoverLettersService {
     tone: string = 'professional',
   ): Promise<CoverLetterDocument> {
     const { content } = await this.buildPromptAndStream(
-      userId, resumeId, jobTitle, company, jobDescription, tone,
+      userId,
+      resumeId,
+      jobTitle,
+      company,
+      jobDescription,
+      tone,
     );
 
     const letter = await this.coverLetterModel.create({
@@ -65,7 +73,12 @@ export class CoverLettersService {
     onChunk: (chunk: string, done: boolean) => void,
   ): Promise<void> {
     const { content } = await this.buildPromptAndStream(
-      userId, resumeId, jobTitle, company, jobDescription, tone,
+      userId,
+      resumeId,
+      jobTitle,
+      company,
+      jobDescription,
+      tone,
       (token) => onChunk(token, false),
     );
 
@@ -93,9 +106,12 @@ export class CoverLettersService {
   ): Promise<{ content: string }> {
     const resume = await this.resumesService.findById(resumeId, userId);
 
-    const resumeData = resume.toJSON()
-    const candidateName = resumeData.name || 'The candidate'
-    const toneLabel = tone === 'all' ? 'balanced — blend professional polish with confident directness and a warm, creative personality. Adjust formality to match the industry' : tone
+    const resumeData = resume.toJSON();
+    const candidateName = resumeData.name || 'The candidate';
+    const toneLabel =
+      tone === 'all'
+        ? 'balanced — blend professional polish with confident directness and a warm, creative personality. Adjust formality to match the industry'
+        : tone;
     const userPrompt = `Write a cover letter for ${candidateName} applying for a ${jobTitle} role at ${company}. Tone: ${toneLabel}.
 
 COMPANY (the company the candidate is applying to):
@@ -107,10 +123,7 @@ CANDIDATE'S RESUME (the candidate's own experience, skills, and projects — DO 
 Name: ${candidateName}
 ${JSON.stringify(resumeData)}`;
 
-    const stream = await this.aiService.stream(
-      COVER_LETTER_SYSTEM,
-      userPrompt,
-    );
+    const stream = await this.aiService.stream(COVER_LETTER_SYSTEM, userPrompt);
 
     const reader = stream.getReader();
     const decoder = new TextDecoder();
@@ -144,6 +157,7 @@ ${JSON.stringify(resumeData)}`;
     const result = await this.coverLetterModel
       .deleteOne({ _id: id, userId })
       .exec();
-    if (!result.deletedCount) throw new NotFoundException('Cover letter not found');
+    if (!result.deletedCount)
+      throw new NotFoundException('Cover letter not found');
   }
 }

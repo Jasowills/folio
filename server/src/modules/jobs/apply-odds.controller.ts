@@ -13,10 +13,7 @@ export class ApplyOddsController {
 
   @Get(':jobId/apply-odds')
   @ApiOperation({ summary: 'Get "should I even apply" assessment for a job' })
-  async getApplyOdds(
-    @Param('jobId') jobId: string,
-    @CurrentUser() user: any,
-  ) {
+  async getApplyOdds(@Param('jobId') jobId: string, @CurrentUser() user: any) {
     return this.oddsService.getOrCreate(user._id.toString(), jobId);
   }
 }

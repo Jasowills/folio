@@ -8,7 +8,11 @@ export class JobMatch {
   @Prop({ required: true, type: MongooseSchema.Types.ObjectId, ref: 'User' })
   userId!: Types.ObjectId;
 
-  @Prop({ required: true, type: MongooseSchema.Types.ObjectId, ref: 'JobListing' })
+  @Prop({
+    required: true,
+    type: MongooseSchema.Types.ObjectId,
+    ref: 'JobListing',
+  })
   jobListingId!: Types.ObjectId;
 
   @Prop({ required: true, type: MongooseSchema.Types.ObjectId, ref: 'Resume' })

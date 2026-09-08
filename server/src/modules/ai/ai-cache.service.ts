@@ -12,7 +12,9 @@ export class AiCacheService {
   private pending = new Map<string, Promise<Record<string, unknown>>>();
 
   makeKey(system: string, user: string, model: string): string {
-    return createHash('sha256').update(`sys:${system}|usr:${user}|mod:${model}`).digest('hex');
+    return createHash('sha256')
+      .update(`sys:${system}|usr:${user}|mod:${model}`)
+      .digest('hex');
   }
 
   get(key: string): Record<string, unknown> | null {

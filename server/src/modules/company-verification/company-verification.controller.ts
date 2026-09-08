@@ -2,7 +2,10 @@ import { Controller, Post, Get, Param, Body, UseGuards } from '@nestjs/common';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { CompanyVerificationService } from './company-verification.service';
-import type { CompanyVerificationInput, CompanyVerificationResult } from './company-verification.types';
+import type {
+  CompanyVerificationInput,
+  CompanyVerificationResult,
+} from './company-verification.types';
 
 @Controller('company-verification')
 @UseGuards(JwtAuthGuard)
