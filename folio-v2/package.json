@@ -1,0 +1,16 @@
+{
+  "name": "folio-v2",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Folio v2 — local-first agentic job-hunting harness + desktop client",
+  "packageManager": "pnpm@10.0.0",
+  "scripts": {
+    "harness:dev": "pnpm --filter @folio/harness repl",
+    "build": "pnpm -r build",
+    "typecheck": "pnpm -r typecheck",
+    "test": "pnpm -r test"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.3"
+  }
+}

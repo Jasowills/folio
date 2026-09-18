@@ -1,0 +1,31 @@
+{
+  "name": "@folio/harness",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "bin": {
+    "folio-harness": "./dist/bin/repl.js"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "repl": "tsx src/bin/repl.ts",
+    "test": "echo \"no tests yet\""
+  },
+  "dependencies": {
+    "@folio/resume-render": "workspace:*",
+    "@folio/resume-schema": "workspace:*",
+    "@folio/shared-types": "workspace:*",
+    "better-sqlite3": "^11.10.0",
+    "dotenv": "^17.4.2",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.13",
+    "@types/node": "^24.0.0",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.3"
+  }
+}

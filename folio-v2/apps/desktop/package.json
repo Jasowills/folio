@@ -1,0 +1,10 @@
+{
+  "name": "@folio/desktop",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "build": "echo \"Electron shell lands in Milestone 3\"",
+    "typecheck": "echo \"no sources yet\"",
+    "test": "echo \"no tests yet\""
+  }
+}
