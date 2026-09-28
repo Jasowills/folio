@@ -13,3 +13,5 @@ coverage/
 .crewel/
 adversary-results/
 adversary-*.mjs
+.impeccable/
+assets/plates/
